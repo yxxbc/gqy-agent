@@ -133,10 +133,6 @@ gqy web
 > [!NOTE]
 > 首次访问会提示登录内置初始账号（默认用户名与密码均为 `gqy`），创建属于你的管理员账号后，初始账号将自动删除。
 
-<div align="center">
-  <img src="pics/webui.png" alt="GQY WebUI Screenshot" width="800" />
-</div>
-
 ### 3. Shell 终端集成
 
 无需离开终端即可直接与 GQY 对话：
