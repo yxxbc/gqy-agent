@@ -1,0 +1,48 @@
+# Dependabot configuration file
+# Reference: https://docs.github.com/en/code-security/dependabot/dependabot-version-updates/configuration-options-for-the-dependabot.yml-file
+
+version: 2
+updates:
+  # 1. GitHub Actions 工作流依赖更新
+  - package-ecosystem: "github-actions"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+      day: "monday"
+      time: "03:00"
+      timezone: "Asia/Shanghai"
+    open-pull-requests-limit: 10
+    commit-message:
+      prefix: "ci"
+      include: "scope"
+    labels:
+      - "dependencies"
+      - "github-actions"
+    groups:
+      github-actions:
+        patterns:
+          - "*"
+
+  # 2. Rust (Cargo) 依赖更新
+  - package-ecosystem: "cargo"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+      day: "monday"
+      time: "03:00"
+      timezone: "Asia/Shanghai"
+    open-pull-requests-limit: 10
+    commit-message:
+      prefix: "deps"
+      prefix-development: "deps(dev)"
+      include: "scope"
+    labels:
+      - "dependencies"
+      - "rust"
+    groups:
+      minor-and-patch:
+        patterns:
+          - "*"
+        update-types:
+          - "minor"
+          - "patch"

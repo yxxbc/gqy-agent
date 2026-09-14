@@ -86,7 +86,11 @@
 git clone https://github.com/yxxbc/gqy-agent.git
 cd gqy-agent
 
-# 2. 编译主程序 (只生成 gqy)
+# 2. 修改默认人格提示词
+cd src/prompts/
+vim gqy.md
+
+# 3. 编译主程序 (只生成 gqy)
 cargo build --release
 
 # (可选) 编译带语音特性的版本 (额外生成 gqy-voice，链接 sherpa-onnx)
