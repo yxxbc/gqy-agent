@@ -44,7 +44,7 @@ md-5 = "0.10"
 futures-util = "0.3"
 flate2 = "1.0"
 fuzzy-matcher = "0.3"
-fancy-regex = "0.17"
+fancy-regex = "0.19"
 fst = "0.4"
 fontdb = { version = "0.23", default-features = false, features = ["std", "fs", "memmap"] }
 if-addrs = "0.13"
