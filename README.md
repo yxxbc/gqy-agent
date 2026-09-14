@@ -1,325 +1,221 @@
+<div align="center">
+
+<img src="pics/gqy-logo.png" alt="GQY Logo" width="160" />
+
+# GQY (顾清影)
+
+**活在终端里的二次元 AI 伴侣 · 开箱即用 · 双模式设计 · 多端接入**
+
+*A lightweight, terminal-first anime AI assistant built with Rust.*
+
 <p align="center">
-  <img src="pics/gqy-logo.png" alt="GQY" width="180">
+  <a href="https://github.com/yxxbc/gqy-agent"><img src="https://img.shields.io/badge/version-0.6.0-blue.svg?style=flat" alt="Version"></a>
+  <a href="https://www.rust-lang.org/"><img src="https://img.shields.io/badge/rust-1.89+-DEA584.svg?style=flat&logo=rust&logoColor=white" alt="Rust Version"></a>
+  <a href="LICENSE"><img src="https://img.shields.io/badge/license-MIT-green.svg?style=flat" alt="License"></a>
+  <img src="https://img.shields.io/badge/platform-Linux%20%7C%20macOS-informational.svg?style=flat" alt="Platform">
 </p>
 
-# GQY
+<img src="pics/gqy-tui.png" alt="GQY TUI Screenshot" width="850" />
 
-一个活在终端里的二次元少女。开箱即用的开源 AI 助手，支持接入通讯平台。
-- 默认人格是GQY，gqy的命令是基于[shorin/miyu-agent](https://github.com/SHORiN-KiWATA/miyu-agent)二改而来。
+</div>
 
->暂时
+---
 
-## 谁是 顾清影？
+## 📑 目录
 
-顾清影 是从我曾经很喜欢的动画中的角色身上汲取灵感制作的虚构角色。
+- [📖 项目简介](#-项目简介)
+- [✨ 核心特性](#-核心特性)
+- [🚀 快速开始](#-快速开始)
+  - [环境准备](#环境准备)
+  - [从源码构建](#从源码构建)
+  - [初始化与启动](#初始化与启动)
+- [🕹️ 交互模式](#️-交互模式)
+  - [1. 终端 TUI / REPL](#1-终端-tui--repl)
+  - [2. 局域网 WebUI](#2-局域网-webui)
+  - [3. Shell 终端集成](#3-shell-终端集成)
+  - [4. 本地离线语音 (Voice)](#4-本地离线语音-voice)
+- [⚙️ 配置与个性化](#️-配置与个性化)
+- [📦 数据迁移与备份](#-数据迁移与备份)
+- [💖 致谢与鸣谢](#-致谢与鸣谢)
+- [📄 开源协议](#-开源协议)
 
-## 有什么功能？
+---
 
-`gqy` 由大模型驱动，默认接入了 [opencode](https://github.com/anomalyco/opencode) 的公共模型服务，你也可以配置自己的大模型服务。
+## 📖 项目简介
 
-`gqy` 拥有两个模式
+**GQY（顾清影）** 是一款以 Rust 编写的高性能、轻量级 AI 智能体应用。
 
-- Normal 普通模式
-  
-  拥有全部功能和工具，可以完成角色扮演、游戏娱乐、系统排障、天气查询、汇率换算、二手市场行情查询等日用场景。
+> 💡 **角色背景**：「顾清影」最初源于作者高中时期接触 AI 时由 `Gemini-2.5-pro` 生成的虚构角色。现在，她化身为你系统中的常驻 AI 伴侣——既能在日常对话中提供贴心陪伴与生活辅助，也能在编码排障时切换为高效纯粹的开发者助手。
 
-- Dev 开发模式
+本项目基础架构与命令系统基于 [shorin/miyu-agent 0.6.0](https://github.com/SHORiN-KiWATA/miyu-agent) 进行深度重构与二改开发。
 
-  和普通模式隔离，移除所有和开发无关的功能和工具，通过极简设计最大限度发挥模型自身的能力。
+---
 
-`gqy` 可以与 `fish`、`zsh`、`bash` 集成，终端打字直接无缝对话！
+## ✨ 核心特性
 
-![](./pics/shell-init.png)
+- 🎭 **双模式架构设计**
+  - **Normal（普通模式）**：全功能与工具链开放，包含角色扮演、情感互动、游戏娱乐、天气汇率查询及日常生活辅助。
+  - **Dev（开发模式）**：彻底隔离非开发工具与冗余提示词，以极简设计最大化释放大语言模型自身的代码推理与工程排障能力。
+- 🧠 **灵活的模型生态**
+  - 广泛兼容主流 OpenAI / Anthropic 协议中转。
+  - 支持调用本地模型环境（如 `Claude Code`、`agy`、`codex`）。
+  - 内置多档位模型池路由（Lite / Cheap / Standard / Flagship）。
+- 🎙️ **端侧离线语音支持**
+  - 搭载 **SenseVoice** 本地离线语音识别（零数据上传，彻底保护隐私）。
+  - 支持常驻低功耗麦克风唤醒词监听、桌面通知提醒与 MiniMax / 小米 MiMo 语音合成（TTS）。
+- 💾 **长期记忆与知识沉淀**
+  - 具备好感度/情绪机制、会话联想注入与回合后经历/日记归档。
+  - 结合本地 ONNX Runtime 向量模型实现本地离线知识库检索（RAG）。
+- 🛠️ **完善的工具与插件生态**
+  - 内置 MCP 客户端、异步命令与后台任务管理、文件 Patch 工具、定时闹钟、Web 抓取与图像生成等。
 
-有终端交互模式
+---
 
-![](./pics/REPL.png)
+## 🚀 快速开始
 
-自带了 TUI 方便修改配置。
+### 环境准备
 
+- **Rust 工具链**：1.89 及以上版本（附带 `cargo`）
+- **操作系统**：Linux / macOS
+- *(推荐)* **终端模拟器**：[Kitty](https://sw.kovidgoyal.net/kitty/)（可获得最佳的终端图文渲染体验）
+
+### 从源码构建
+
+```bash
+# 1. 克隆代码仓库
+git clone https://github.com/yxxbc/gqy-agent.git
+cd gqy-agent
+
+# 2. 编译主程序 (只生成 gqy)
+cargo build --release
+
+# (可选) 编译带语音特性的版本 (额外生成 gqy-voice，链接 sherpa-onnx)
+cargo build --release --features voice
 ```
+
+> [!TIP]
+> 编译完成后，建议将 `target/release/gqy`（以及可选的 `gqy-voice`）放置在相同的系统 `PATH` 路径下（如 `~/.local/bin` 或 `/usr/local/bin`）。GQY 守护进程启动时会自动在同级目录寻找 `gqy-voice`。
+
+### 初始化与启动
+
+```bash
+# 初始化配置与状态数据文件
+gqy init
+
+# 启动后台守护进程 (首次运行也会自动执行初始化)
+gqy daemon start
+
+# 查看 CLI 完整帮助
+gqy -h
+```
+
+---
+
+## 🕹️ 交互模式
+
+GQY 提供了多样化的交互方式，无缝融入日常工作流：
+
+### 1. 终端 TUI / REPL
+
+```bash
+gqy        # 进入 Normal 普通模式 REPL
+gqy dev    # 进入 Dev 极简开发模式 REPL
+```
+
+### 2. 局域网 WebUI
+
+轻量响应式 Web 操作界面，便于手机、平板或其他局域网设备接入：
+
+```bash
+gqy web
+```
+
+> [!NOTE]
+> 首次访问会提示登录内置初始账号（默认用户名与密码均为 `gqy`），创建属于你的管理员账号后，初始账号将自动删除。
+
+<div align="center">
+  <img src="pics/webui.png" alt="GQY WebUI Screenshot" width="800" />
+</div>
+
+### 3. Shell 终端集成
+
+无需离开终端即可直接与 GQY 对话：
+
+```bash
+# 生成并配置 zsh 集成脚本
+gqy zsh-init
+```
+
+- **zsh**：提供无缝嵌入式对话支持。
+- **fish / bash**：支持单行快速问答。
+
+### 4. 本地离线语音 (Voice)
+
+在配置中开启「语音功能」后，Daemon 会自动拉起独立的 `gqy-voice` 常驻进程：
+
+- **语音唤醒**：呼叫唤醒词（默认 *清影* / *顾清影* / *清影清影*） $\rightarrow$ 提示音 + 桌面通知 $\rightarrow$ 说出指令 $\rightarrow$ 执行并播报回复摘要。
+- **本地听写**：REPL 中执行 `/stt`、命令行输入 `gqy stt` 或点击 WebUI 麦克风均可快速听写。
+- **快捷收听**：支持通过 `gqy listen` 绑定全局快捷键一键唤起。
+- 更多详细配置请参阅 [`docs/voice.md`](docs/voice.md)。
+
+---
+
+## ⚙️ 配置与个性化
+
+运行以下命令调出可视化的交互式配置终端（TUI）：
+
+```bash
 gqy config
 ```
 
-![](./pics/tui.png)
+- **供应商与模型设置**：默认提供 opencode 公共 API，推荐配置个人 API 密钥以获得更稳定的服务体验。
+- **自定义提示词与人设**：支持在「自定义提示词」中创建专属 AI 人格，并可设置「用户身份」使对话体验更加贴合个人喜好。
 
-还有 WebUI 
+---
 
-![](./pics/webui.png)
+## 📦 数据迁移与备份
 
-还可以接入 QQ，远程操作电脑；亦或是加入群聊，陪网友吹水，帮助你管理群聊。
-
-![](./pics/qq私聊.png)
-
-
-## 如何安装？
-
-- Arch Linux
-
-  ```
-  yay -S gqy
-  ```
-
-  语音唤醒和本地语音识别是可选组件，单独打成 `gqy-voice` 包（依赖 `gqy`，大约 30MB，不装不影响其他功能）：
-
-  ```
-  yay -S gqy-voice
-  ```
-
-  装好后运行 `gqy config`，在「全局设置」里开启「语音功能」，daemon 会自动拉起 `gqy-voice` 进程。
-
-- 从源码构建
-
-  ```
-  git clone https://github.com/SHORiN-KiWATA/miyu-agent.git
-  cd miyu-agent
-  cargo build --release                    # 只出 gqy
-  cargo build --release --features voice   # 再出 gqy-voice(可选,链接 sherpa-onnx)
-  ```
-
-  源码构建时把 `target/release/gqy`（以及可选的 `gqy-voice`）放到同一个 `PATH` 目录里即可，daemon 在主程序同目录寻找 `gqy-voice`。
-
-安装完成后可以运行 `gqy init` 初始化配置和状态文件；也可以直接运行 `gqy daemon start`，首次启动会自动初始化。查看完整帮助信息可以运行 `gqy -h`。
-
-## 三种触发
-
-> 与 `gqy` 运行最适配的是 `kitty`终端
-
-- REPL TUI
-
-  裸 `gqy` 进入普通模式的 REPL； `gqy dev` 进入开发预设的 REPL。
-
-- webui 局域网网页
-
-  ```
-  gqy web
-  ```
-  第一次进入会提示登录内置账号后创建管理员账户，内置账户的用户名和密码都是 gqy，创建管理员账户后内置账户自动删除。
-
-- shell hook 终端集成
-
-  最好的集成效果要求使用 `fish`，`zsh` 和`bash` 只能做到单行对话，`fish` 可以完整无缝集成。
-  
-  ```
-  gqy fish-init
-  ```
-  初始化后可以直接在终端打字对话。
-
-- 语音唤醒(可选,需装 `gqy-voice`)
-
-  设置里开启「语音功能」后 daemon 会拉起独立的 `gqy-voice` 进程常开麦克风:
-  喊唤醒词(默认「未有未有 / 密友密友 / gqygqy / みゆみゆ」)→ 提示音 + 桌面通知「在听」→ 说指令 → 执行完
-  提示音 + 通知回复摘要。识别全在本机(SenseVoice,不联网);不开语音时零占用。
-  REPL 里 `/stt`、终端 `gqy stt`、WebUI 麦克风按钮可用同一套识别做听写。
-  可选回复播报(MiniMax / 小米 MiMo 语音合成);`gqy listen` 绑快捷键一键收听(再按一次关闭)。
-  详见 `docs/voice.md`。
-
-## 重要配置调整
-
-运行 `gqy config` 命令打开配置 TUI。
-
-- 供应商和模型
-
-  `gqy` 默认使用 opencode 的公共 API，推荐配置自己的 API。
-
-- 自定义提示词
-
-  `gqy`的默认提示词是无法修改的。你可以在`自定义提示词`中新建属于自己的 AI 人格，还可以配置 `用户身份` 让对话更加沉浸。 
-
-## 搬到另一台机器
-
-`gqy export` 把当前安装打成一个 `.tar.gz`（权限 0600），`gqy import` 在新机器上还原：
+GQY 提供便捷的打包与迁移指令，支持一键备份至 `.tar.gz` 文件（文件权限默认设为 `0600`）：
 
 ```bash
-gqy export                      # 配置、会话历史、记忆、知识库原文、用户资源
-gqy export --index --platforms  # 额外带上向量索引与平台聊天历史
-gqy export --no-secrets         # 清空 API key 与令牌，导入后自行补填
-gqy export --dry-run            # 只看清单与体积，不写文件
+# 导出当前数据
+gqy export                      # 导出基础配置、会话历史、记忆与知识库原文
+gqy export --index --platforms  # 额外导出向量索引与外部平台聊天历史
+gqy export --no-secrets         # 过滤 API Key 与令牌（推荐用于公开分享配置）
+gqy export --dry-run            # 演练预览：仅检查打包清单与文件体积，不实际写入
 
-gqy daemon stop                 # daemon 占着数据库，导入前必须停
-gqy import gqy-export-*.tar.gz
+# 在新设备上导入数据
+gqy daemon stop                 # 导入前必须先停止正在占用数据库的 daemon
+gqy import gqy-export-*.tar.gz  # 执行导入还原
 ```
 
-默认**不含**知识库向量索引（很大，且 `gqy kb embed` 可重建）、缓存、日志和其他一次性的本机状态。密钥默认带上并在导出时警告——归档是明文的，别随手发出去。
+> [!WARNING]
+> 默认导出的归档文件中包含明文 API 密钥与令牌，请妥善保管归档文件，避免泄露至公开环境。
 
-## 内置插件
+---
 
-<details><summary>[展开/收起] 具体介绍</summary>
-<br>
+## 💖 致谢与鸣谢
 
-- 表情包
-  
-  表情包毫无疑问是聊天时最重要的部分，在对话时，顾清影 会根据情景自主发送符合情境的表情包。除了自主发送，设置里还可以设置概率、置信度和冷却时间。
-
-  ![](./pics/nvidiafuckyou.png)
-
-  顾清影 自带了一些表情，存放在`/usr/share/gqy`，对应的用户空间目录位于`~/.gqy/data`。表情库是跟随人格的，如果你在设置里新建了自己的人格，那么就无法使用 顾清影 的默认表情。你可以准备一些图片，把路径给 Ai，让其保存到表情库。届时会自动调用识图模型对图片进行分析并保存。顾清影 默认使用 opencode 公共模型服务中的多模态模型进行识图，所以即使不配置自己的多模态模型也可以看图片。
-
-- 玄学算命
-
-  >心理学。
-  
-  算命就像看天气预报一般稀松平常。顾清影 自带了周易六十四卦、吉凶占、塔罗牌抽取等玄学功能。
-
-  ![](./pics/玄学.png)
-
-  ![](./pics/吉凶占.png)
-
-- 投骰子
-
-  >赌！
-
-  闲来无事可以和 AI 比比大小。
-
-  ![](./pics/骰子.png)
-
-- 闹钟
-
-  >要我说，这比GNOME时钟的闹钟好用多了
-  
-  顾清影 自带了闹钟，日常泡泡面、番茄钟学习、计时任务什么的都很实用。内置了闹钟音频，你还可以通过路径传入你想要在到点后播放的“闹钟”。
-
-  ![](./pics/set_alarm.png)
-
-- 知识库
-
-  顾清影 自带了 [ShorinWiki](https://github.com/SHORiN-KiWATA/Shorin-ArchLinux-Guide) 中的内容和一些日用 Linux 会遇到的问题作为默认知识库。
-
-  当然，你也可以通过 `gqy kb` 命令，或者通过跟 AI 的自然语言交互管理属于你自己的知识库。
-
-  ![](./pics/kb.png)
-
-- ProtonDB 查询
-
-  可以查询 ProtonDB 上的游戏信息和相应的评论，为 Linux 玩游戏提供参考建议。
-
-- Linux 游戏兼容性调查
-
-  >这个游戏 Linux 能玩吗？
-
-  这是桌面端使用 Linux 的日经问题，顾清影 会去 [ProtonDB](https://www.protondb.com/)、[Are We Anti-Cheat Yet?](https://areweanticheatyet.com/)、[Can I Play On Linux](https://caniplayonlinux.com/)等 Linux游戏兼容性资讯网站获取主要信息，辅以社区玩家的声音，综合判断一款游戏的兼容性并提出建议和注意事项。
-
-  ![](./pics/gaming.png)
-
-- 网络搜索
-
-  即使不配置网络搜索 API，顾清影 也仍然拥有基础的网络搜索和网页读取能力：未配置任何搜索服务时会优先使用 Exa 的免 key 公共额度（每日限量，报错或超额后自动冷却并回退到内置爬虫搜索）。可以在插件配置中设置 Tavily、Firecrawl 、AnySearch、Exa、SearXNG 等网络搜索 API 以获得更佳的搜索效果。
-
-  ![](./pics/web-search-config.png)
-
-- 搜图
-
-  顾清影 还能帮你找图片喔！搜图会根据网络环境并行使用多个来源，并通过视觉模型筛选相关且安全的结果。图片会默认保存至`~/.gqy/data/pictures/web-images`。
-
-  >NSFW 禁止！
-
-  ![](./pics/搜图.png)
-
-- 生图
-
-  支持 OpenAI 的画图服务喔。图片会默认保存至`~/.gqy/data/pictures/generated-images`。
-
-  >这个功能默认用不了，要自己在插件设置里开启并配置 API
-
-  ![](./pics/生图.png)
-
-- 天气查询
-
-  查询天气是每天的必做活动，当然少不了。
-
-  ![](./pics/weather.png)
-
-- 汇率查询
-
-  国际社会，查个汇率也很合理吧？
-
-  ![](./pics/汇率.png)
-
-- Man 手册查询
-
-  >Man！
-
-  专门的手册查询工具，虽然网络搜索也能做到，但这值得做成单独的插件。
-  
-  ![](./pics/man.png)
-
-- Arch Linux相关
-
-  Arch Linux 是桌面 Linux 的热门之选，顾清影 有一系列插件可以帮助提高 Arch Linux 的日用体验。
-
-  - AUR 状态查询
-
-    >AUR 还在被 DDos 吗！
-
-    AUR 的状态是日用 Arch 时的重要信息之一，不访问网站就能查询的话，在 AUR 安装出现异常时查起来会方便很多。
-
-    ![](./pics/aur-status.png)
-
-  - AUR 包查询
-
-    可以查询 AUR 上的包的具体信息
-
-  - Arch Wiki 查询
-
-    作为 “Linux 圣经”，查询 Arch Wiki 不仅能提高日用 Arch 的体验，对其他发行版也大有裨益。
-
-    ![](./pics/archwiki.png)
-
-  - PKGBUILD 审查（Arch Linux 插件的一部分）
-
-    AUR 投毒的事件搞得人心惶惶，但现在，顾清影 可以帮忙审查 PKGBUILD 啦！审查通过且你确认后才会安装。
-
-    ![](./pics/pkgbuild审核.png)
-
-- 文件操作
-
-  >自不必说。
-
-  顾清影 支持读写文件、搜索内容、查找文件、删除文件等。
-
-- 计算器和哈希编解码
-
-  为了计算结果的准确性，顾清影 自带了科学计算器和哈希编解码的能力。
-
-  ![](./pics/hash.png)
-
-- 记忆系统
-
-  顾清影 的记忆分为短期日记、长期日记和知识点。每个成功完成的对话轮次会立即写入短期日记；同一人格累计 14 条未整理日记后，由独立后台线程并行提炼长期知识点和有回溯价值的长期经历，不会阻塞正常回复。成功整理的短期日记默认保留 14 天，每次有效联想会刷新保留时间；召回达到 3 次时会立即进入长期化整理。尚未成功整理的原文超期后会退出自动联想但不会丢失，后台仍可继续整理；整理成功后再物理清理。已经长期化的日记不再刷新短期原文的清理时间。
-
-  联想会同时检索三类记忆，并使用 `jieba-rs` 中文分词进行低成本匹配。Embedding 后续可以作为可选辅助接入，但不是记忆系统运行的前提。长期知识点和长期日记会随时间衰减为“已遗忘”，不物理删除；显式搜索仍可找回。
-
-  `/reset` 只清理当前会话，不删除人格记忆；终端或 WebUI 的 `/reset all` 会清空当前人格的短期日记、长期日记、知识点、修订记录和待整理状态。主体记忆在一个事务中清理，淘汰上下文随后独立清理。即使后台模型当时正在整理，旧结果也会因数据库身份或记忆代数变化而被拒绝，不能在清理后重新写回；重置前已经启动的其他会话也不能再写入旧日记。
-
-  ![](./pics/记忆.png)
-
-- Fcitx5 wiki 查询
-
-  阅读 Fcitx5 wiki，为输入法问题提供参考。
-
-</details>
-
-## 致谢
-
-#### 功能参考
-
-- [Opencode](https://github.com/anomalyco/opencode) 
+### 功能与架构参考
+- [shorin/miyu-agent](https://github.com/SHORiN-KiWATA/miyu-agent) - 核心基础与架构演进
+- [Opencode](https://github.com/anomalyco/opencode)
 - [Claude Code](https://github.com/anthropics/claude-code)
 - [Pi](https://github.com/earendil-works/pi)
 - [Deepseek-Reasonix](https://github.com/esengine/deepseek-reasonix)
-- [Deeepseek-Harness](https://github.com/deepseek-ai/deepseek-harness)
-- [Astrbot](https://github.com/AstrBotDevs/AstrBot) 
-- [NapCatQQ](https://github.com/NapNeko/NapCatQQ) 
+- [Deepseek-Harness](https://github.com/deepseek-ai/deepseek-harness)
+- [AstrBot](https://github.com/AstrBotDevs/AstrBot)
+- [NapCatQQ](https://github.com/NapNeko/NapCatQQ)
 
-#### 插件设计参考
-
+### 插件与设计参考
 - [Yue-bin/astrbot_plugin_maskoff](https://github.com/Yue-bin/astrbot_plugin_maskoff)
-- [nuomicici/astrbot_plugin_GroupMemberQuery](nuomicici/astrbot_plugin_GroupMemberQuery)
-- [advent259141/Astrbot_plugin_Heartflow](advent259141/Astrbot_plugin_Heartflow)
-- [Railgun19457/astrbot_plugin_image_generation](Railgun19457/astrbot_plugin_image_generation)
-- [xiewoc/astrbot_plugin_weather_wttr_in](xiewoc/astrbot_plugin_weather_wttr_in)
-- [muyouzhi6/astrbot_plugin_recall_cancel](muyouzhi6/astrbot_plugin_recall_cancel)
+- [nuomicici/astrbot_plugin_GroupMemberQuery](https://github.com/nuomicici/astrbot_plugin_GroupMemberQuery)
+- [advent259141/Astrbot_plugin_Heartflow](https://github.com/advent259141/Astrbot_plugin_Heartflow)
+- [Railgun19457/astrbot_plugin_image_generation](https://github.com/Railgun19457/astrbot_plugin_image_generation)
+- [xiewoc/astrbot_plugin_weather_wttr_in](https://github.com/xiewoc/astrbot_plugin_weather_wttr_in)
+- [muyouzhi6/astrbot_plugin_recall_cancel](https://github.com/muyouzhi6/astrbot_plugin_recall_cancel)
 
-## 许可
+---
 
-顾清影 使用 MIT License 发布，见 `LICENSE`。
+## 📄 开源协议
+
+本项目采用 [MIT License](LICENSE) 协议开源。
