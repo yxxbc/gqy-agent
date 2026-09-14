@@ -40,7 +40,7 @@ image = { version = "0.25", default-features = false, features = ["bmp", "gif", 
 json_comments = "0.2"
 markup5ever_rcdom = "0.38"
 # 快递 100 的请求签名是 MD5(param + key + customer)——只当摘要用,不是安全原语。
-md-5 = "0.10"
+md-5 = "0.11"
 futures-util = "0.3"
 flate2 = "1.0"
 fuzzy-matcher = "0.3"
