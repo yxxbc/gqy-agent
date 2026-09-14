@@ -47,7 +47,7 @@ fuzzy-matcher = "0.3"
 fancy-regex = "0.19"
 fst = "0.4"
 fontdb = { version = "0.23", default-features = false, features = ["std", "fs", "memmap"] }
-if-addrs = "0.13"
+if-addrs = "0.15"
 libc = "0.2"
 pulldown-cmark = { version = "0.13.4", default-features = false }
 # Local embedding inference. ONNX Runtime is loaded at runtime from the system
