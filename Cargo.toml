@@ -57,7 +57,7 @@ pulldown-cmark = { version = "0.13.4", default-features = false }
 ort = { version = "2.0.0-rc.13", default-features = false, features = ["load-dynamic", "std"] }
 tokenizers = { version = "0.23", default-features = false, features = ["fancy-regex"] }
 reqwest = { version = "0.12", default-features = false, features = ["blocking", "json", "multipart", "rustls-tls", "stream", "gzip", "deflate"] }
-ratatui = { version = "0.29", default-features = false, features = ["crossterm", "unstable-rendered-line-info"] }
+ratatui = { version = "0.30", default-features = false, features = ["crossterm", "unstable-rendered-line-info"] }
 rand = "0.8"
 rpassword = "7.4"
 rodio = { version = "0.19", default-features = false, features = ["mp3", "wav"] }
