@@ -169,14 +169,64 @@ pub(in crate::cli) fn url_at(spans: &[AnsiSpan], column: u16) -> Option<String> 
     (token.starts_with("http://") || token.starts_with("https://")).then(|| token.to_string())
 }
 
-/// 交给桌面去开。开不了就算了——为了一个链接把整个界面弄崩没道理。
-pub(in crate::cli) fn open_url(url: &str) {
-    let _ = std::process::Command::new("xdg-open")
-        .arg(url)
+/// 本平台「交给桌面打开」的命令。以前写死 `xdg-open`,macOS 上没有这个
+/// 命令,spawn 失败被吞掉,界面照样提示「正在打开链接」却什么也没发生。
+fn url_opener(url: &str) -> (&'static str, Vec<String>) {
+    if cfg!(target_os = "macos") {
+        ("open", vec![url.to_string()])
+    } else if cfg!(target_os = "windows") {
+        // `start` 的第一个带引号参数是窗口标题,留空,否则 URL 会被当标题吃掉。
+        (
+            "cmd",
+            vec!["/C".into(), "start".into(), String::new(), url.to_string()],
+        )
+    } else {
+        ("xdg-open", vec![url.to_string()])
+    }
+}
+
+/// 交给桌面去开,返回有没有成功拉起打开命令。开不了只提示,不让界面崩。
+pub(in crate::cli) fn open_url(url: &str) -> bool {
+    let (program, args) = url_opener(url);
+    match std::process::Command::new(program)
+        .args(&args)
         .stdin(std::process::Stdio::null())
         .stdout(std::process::Stdio::null())
         .stderr(std::process::Stdio::null())
-        .spawn();
+        .spawn()
+    {
+        Ok(mut child) => {
+            // 打开命令转手给桌面后很快退出;收掉它,免得全屏会话期间留僵尸进程。
+            std::thread::spawn(move || {
+                let _ = child.wait();
+            });
+            true
+        }
+        Err(error) => {
+            tracing::warn!(%error, program, "failed to launch URL opener");
+            false
+        }
+    }
+}
+
+#[cfg(test)]
+mod opener_tests {
+    use super::url_opener;
+
+    #[test]
+    fn url_opener_uses_the_platform_command() {
+        let url = "https://example.com/a?b=1";
+        let (program, args) = url_opener(url);
+        let expected = if cfg!(target_os = "macos") {
+            "open"
+        } else if cfg!(target_os = "windows") {
+            "cmd"
+        } else {
+            "xdg-open"
+        };
+        assert_eq!(program, expected);
+        assert_eq!(args.last().map(String::as_str), Some(url));
+    }
 }
 
 impl Screen {

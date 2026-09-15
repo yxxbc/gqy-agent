@@ -1141,9 +1141,13 @@ impl super::LiveReplTail {
                             .map(|screen| screen.view_row(row))
                             .and_then(|spans| super::screen::select::url_at(&spans, column))
                         {
-                            super::screen::select::open_url(&url);
+                            let opened = super::screen::select::open_url(&url);
                             if let Some(screen) = &mut self.screen {
-                                screen.toast(crate::i18n::text("opening link", "正在打开链接"));
+                                screen.toast(if opened {
+                                    crate::i18n::text("opening link", "正在打开链接")
+                                } else {
+                                    crate::i18n::text("could not open link", "无法打开链接")
+                                });
                             }
                             self.repaint_screen()?;
                             return Ok(true);
