@@ -28,9 +28,9 @@ Rust 官方没有文件行数规范，clippy 的 `too_many_lines` 管的是函�
 
 ## 用法
 
-    python3 scripts/refactor_size_report.py                 # 只报告
-    python3 scripts/refactor_size_report.py --write-baseline # 记录基线
-    python3 scripts/refactor_size_report.py --check          # 门禁（CI 用）
+    python3 test_scripts/refactor_size_report.py                 # 只报告
+    python3 test_scripts/refactor_size_report.py --write-baseline # 记录基线
+    python3 test_scripts/refactor_size_report.py --check          # 门禁（CI 用）
 
 `--check` 的失败条件（都只针对**恶化**，不要求一次达标）：
 

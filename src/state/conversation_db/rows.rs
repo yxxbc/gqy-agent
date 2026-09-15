@@ -43,39 +43,47 @@ pub fn interrupted_text() -> &'static str {
     INTERRUPTED_TEXT
 }
 
+/// `map_turn_row` 读的列。映射按列名取值，所以这里的顺序无关紧要；加一列
+/// 只需改这张清单和下面的映射，不会让其后的字段错位。
+pub(crate) const TURN_COLUMNS: &str = "turn_id, seq, user_content, display_content, user_timestamp, assistant_content, assistant_reasoning, assistant_provider_id, assistant_model, assistant_timestamp, status, tool_reports, hidden, is_summary, owner_pid, token_total, token_usage_estimated, revision, context_messages, token_prompt, token_cache_read, tool_flow";
+
 pub(crate) fn map_turn_row(row: &rusqlite::Row) -> rusqlite::Result<Turn> {
-    let tool_reports_json: String = row.get(11)?;
+    let tool_reports_json: String = row.get("tool_reports")?;
     let tool_reports: Vec<String> = serde_json::from_str(&tool_reports_json).unwrap_or_default();
-    let context_messages_json: String = row.get::<_, Option<String>>(18)?.unwrap_or_default();
+    let context_messages_json: String = row
+        .get::<_, Option<String>>("context_messages")?
+        .unwrap_or_default();
     let context_messages: Vec<ChatMessage> =
         serde_json::from_str(&context_messages_json).unwrap_or_default();
-    let tool_flow_json: String = row.get::<_, Option<String>>(21)?.unwrap_or_default();
+    let tool_flow_json: String = row
+        .get::<_, Option<String>>("tool_flow")?
+        .unwrap_or_default();
     let tool_flow: Vec<ToolFlowRound> = serde_json::from_str(&tool_flow_json).unwrap_or_default();
     Ok(Turn {
-        turn_id: row.get(0)?,
-        seq: row.get(1)?,
-        user_content: row.get(2)?,
-        display_content: row.get(3)?,
-        user_timestamp: row.get(4)?,
-        assistant_content: row.get(5)?,
-        assistant_reasoning: row.get(6)?,
-        assistant_provider_id: row.get(7)?,
-        assistant_model: row.get(8)?,
-        assistant_timestamp: row.get(9)?,
-        status: TurnStatus::from_str(row.get::<_, String>(10)?.as_str()),
+        turn_id: row.get("turn_id")?,
+        seq: row.get("seq")?,
+        user_content: row.get("user_content")?,
+        display_content: row.get("display_content")?,
+        user_timestamp: row.get("user_timestamp")?,
+        assistant_content: row.get("assistant_content")?,
+        assistant_reasoning: row.get("assistant_reasoning")?,
+        assistant_provider_id: row.get("assistant_provider_id")?,
+        assistant_model: row.get("assistant_model")?,
+        assistant_timestamp: row.get("assistant_timestamp")?,
+        status: TurnStatus::from_str(row.get::<_, String>("status")?.as_str()),
         tool_reports,
         tool_flow,
         question_exchanges: Vec::new(),
         followups: Vec::new(),
         attachments: Vec::new(),
-        hidden: row.get::<_, i64>(12)? != 0,
-        is_summary: row.get::<_, i64>(13)? != 0,
-        owner_pid: row.get(14)?,
-        token_total: row.get::<_, i64>(15)?.max(0) as u64,
-        token_prompt: row.get::<_, i64>(19)?.max(0) as u64,
-        token_cache_read: row.get::<_, i64>(20)?.max(0) as u64,
-        token_usage_estimated: row.get::<_, i64>(16)? != 0,
-        revision: row.get(17)?,
+        hidden: row.get::<_, i64>("hidden")? != 0,
+        is_summary: row.get::<_, i64>("is_summary")? != 0,
+        owner_pid: row.get("owner_pid")?,
+        token_total: row.get::<_, i64>("token_total")?.max(0) as u64,
+        token_prompt: row.get::<_, i64>("token_prompt")?.max(0) as u64,
+        token_cache_read: row.get::<_, i64>("token_cache_read")?.max(0) as u64,
+        token_usage_estimated: row.get::<_, i64>("token_usage_estimated")? != 0,
+        revision: row.get("revision")?,
         journal_events: Vec::new(),
         context_messages,
     })

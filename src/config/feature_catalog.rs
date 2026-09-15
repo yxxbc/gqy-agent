@@ -18,46 +18,22 @@
 //! （= 以后装进来的也自动可见），只有关过东西、或自定义人格勾了内置件才写明细。
 
 use super::persona_manifest::{PersonaManifest, PLUGIN_IDS};
+use super::plugin_catalog::{plugin_info, PLUGINS};
 
-/// 引导里给开关的内置插件。其余 `PLUGIN_IDS` 一律常开、不摆出来。
-pub const TOGGLE_PLUGINS: &[&str] = &[
-    "alarm",
-    "exchange_rate",
-    "archlinux",
-    "api_quota",
-    "memes",
-    "image_generation",
-    "ledger",
-];
+/// 引导里给开关的内置插件(插件目录里 `toggle` 的那几行)。其余一律常开、不摆出来。
+pub use super::plugin_catalog::TOGGLE_PLUGINS;
 
 /// 引导里不摆开关、永远开着的插件 id。
 pub fn always_on_plugins() -> impl Iterator<Item = &'static str> {
-    PLUGIN_IDS
+    PLUGINS
         .iter()
-        .copied()
-        .filter(|id| !TOGGLE_PLUGINS.contains(id))
+        .filter(|plugin| !plugin.toggle)
+        .map(|plugin| plugin.id)
 }
 
-/// 插件 id → (显示名, 一句话说明)。WebUI 与终端引导共用。
+/// 插件 id → (显示名, 一句话说明)。WebUI 与终端引导共用;未知 id 给空串。
 pub fn plugin_label(id: &str) -> (&'static str, &'static str) {
-    match id {
-        "files" => ("文件", "读写工作区文件"),
-        "usage_query" => ("用量查询", "对话里问用了多少 token"),
-        "alarm" => ("闹钟", "定时提醒"),
-        "exchange_rate" => ("汇率", "货币换算"),
-        "archlinux" => ("Arch Linux", "AUR 查询与审查安装、Arch 新闻"),
-        "api_quota" => ("API 额度", "查供应商余额"),
-        "print_image" => ("视觉分析", "看图片和截图"),
-        "memes" => ("表情包", "用表情包回复"),
-        "platform_outreach" => ("外发", "从对话里给通讯平台发消息"),
-        "web_images" => ("搜图", "网络找图"),
-        "image_generation" => ("生图", "AI 画图"),
-        "knowledge_base" => ("知识库", "自己的资料库,对话里能查"),
-        "ledger" => ("记账", "记账本"),
-        "scripts" => ("脚本工具", "逐个勾选"),
-        "mcp" => ("MCP", "外接 MCP 服务器的工具"),
-        _ => ("", ""),
-    }
+    plugin_info(id).map_or(("", ""), |plugin| (plugin.name, plugin.hint))
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]

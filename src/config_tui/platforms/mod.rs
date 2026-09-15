@@ -245,6 +245,247 @@ pub(in crate::config_tui) fn enabled_label(value: bool) -> &'static str {
     }
 }
 
+/// QQ 菜单的一行。菜单按行枚举分发,不按下标:「并行数量」随开关出现/消失,
+/// 旧写法里尾部几项靠 `23 - usize::from(!parallel)` 这种魔法数跟着顺延,
+/// 插一行就会让后面每一项都错位(`api_quota` 永不可达就是同一类 bug,见
+/// docs/code-review-2026-08-16.md 第 4 轮 §1.4)。
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+enum QqRow {
+    Enabled,
+    Models,
+    ReverseWsPort,
+    AccessToken,
+    UserIdentification,
+    ShowGroupName,
+    MemoryWrite,
+    AdminUsers,
+    NonAdminHostTools,
+    GroupIntermediateMessages,
+    PrivateIntermediateMessages,
+    PrivateWhitelist,
+    FriendRequestsRequireWhitelist,
+    PrivateAllowNonWhitelist,
+    PrivateNonWhitelistRateLimit,
+    SleepHours,
+    GroupWhitelist,
+    GroupTriggerKeywords,
+    GroupWhitelistRateLimit,
+    GroupAllowNonWhitelist,
+    GroupNonWhitelistRateLimit,
+    SessionParallel,
+    SessionLimits,
+    Conversations,
+    Plugins,
+    Advanced,
+}
+
+fn qq_menu_rows(config: &AppConfig) -> Vec<(QqRow, String)> {
+    let qq = &config.platforms.qq;
+    let row = |label: &str, value: &dyn std::fmt::Display| format!("{label}: {value}");
+    let mut rows = vec![
+        (
+            QqRow::Enabled,
+            row(t("Enabled", "是否启用"), &enabled_label(qq.enabled)),
+        ),
+        (
+            QqRow::Models,
+            row(
+                t("Configure models", "配置模型"),
+                &qq_model_assignment_label(config),
+            ),
+        ),
+        (
+            QqRow::ReverseWsPort,
+            row(
+                t("Reverse WebSocket port", "反向 WebSocket 端口"),
+                &qq.reverse_ws_port,
+            ),
+        ),
+        (
+            QqRow::AccessToken,
+            row(
+                t("Reverse WebSocket token", "反向 WebSocket 验证 Token"),
+                &if qq.access_token.is_empty() {
+                    t("empty", "未设置")
+                } else {
+                    "********"
+                },
+            ),
+        ),
+        (
+            QqRow::UserIdentification,
+            row(
+                t("User identification", "用户识别"),
+                &enabled_label(qq.user_identification),
+            ),
+        ),
+        (
+            QqRow::ShowGroupName,
+            row(
+                t("Show group name", "显示群名称"),
+                &enabled_label(qq.show_group_name),
+            ),
+        ),
+        (
+            QqRow::MemoryWrite,
+            row(
+                t("Write persona memory", "写入人格记忆"),
+                &enabled_label(qq.memory.write_enabled),
+            ),
+        ),
+        (
+            QqRow::AdminUsers,
+            row(
+                t(
+                    "Administrator QQ ids allowed to use the terminal",
+                    "允许使用终端的管理员 QQ 号",
+                ),
+                &qq.admin_users.len(),
+            ),
+        ),
+        (
+            QqRow::NonAdminHostTools,
+            row(
+                t(
+                    "Allow non-admin computer access",
+                    "是否允许非管理员使用电脑",
+                ),
+                &enabled_label(qq.allow_non_admin_host_tools),
+            ),
+        ),
+        (
+            QqRow::GroupIntermediateMessages,
+            row(
+                t(
+                    "Send intermediate messages in group chats",
+                    "群聊是否输出中间消息",
+                ),
+                &enabled_label(qq.group_intermediate_messages),
+            ),
+        ),
+        (
+            QqRow::PrivateIntermediateMessages,
+            row(
+                t(
+                    "Send intermediate messages in private chats",
+                    "私聊是否输出中间消息",
+                ),
+                &enabled_label(qq.private_intermediate_messages),
+            ),
+        ),
+        (
+            QqRow::PrivateWhitelist,
+            row(
+                t("Private whitelist", "私聊白名单"),
+                &qq.private_chats.whitelist.len(),
+            ),
+        ),
+        (
+            QqRow::FriendRequestsRequireWhitelist,
+            row(
+                t(
+                    "Only private whitelist can add friends",
+                    "仅私聊白名单能加好友",
+                ),
+                &enabled_label(qq.private_chats.friend_requests_require_private_whitelist),
+            ),
+        ),
+        (
+            QqRow::PrivateAllowNonWhitelist,
+            row(
+                t("Allow non-whitelist private chats", "是否允许非白名单私聊"),
+                &enabled_label(qq.private_chats.allow_non_whitelist),
+            ),
+        ),
+        (
+            QqRow::PrivateNonWhitelistRateLimit,
+            row(
+                t("Non-whitelist private rate limit", "非白名单私聊限流"),
+                &rate_limit_label(qq.private_chats.non_whitelist_rate_limit),
+            ),
+        ),
+        (
+            QqRow::SleepHours,
+            row(
+                t("Sleep hours", "睡眠时间"),
+                &if qq.sleep_hours.is_empty() {
+                    t("not set", "未设置")
+                } else {
+                    qq.sleep_hours.as_str()
+                },
+            ),
+        ),
+        (
+            QqRow::GroupWhitelist,
+            row(
+                t("Group whitelist", "群聊白名单"),
+                &qq.group_chats.whitelist.len(),
+            ),
+        ),
+        (
+            QqRow::GroupTriggerKeywords,
+            row(
+                t("Additional group wake keywords", "额外群聊触发关键词"),
+                &qq.group_chats.trigger_keywords.len(),
+            ),
+        ),
+        (
+            QqRow::GroupWhitelistRateLimit,
+            row(
+                t("Whitelist-group rate limit", "白名单群聊限流"),
+                &rate_limit_label(qq.group_chats.whitelist_rate_limit),
+            ),
+        ),
+        (
+            QqRow::GroupAllowNonWhitelist,
+            row(
+                t("Allow non-whitelist groups", "是否允许非白名单群聊"),
+                &enabled_label(qq.group_chats.allow_non_whitelist),
+            ),
+        ),
+        (
+            QqRow::GroupNonWhitelistRateLimit,
+            row(
+                t("Non-whitelist-group rate limit", "非白名单群聊限流"),
+                &rate_limit_label(qq.group_chats.non_whitelist_rate_limit),
+            ),
+        ),
+        (
+            QqRow::SessionParallel,
+            row(
+                t("In-conversation parallelism", "会话内并行"),
+                &enabled_label(qq.session_parallel),
+            ),
+        ),
+    ];
+    // 串行时并行数无处可用,整项不出现(08-26 用户裁定):串行下被挡住的
+    // 消息由「多少秒多少条」限流决定丢弃,不归这里管。
+    if qq.session_parallel {
+        rows.push((
+            QqRow::SessionLimits,
+            row(
+                t("In-conversation parallel turns", "会话内并行数量"),
+                &session_limits_label(qq.session_limits),
+            ),
+        ));
+    }
+    rows.extend([
+        (
+            QqRow::Conversations,
+            row(
+                t("Private/group conversation settings", "私聊/群聊专属配置"),
+                &qq.conversations.len(),
+            ),
+        ),
+        (QqRow::Plugins, t("QQ plugins", "QQ 插件配置").to_string()),
+        (
+            QqRow::Advanced,
+            t("Advanced settings", "高级设置").to_string(),
+        ),
+    ]);
+    rows
+}
+
 pub(in crate::config_tui) fn edit_qq(
     stdout: &mut io::Stdout,
     paths: &GqyPaths,
@@ -252,161 +493,11 @@ pub(in crate::config_tui) fn edit_qq(
 ) -> Result<()> {
     let mut selected = 0usize;
     loop {
-        let qq = &config.platforms.qq;
-        let parallel = qq.session_parallel;
-        let mut options = vec![
-            format!(
-                "{}: {}",
-                t("Enabled", "是否启用"),
-                enabled_label(qq.enabled)
-            ),
-            format!(
-                "{}: {}",
-                t("Configure models", "配置模型"),
-                qq_model_assignment_label(config)
-            ),
-            format!(
-                "{}: {}",
-                t("Reverse WebSocket port", "反向 WebSocket 端口"),
-                qq.reverse_ws_port
-            ),
-            format!(
-                "{}: {}",
-                t("Reverse WebSocket token", "反向 WebSocket 验证 Token"),
-                if qq.access_token.is_empty() {
-                    t("empty", "未设置")
-                } else {
-                    "********"
-                }
-            ),
-            format!(
-                "{}: {}",
-                t("User identification", "用户识别"),
-                enabled_label(qq.user_identification)
-            ),
-            format!(
-                "{}: {}",
-                t("Show group name", "显示群名称"),
-                enabled_label(qq.show_group_name)
-            ),
-            format!(
-                "{}: {}",
-                t("Write persona memory", "写入人格记忆"),
-                enabled_label(qq.memory.write_enabled)
-            ),
-            format!(
-                "{}: {}",
-                t(
-                    "Administrator QQ ids allowed to use the terminal",
-                    "允许使用终端的管理员 QQ 号"
-                ),
-                qq.admin_users.len()
-            ),
-            format!(
-                "{}: {}",
-                t(
-                    "Allow non-admin computer access",
-                    "是否允许非管理员使用电脑"
-                ),
-                enabled_label(qq.allow_non_admin_host_tools)
-            ),
-            format!(
-                "{}: {}",
-                t(
-                    "Send intermediate messages in group chats",
-                    "群聊是否输出中间消息"
-                ),
-                enabled_label(qq.group_intermediate_messages)
-            ),
-            format!(
-                "{}: {}",
-                t(
-                    "Send intermediate messages in private chats",
-                    "私聊是否输出中间消息"
-                ),
-                enabled_label(qq.private_intermediate_messages)
-            ),
-            format!(
-                "{}: {}",
-                t("Private whitelist", "私聊白名单"),
-                qq.private_chats.whitelist.len()
-            ),
-            format!(
-                "{}: {}",
-                t(
-                    "Only private whitelist can add friends",
-                    "仅私聊白名单能加好友"
-                ),
-                enabled_label(qq.private_chats.friend_requests_require_private_whitelist)
-            ),
-            format!(
-                "{}: {}",
-                t("Allow non-whitelist private chats", "是否允许非白名单私聊"),
-                enabled_label(qq.private_chats.allow_non_whitelist)
-            ),
-            format!(
-                "{}: {}",
-                t("Non-whitelist private rate limit", "非白名单私聊限流"),
-                rate_limit_label(qq.private_chats.non_whitelist_rate_limit)
-            ),
-            format!(
-                "{}: {}",
-                t("Sleep hours", "睡眠时间"),
-                if qq.sleep_hours.is_empty() {
-                    t("not set", "未设置")
-                } else {
-                    qq.sleep_hours.as_str()
-                }
-            ),
-            format!(
-                "{}: {}",
-                t("Group whitelist", "群聊白名单"),
-                qq.group_chats.whitelist.len()
-            ),
-            format!(
-                "{}: {}",
-                t("Additional group wake keywords", "额外群聊触发关键词"),
-                qq.group_chats.trigger_keywords.len()
-            ),
-            format!(
-                "{}: {}",
-                t("Whitelist-group rate limit", "白名单群聊限流"),
-                rate_limit_label(qq.group_chats.whitelist_rate_limit)
-            ),
-            format!(
-                "{}: {}",
-                t("Allow non-whitelist groups", "是否允许非白名单群聊"),
-                enabled_label(qq.group_chats.allow_non_whitelist)
-            ),
-            format!(
-                "{}: {}",
-                t("Non-whitelist-group rate limit", "非白名单群聊限流"),
-                rate_limit_label(qq.group_chats.non_whitelist_rate_limit)
-            ),
-            format!(
-                "{}: {}",
-                t("In-conversation parallelism", "会话内并行"),
-                enabled_label(qq.session_parallel)
-            ),
-        ];
-        // 串行时并行数无处可用,整项不出现(08-26 用户裁定):串行下被挡住的
-        // 消息由「多少秒多少条」限流决定丢弃,不归这里管。
-        if qq.session_parallel {
-            options.push(format!(
-                "{}: {}",
-                t("In-conversation parallel turns", "会话内并行数量"),
-                session_limits_label(qq.session_limits)
-            ));
-        }
-        options.extend([
-            format!(
-                "{}: {}",
-                t("Private/group conversation settings", "私聊/群聊专属配置"),
-                qq.conversations.len()
-            ),
-            t("QQ plugins", "QQ 插件配置").to_string(),
-            t("Advanced settings", "高级设置").to_string(),
-        ]);
+        let rows = qq_menu_rows(config);
+        let options = rows
+            .iter()
+            .map(|(_, label)| label.clone())
+            .collect::<Vec<_>>();
         draw_menu(
             stdout,
             t(" TENCENT QQ ", " 腾讯 QQ "),
@@ -418,134 +509,108 @@ pub(in crate::config_tui) fn edit_qq(
         match key {
             KeyCode::Char('q') | KeyCode::Esc => return Ok(()),
             KeyCode::Up | KeyCode::Char('k') => selected = selected.saturating_sub(1),
-            KeyCode::Down | KeyCode::Char('j') => selected = (selected + 1).min(options.len() - 1),
-            KeyCode::Enter | KeyCode::Char(' ') => match selected {
-                0 => config.platforms.qq.enabled = !config.platforms.qq.enabled,
-                1 if matches!(key, KeyCode::Enter) => select_qq_model_assignment(stdout, config)?,
-                2 if matches!(key, KeyCode::Enter) => {
-                    if let Some(value) = edit_u16_value(
-                        stdout,
-                        t("Reverse WebSocket port", "反向 WebSocket 端口"),
-                        config.platforms.qq.reverse_ws_port,
-                    )? {
-                        if value == 0 {
-                            message(
-                                stdout,
-                                t(
-                                    "Port must be between 1 and 65535.",
-                                    "端口必须在 1 到 65535 之间。",
-                                ),
-                            )?;
-                        } else {
-                            config.platforms.qq.reverse_ws_port = value;
+            KeyCode::Down | KeyCode::Char('j') => selected = (selected + 1).min(rows.len() - 1),
+            KeyCode::Enter | KeyCode::Char(' ') => {
+                // 光标停在「会话内并行」这一行时关掉并行,排在它之后的「并行数量」
+                // 消失,光标仍落在存在的行上,无需再钳制。
+                let enter = matches!(key, KeyCode::Enter);
+                let qq = &mut config.platforms.qq;
+                match rows[selected].0 {
+                    QqRow::Enabled => qq.enabled = !qq.enabled,
+                    QqRow::UserIdentification => qq.user_identification = !qq.user_identification,
+                    QqRow::ShowGroupName => qq.show_group_name = !qq.show_group_name,
+                    QqRow::MemoryWrite => qq.memory.write_enabled = !qq.memory.write_enabled,
+                    QqRow::NonAdminHostTools => {
+                        qq.allow_non_admin_host_tools = !qq.allow_non_admin_host_tools
+                    }
+                    QqRow::GroupIntermediateMessages => {
+                        qq.group_intermediate_messages = !qq.group_intermediate_messages
+                    }
+                    QqRow::PrivateIntermediateMessages => {
+                        qq.private_intermediate_messages = !qq.private_intermediate_messages
+                    }
+                    QqRow::FriendRequestsRequireWhitelist => {
+                        let chats = &mut qq.private_chats;
+                        chats.friend_requests_require_private_whitelist =
+                            !chats.friend_requests_require_private_whitelist
+                    }
+                    QqRow::PrivateAllowNonWhitelist => {
+                        qq.private_chats.allow_non_whitelist = !qq.private_chats.allow_non_whitelist
+                    }
+                    QqRow::GroupAllowNonWhitelist => {
+                        qq.group_chats.allow_non_whitelist = !qq.group_chats.allow_non_whitelist
+                    }
+                    QqRow::SessionParallel => qq.session_parallel = !qq.session_parallel,
+                    // 以下各项打开子界面,只认 Enter。
+                    _ if !enter => {}
+                    QqRow::Models => select_qq_model_assignment(stdout, config)?,
+                    QqRow::ReverseWsPort => {
+                        if let Some(value) = edit_u16_value(
+                            stdout,
+                            t("Reverse WebSocket port", "反向 WebSocket 端口"),
+                            config.platforms.qq.reverse_ws_port,
+                        )? {
+                            if value == 0 {
+                                message(
+                                    stdout,
+                                    t(
+                                        "Port must be between 1 and 65535.",
+                                        "端口必须在 1 到 65535 之间。",
+                                    ),
+                                )?;
+                            } else {
+                                config.platforms.qq.reverse_ws_port = value;
+                            }
                         }
                     }
-                }
-                3 if matches!(key, KeyCode::Enter) => edit_qq_token(stdout, config)?,
-                4 => {
-                    config.platforms.qq.user_identification =
-                        !config.platforms.qq.user_identification
-                }
-                5 => config.platforms.qq.show_group_name = !config.platforms.qq.show_group_name,
-                6 => {
-                    config.platforms.qq.memory.write_enabled =
-                        !config.platforms.qq.memory.write_enabled
-                }
-                7 if matches!(key, KeyCode::Enter) => edit_qq_admin_list(
-                    stdout,
-                    t(
-                        " TERMINAL-ENABLED ADMINISTRATORS ",
-                        " 允许使用终端的管理员 QQ 号 ",
-                    ),
-                    &mut config.platforms.qq.admin_users,
-                    &mut config.platforms.qq.admin_aliases,
-                )?,
-                8 => {
-                    config.platforms.qq.allow_non_admin_host_tools =
-                        !config.platforms.qq.allow_non_admin_host_tools
-                }
-                9 => {
-                    config.platforms.qq.group_intermediate_messages =
-                        !config.platforms.qq.group_intermediate_messages
-                }
-                10 => {
-                    config.platforms.qq.private_intermediate_messages =
-                        !config.platforms.qq.private_intermediate_messages
-                }
-                11 if matches!(key, KeyCode::Enter) => edit_qq_id_list(
-                    stdout,
-                    t(" PRIVATE WHITELIST ", " 私聊白名单 "),
-                    t("QQ id", "QQ 号"),
-                    &mut config.platforms.qq.private_chats.whitelist,
-                )?,
-                12 => {
-                    config
-                        .platforms
-                        .qq
-                        .private_chats
-                        .friend_requests_require_private_whitelist = !config
-                        .platforms
-                        .qq
-                        .private_chats
-                        .friend_requests_require_private_whitelist
-                }
-                13 => {
-                    config.platforms.qq.private_chats.allow_non_whitelist =
-                        !config.platforms.qq.private_chats.allow_non_whitelist
-                }
-                14 if matches!(key, KeyCode::Enter) => {
-                    edit_platform_rate_limit(
+                    QqRow::AccessToken => edit_qq_token(stdout, config)?,
+                    QqRow::AdminUsers => edit_qq_admin_list(
+                        stdout,
+                        t(
+                            " TERMINAL-ENABLED ADMINISTRATORS ",
+                            " 允许使用终端的管理员 QQ 号 ",
+                        ),
+                        &mut config.platforms.qq.admin_users,
+                        &mut config.platforms.qq.admin_aliases,
+                    )?,
+                    QqRow::PrivateWhitelist => edit_qq_id_list(
+                        stdout,
+                        t(" PRIVATE WHITELIST ", " 私聊白名单 "),
+                        t("QQ id", "QQ 号"),
+                        &mut config.platforms.qq.private_chats.whitelist,
+                    )?,
+                    QqRow::PrivateNonWhitelistRateLimit => edit_platform_rate_limit(
                         stdout,
                         &mut config.platforms.qq.private_chats.non_whitelist_rate_limit,
-                    )?;
-                }
-                15 if matches!(key, KeyCode::Enter) => edit_qq_sleep_hours(stdout, config)?,
-                16 if matches!(key, KeyCode::Enter) => edit_qq_id_list(
-                    stdout,
-                    t(" GROUP WHITELIST ", " 群聊白名单 "),
-                    t("Group id", "群号"),
-                    &mut config.platforms.qq.group_chats.whitelist,
-                )?,
-                17 if matches!(key, KeyCode::Enter) => edit_keyword_list(
-                    stdout,
-                    &mut config.platforms.qq.group_chats.trigger_keywords,
-                )?,
-                18 if matches!(key, KeyCode::Enter) => {
-                    edit_platform_rate_limit(
+                    )?,
+                    QqRow::SleepHours => edit_qq_sleep_hours(stdout, config)?,
+                    QqRow::GroupWhitelist => edit_qq_id_list(
+                        stdout,
+                        t(" GROUP WHITELIST ", " 群聊白名单 "),
+                        t("Group id", "群号"),
+                        &mut config.platforms.qq.group_chats.whitelist,
+                    )?,
+                    QqRow::GroupTriggerKeywords => edit_keyword_list(
+                        stdout,
+                        &mut config.platforms.qq.group_chats.trigger_keywords,
+                    )?,
+                    QqRow::GroupWhitelistRateLimit => edit_platform_rate_limit(
                         stdout,
                         &mut config.platforms.qq.group_chats.whitelist_rate_limit,
-                    )?;
-                }
-                19 => {
-                    config.platforms.qq.group_chats.allow_non_whitelist =
-                        !config.platforms.qq.group_chats.allow_non_whitelist
-                }
-                20 if matches!(key, KeyCode::Enter) => {
-                    edit_platform_rate_limit(
+                    )?,
+                    QqRow::GroupNonWhitelistRateLimit => edit_platform_rate_limit(
                         stdout,
                         &mut config.platforms.qq.group_chats.non_whitelist_rate_limit,
-                    )?;
+                    )?,
+                    QqRow::SessionLimits => edit_platform_session_limits(
+                        stdout,
+                        &mut config.platforms.qq.session_limits,
+                    )?,
+                    QqRow::Conversations => select_platform_model_routes(stdout, paths, config)?,
+                    QqRow::Plugins => select_platform_plugins(stdout, paths, config)?,
+                    QqRow::Advanced => edit_qq_advanced(stdout, config)?,
                 }
-                // 光标就停在开关这一行(21),"并行数量"排在它之后——关掉并行
-                // 时那一项消失也不会把光标落到不存在的行上,无需再钳制。
-                21 => {
-                    config.platforms.qq.session_parallel = !config.platforms.qq.session_parallel;
-                }
-                22 if parallel && matches!(key, KeyCode::Enter) => {
-                    edit_platform_session_limits(stdout, &mut config.platforms.qq.session_limits)?
-                }
-                // 尾部三项随"并行数量"是否出现整体顺延一位。
-                index if index == 23 - usize::from(!parallel) && matches!(key, KeyCode::Enter) => {
-                    select_platform_model_routes(stdout, paths, config)?
-                }
-                index if index == 24 - usize::from(!parallel) && matches!(key, KeyCode::Enter) => {
-                    select_platform_plugins(stdout, paths, config)?
-                }
-                index if index == 25 - usize::from(!parallel) && matches!(key, KeyCode::Enter) => {
-                    edit_qq_advanced(stdout, config)?
-                }
-                _ => {}
-            },
+            }
             _ => {}
         }
     }

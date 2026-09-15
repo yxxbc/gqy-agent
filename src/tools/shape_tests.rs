@@ -54,6 +54,41 @@ fn registry_shapes_match_fixture() {
     }
 }
 
+/// 只有 Rust 侧描述、刻意不走 descriptions/*.json 的内置工具。其余工具注册时
+/// 若找不到 JSON,`apply_built_in_description` 会静默保留 Rust 占位描述——而
+/// 刷新夹具会把这种错误状态一并钉进基线,所以单独拦一道。
+const RUST_ONLY_DESCRIPTIONS: &[&str] = &[
+    "job",
+    "load_tools",
+    "query_token_usage",
+    "send_subagent_message",
+];
+
+#[test]
+fn registered_built_in_tools_have_json_descriptions() {
+    let temp = tempfile::tempdir().unwrap();
+    let paths = tests::test_paths(temp.path());
+    let config = AppConfig::default();
+    let mut missing = std::collections::BTreeSet::new();
+    for registry in [
+        builtin_registry(&config, &paths),
+        dev_registry(&config, &paths),
+        restricted_platform_registry(&config, &paths),
+    ] {
+        for name in registry.tool_names() {
+            if tool_descriptions::get(&name).is_none()
+                && !RUST_ONLY_DESCRIPTIONS.contains(&name.as_str())
+            {
+                missing.insert(name);
+            }
+        }
+    }
+    assert!(
+        missing.is_empty(),
+        "tools registered without src/tools/descriptions/*.json: {missing:?}"
+    );
+}
+
 #[test]
 #[ignore]
 fn write_registry_shape_fixture() {

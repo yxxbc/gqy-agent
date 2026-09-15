@@ -73,12 +73,10 @@ impl ConversationDb {
 
     pub fn load_turns(&self, session_id: &str) -> Result<Vec<Turn>> {
         let conn = self.conn.lock().unwrap();
-        let mut stmt = conn.prepare(
-            "SELECT turn_id, seq, user_content, display_content, user_timestamp, assistant_content,
-                    assistant_reasoning, assistant_provider_id, assistant_model, assistant_timestamp, status, tool_reports, hidden, is_summary, owner_pid,
-                    token_total, token_usage_estimated, revision, context_messages, token_prompt, token_cache_read, tool_flow
-             FROM turns WHERE session_id = ?1 ORDER BY seq ASC",
-        )?;
+        let mut stmt = conn.prepare(&format!(
+            "SELECT {TURN_COLUMNS}
+             FROM turns WHERE session_id = ?1 ORDER BY seq ASC"
+        ))?;
         let mut turns = stmt
             .query_map(params![session_id], map_turn_row)?
             .collect::<std::result::Result<Vec<_>, _>>()?;
@@ -93,12 +91,10 @@ impl ConversationDb {
         exclude_turn_id: &str,
     ) -> Result<Vec<Turn>> {
         let conn = self.conn.lock().unwrap();
-        let mut stmt = conn.prepare(
-            "SELECT turn_id, seq, user_content, display_content, user_timestamp, assistant_content,
-                    assistant_reasoning, assistant_provider_id, assistant_model, assistant_timestamp, status, tool_reports, hidden, is_summary, owner_pid,
-                    token_total, token_usage_estimated, revision, context_messages, token_prompt, token_cache_read, tool_flow
-             FROM turns WHERE session_id = ?1 AND turn_id != ?2 ORDER BY seq ASC",
-        )?;
+        let mut stmt = conn.prepare(&format!(
+            "SELECT {TURN_COLUMNS}
+             FROM turns WHERE session_id = ?1 AND turn_id != ?2 ORDER BY seq ASC"
+        ))?;
         let mut turns = stmt
             .query_map(params![session_id, exclude_turn_id], map_turn_row)?
             .collect::<std::result::Result<Vec<_>, _>>()?;
@@ -113,12 +109,10 @@ impl ConversationDb {
 
     pub fn load_visible_turns(&self, session_id: &str) -> Result<Vec<Turn>> {
         let conn = self.conn.lock().unwrap();
-        let mut stmt = conn.prepare(
-            "SELECT turn_id, seq, user_content, display_content, user_timestamp, assistant_content,
-                    assistant_reasoning, assistant_provider_id, assistant_model, assistant_timestamp, status, tool_reports, hidden, is_summary, owner_pid,
-                    token_total, token_usage_estimated, revision, context_messages, token_prompt, token_cache_read, tool_flow
-             FROM turns WHERE session_id = ?1 AND hidden = 0 ORDER BY seq ASC",
-        )?;
+        let mut stmt = conn.prepare(&format!(
+            "SELECT {TURN_COLUMNS}
+             FROM turns WHERE session_id = ?1 AND hidden = 0 ORDER BY seq ASC"
+        ))?;
         let mut turns = stmt
             .query_map(params![session_id], map_turn_row)?
             .collect::<std::result::Result<Vec<_>, _>>()?;
@@ -132,12 +126,10 @@ impl ConversationDb {
         exclude_turn_id: &str,
     ) -> Result<Vec<Turn>> {
         let conn = self.conn.lock().unwrap();
-        let mut stmt = conn.prepare(
-            "SELECT turn_id, seq, user_content, display_content, user_timestamp, assistant_content,
-                    assistant_reasoning, assistant_provider_id, assistant_model, assistant_timestamp, status, tool_reports, hidden, is_summary, owner_pid,
-                    token_total, token_usage_estimated, revision, context_messages, token_prompt, token_cache_read, tool_flow
-             FROM turns WHERE session_id = ?1 AND hidden = 0 AND turn_id != ?2 ORDER BY seq ASC",
-        )?;
+        let mut stmt = conn.prepare(&format!(
+            "SELECT {TURN_COLUMNS}
+             FROM turns WHERE session_id = ?1 AND hidden = 0 AND turn_id != ?2 ORDER BY seq ASC"
+        ))?;
         let mut turns = stmt
             .query_map(params![session_id, exclude_turn_id], map_turn_row)?
             .collect::<std::result::Result<Vec<_>, _>>()?;
@@ -185,12 +177,10 @@ impl ConversationDb {
 
     pub fn load_last_summary(&self, session_id: &str) -> Result<Option<Turn>> {
         let conn = self.conn.lock().unwrap();
-        let mut stmt = conn.prepare(
-            "SELECT turn_id, seq, user_content, display_content, user_timestamp, assistant_content,
-                    assistant_reasoning, assistant_provider_id, assistant_model, assistant_timestamp, status, tool_reports, hidden, is_summary, owner_pid,
-                    token_total, token_usage_estimated, revision, context_messages, token_prompt, token_cache_read, tool_flow
-             FROM turns WHERE session_id = ?1 AND is_summary = 1 AND hidden = 0 ORDER BY seq DESC LIMIT 1",
-        )?;
+        let mut stmt = conn.prepare(&format!(
+            "SELECT {TURN_COLUMNS}
+             FROM turns WHERE session_id = ?1 AND is_summary = 1 AND hidden = 0 ORDER BY seq DESC LIMIT 1"
+        ))?;
         let turn = stmt
             .query_map(params![session_id], map_turn_row)?
             .next()
@@ -218,12 +208,10 @@ impl ConversationDb {
     #[allow(dead_code)]
     pub fn trim_oldest_turns(&self, session_id: &str, count: usize) -> Result<Vec<Turn>> {
         let conn = self.conn.lock().unwrap();
-        let mut stmt = conn.prepare(
-            "SELECT turn_id, seq, user_content, display_content, user_timestamp, assistant_content,
-                    assistant_reasoning, assistant_provider_id, assistant_model, assistant_timestamp, status, tool_reports, hidden, is_summary, owner_pid,
-                    token_total, token_usage_estimated, revision, context_messages, token_prompt, token_cache_read, tool_flow
-             FROM turns WHERE session_id = ?1 AND is_summary = 0 ORDER BY seq ASC LIMIT ?2",
-        )?;
+        let mut stmt = conn.prepare(&format!(
+            "SELECT {TURN_COLUMNS}
+             FROM turns WHERE session_id = ?1 AND is_summary = 0 ORDER BY seq ASC LIMIT ?2"
+        ))?;
         let mut to_remove: Vec<Turn> = stmt
             .query_map(params![session_id, count as i64], map_turn_row)?
             .collect::<std::result::Result<Vec<_>, _>>()?;
@@ -244,14 +232,12 @@ impl ConversationDb {
         count: usize,
     ) -> Result<Vec<Turn>> {
         let conn = self.conn.lock().unwrap();
-        let mut stmt = conn.prepare(
-            "SELECT turn_id, seq, user_content, display_content, user_timestamp, assistant_content,
-                    assistant_reasoning, assistant_provider_id, assistant_model, assistant_timestamp, status, tool_reports, hidden, is_summary, owner_pid,
-                    token_total, token_usage_estimated, revision, context_messages, token_prompt, token_cache_read, tool_flow
+        let mut stmt = conn.prepare(&format!(
+            "SELECT {TURN_COLUMNS}
              FROM turns
              WHERE session_id = ?1 AND hidden = 0 AND is_summary = 0 AND status != 'running'
-             ORDER BY seq ASC LIMIT ?2",
-        )?;
+             ORDER BY seq ASC LIMIT ?2"
+        ))?;
         let count = i64::try_from(count).unwrap_or(i64::MAX);
         let mut turns = stmt
             .query_map(params![session_id, count], map_turn_row)?

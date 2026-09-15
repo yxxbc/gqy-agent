@@ -65,8 +65,37 @@ fn main() {
     )
     .expect("write generated prompt asset");
 
+    build_tool_description_index(&out_dir);
     build_o200k_vocab();
     build_jieba_index();
+}
+
+/// Every `src/tools/descriptions/*.json` except `groups.json` becomes one
+/// `include_str!` entry. The list used to be hand-maintained, and a JSON file
+/// missing from it silently fell back to the Rust placeholder description.
+fn build_tool_description_index(out_dir: &str) {
+    const DIR: &str = "src/tools/descriptions";
+    println!("cargo:rerun-if-changed={DIR}");
+    let manifest_dir = env::var("CARGO_MANIFEST_DIR").expect("CARGO_MANIFEST_DIR is set by cargo");
+    let mut files = fs::read_dir(DIR)
+        .expect("read tool descriptions directory")
+        .map(|entry| entry.expect("tool description entry").path())
+        .filter(|path| path.extension().is_some_and(|ext| ext == "json"))
+        .filter(|path| path.file_name().is_some_and(|name| name != "groups.json"))
+        .collect::<Vec<_>>();
+    files.sort();
+    let mut source = String::from("const TOOL_DESCRIPTION_FILES: &[(&str, &str)] = &[\n");
+    for path in &files {
+        let name = path.file_name().unwrap().to_string_lossy();
+        let absolute = Path::new(&manifest_dir).join(path);
+        source.push_str(&format!(
+            "    ({name:?}, include_str!({:?})),\n",
+            absolute.display().to_string()
+        ));
+    }
+    source.push_str("];\n");
+    fs::write(Path::new(out_dir).join("tool_description_files.rs"), source)
+        .expect("write generated tool description index");
 }
 
 fn build_jieba_index() {

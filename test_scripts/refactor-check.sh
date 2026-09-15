@@ -4,23 +4,22 @@
 # 拆分的铁律是「零行为变化」，而零行为变化没法靠肉眼保证——这个脚本把能
 # 机械检查的部分全查一遍：
 #
-#   1. 格式      改动过的文件违规数不得增加（存量不追，见 fmt_no_regress.py）
+#   1. 格式      全仓 `cargo fmt --check`
 #   2. 编译      --all-targets，测试代码也要编过
 #   3. 测试      全量；用例数不得减少（搬测试时最容易漏掉一整个 mod）
-#   4. 文件规模  不得出现新的越红线文件，超标文件不得变长
-#   5. 依赖方向  不得新增跨层引用，已有的不得变多
+#   4. 模型面语言 模型可见文本恒英文
+#   5. 文件规模  不得出现新的越红线文件，超标文件不得变长
+#   6. 依赖方向  按层序表全对比较：不得新增跨层引用，已有的不得变多
 #
-# 关于格式：`cargo fmt --check` 当前有约 4400 行 diff（历史遗留）。全仓格式化
-# 会产生一个巨大的、与拆分混在一起的提交，破坏 `git blame` 与 bisect，所以不
-# 做。但「只查改动过的文件」也不对——web.rs 在 HEAD 时就有 39 处违规，碰一下
-# 就把历史欠账全算到这次头上。于是与另外两道门禁同一语义：只禁止变差。
+# 关于格式：仓库自 08-26（`939a2feb` 全量格式化）起 fmt-clean，早先那道
+# 「只禁止变差」的渐进门禁已无存在理由，直接全仓检查。
 set -euo pipefail
 cd "$(git rev-parse --show-toplevel)"
 
 step() { printf '\n\033[1m── %s ──\033[0m\n' "$1"; }
 
 step "格式"
-python3 test_scripts/fmt_no_regress.py
+cargo fmt --check
 
 step "编译"
 cargo check --all-targets
@@ -38,7 +37,9 @@ now=$(printf '%s\n' "$output" | awk '/^test result:/ {sum += $4 + $6} END {print
 failed=$(printf '%s\n' "$output" | awk '/^test result:/ {sum += $6} END {print sum+0}')
 echo "$now" > test_scripts/.test-count
 if [ "$before" -gt 0 ] && [ "$now" -lt "$before" ]; then
-  echo "✗ 用例数从 $before 降到 $now——搬测试时漏了一整个 mod？"
+  # 变量一律加花括号:中文 locale 下 bash 会把紧跟的全角字符当成变量名的一部分,
+  # `set -u` 随即报「未绑定的变量」,门禁在测试全绿之后反而失败。
+  echo "✗ 用例数从 ${before} 降到 ${now}——搬测试时漏了一整个 mod？"
   exit 1
 fi
 # 这里曾经放行 origin_tty_gates_and_writeback_against_real_pty，理由写的是
@@ -52,7 +53,7 @@ if [ "$failed" -gt 0 ]; then
   echo "✗ 有 $failed 个用例失败"
   exit 1
 fi
-echo "用例数 $now（基线 $before）"
+echo "用例数 ${now}（基线 ${before}）"
 
 step "模型面语言"
 bash test_scripts/check-model-english.sh

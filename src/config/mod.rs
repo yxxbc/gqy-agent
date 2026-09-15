@@ -7,6 +7,7 @@ mod persona_paths;
 mod platform;
 mod platform_ops;
 mod platform_plugins;
+pub mod plugin_catalog;
 mod pool_ref;
 mod provider;
 pub(crate) use provider::append_resolved_api_keys;

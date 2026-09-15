@@ -47,65 +47,23 @@ static TOOL_DESCRIPTIONS: OnceLock<HashMap<String, ToolDescription>> = OnceLock:
 static TOOL_GROUPS: OnceLock<HashMap<String, ToolGroupDescription>> = OnceLock::new();
 const TOOL_GROUPS_RAW: &str = include_str!("descriptions/groups.json");
 
-macro_rules! tool_description_files {
-    () => {
-        [
-            include_str!("descriptions/album.json"),
-            include_str!("descriptions/alarm.json"),
-            include_str!("descriptions/archlinux_news.json"),
-            include_str!("descriptions/archlinux_official_package_query.json"),
-            include_str!("descriptions/archwiki_query.json"),
-            include_str!("descriptions/artifact.json"),
-            include_str!("descriptions/ask_question.json"),
-            include_str!("descriptions/goal.json"),
-            include_str!("descriptions/github.json"),
-            include_str!("descriptions/aur.json"),
-            include_str!("descriptions/check_os_info.json"),
-            include_str!("descriptions/edit.json"),
-            include_str!("descriptions/generate_image.json"),
-            include_str!("descriptions/get_exchange_rate.json"),
-            include_str!("descriptions/map.json"),
-            include_str!("descriptions/express.json"),
-            include_str!("descriptions/glob.json"),
-            include_str!("descriptions/grep.json"),
-            include_str!("descriptions/install_aur_package.json"),
-            include_str!("descriptions/kb.json"),
-            include_str!("descriptions/load_skill.json"),
-            include_str!("descriptions/ledger.json"),
-            include_str!("descriptions/manage_ledger.json"),
-            include_str!("descriptions/manage_script.json"),
-            include_str!("descriptions/manage_meme.json"),
-            include_str!("descriptions/manage_skill.json"),
-            include_str!("descriptions/use_meme.json"),
-            include_str!("descriptions/present_artifact.json"),
-            include_str!("descriptions/print_image.json"),
-            include_str!("descriptions/query_api_quota.json"),
-            include_str!("descriptions/read.json"),
-            include_str!("descriptions/recall_memories.json"),
-            include_str!("descriptions/remember_fact.json"),
-            include_str!("descriptions/review_aur_package.json"),
-            include_str!("descriptions/run_command.json"),
-            include_str!("descriptions/search_evicted_context.json"),
-            include_str!("descriptions/search_knowledge_base.json"),
-            include_str!("descriptions/search_web_images.json"),
-            include_str!("descriptions/share_file.json"),
-            include_str!("descriptions/subagent.json"),
-            include_str!("descriptions/todowrite.json"),
-            include_str!("descriptions/trash_path.json"),
-            include_str!("descriptions/vision_analyze.json"),
-            include_str!("descriptions/web_fetch.json"),
-            include_str!("descriptions/web_search.json"),
-        ]
-    };
-}
+// `TOOL_DESCRIPTION_FILES`:build.rs 扫 `descriptions/` 目录生成,每个
+// `*.json`(groups.json 除外)一条 include_str!。以前是手写清单,新增 JSON
+// 忘了补一行就静默退回 Rust 占位描述;现在丢进目录即生效。
+include!(concat!(env!("OUT_DIR"), "/tool_description_files.rs"));
 
 pub fn all() -> &'static HashMap<String, ToolDescription> {
     TOOL_DESCRIPTIONS.get_or_init(|| {
         let mut map = HashMap::new();
-        for raw in tool_description_files!() {
-            let desc: ToolDescription =
-                serde_json::from_str(raw).expect("built-in tool description JSON must be valid");
-            map.insert(desc.name.clone(), desc);
+        for (file, raw) in TOOL_DESCRIPTION_FILES {
+            let desc: ToolDescription = serde_json::from_str(raw).unwrap_or_else(|error| {
+                panic!("built-in tool description {file} must be valid JSON: {error}")
+            });
+            let name = desc.name.clone();
+            assert!(
+                map.insert(name.clone(), desc).is_none(),
+                "tool description {file} reuses the name `{name}`"
+            );
         }
         map
     })

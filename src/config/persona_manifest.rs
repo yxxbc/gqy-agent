@@ -18,30 +18,10 @@ use std::path::PathBuf;
 
 pub const PERSONA_MANIFEST_FILE: &str = "persona.toml";
 
-/// 插件 id:与 `tools::compose_registry` 里的注册单元一一对应。写在这里是为了
-/// 让 persona.toml 里的名字有一份真相源,拼错的名字在 [`PersonaManifest::validate`]
+/// 插件 id:由 [`super::plugin_catalog::PLUGINS`] 派生,与 `tools::compose` 里的
+/// 注册单元一一对应。persona.toml 里拼错的名字在 [`PersonaManifest::validate`]
 /// 里能被指出来。
-pub const PLUGIN_IDS: &[&str] = &[
-    "files",
-    "album",
-    "usage_query",
-    "alarm",
-    "exchange_rate",
-    "map",
-    "express",
-    "archlinux",
-    "api_quota",
-    "print_image",
-    "memes",
-    "platform_outreach",
-    "web_images",
-    "image_generation",
-    "knowledge_base",
-    "ledger",
-    "scripts",
-    // MCP 与脚本同级:插件闸之上还能按服务器 id 逐个勾(`plugins.mcp`)。
-    "mcp",
-];
+pub use super::plugin_catalog::PLUGIN_IDS;
 
 /// 已退役的插件 id:存量 persona.toml 里写着也当没写(09-13 删 deep_research /
 /// diagnostics,package_advisor 并入 archlinux)。

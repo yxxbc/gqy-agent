@@ -35,110 +35,172 @@ pub(in crate::config_tui) fn edit_settings(
     config: &mut AppConfig,
 ) -> Result<()> {
     let language = language_choice_value(&config.display.language).unwrap_or("auto");
-    let mut fields = vec![
-        Field::boolean(t("Enable tools", "工具启用"), config.tools.enabled),
-        Field::new(
-            t("Maximum tool rounds", "工具最大轮数"),
-            config.tools.max_rounds.to_string(),
-        ),
-        Field::new(
-            t("Tool loading mode", "工具加载模式"),
-            normalize_tools_loading_mode(&config.tools.loading_mode),
+    let mut form = BoundFields::default()
+        .with(
+            Field::boolean(t("Enable tools", "工具启用"), config.tools.enabled),
+            |config, value| {
+                config.tools.enabled = parse_bool_field(value)?;
+                Ok(())
+            },
         )
-        .choices(&["full", "stub"]),
-        Field::boolean(
-            t("Remember loaded tools", "记住已加载工具"),
-            config.tools.persist_loaded_tools,
-        ),
-        Field::boolean(t("Enable skills", "Skills 启用"), config.skills.enabled),
-        Field::boolean(
-            t("Allow command execution", "允许执行命令"),
-            config.skills.allow_command_execution,
-        ),
-        Field::new(t("Interface language", "界面语言"), language.to_string())
-            .choices(&["auto", "en", "zh"]),
-        Field::new(
-            t("Show reasoning", "显示思考过程"),
-            config.display.reasoning.clone(),
-        )
-        .choices(&["summary", "full", "hidden"]),
-        Field::new(
-            t("Show tool call details", "显示工具调用信息"),
-            config.display.tool_calls.clone(),
-        )
-        .choices(&["summary", "full", "hidden"]),
-        Field::new(
-            t("Command output lines", "命令输出显示行数"),
-            config.display.command_output_lines.to_string(),
-        ),
-        Field::boolean(
-            t("Readable tool names", "工具名可读显示"),
-            config.display.readable_tool_names,
-        ),
-        Field::boolean(
-            t(
-                "Show token usage in shell conversations",
-                "Shell 无缝对话显示 Token 计数",
+        .with(
+            Field::new(
+                t("Maximum tool rounds", "工具最大轮数"),
+                config.tools.max_rounds.to_string(),
             ),
-            config.display.show_token_usage,
-        ),
-        Field::new(
-            t(
-                "Show current provider/model in Mixed mode",
-                "Mixed 时显示本次供应商/模型",
-            ),
-            parse_mixed_endpoint_display(&config.display.mixed_model_endpoint_display),
+            |config, value| {
+                config.tools.max_rounds = value.trim().parse::<usize>()?;
+                Ok(())
+            },
         )
-        .choices(&["off", "interactive", "all"]),
-        Field::new(
-            t("When context reaches its limit", "上下文到达上限后"),
-            config.context.on_overflow.clone(),
+        .with(
+            Field::new(
+                t("Tool loading mode", "工具加载模式"),
+                normalize_tools_loading_mode(&config.tools.loading_mode),
+            )
+            .choices(&["full", "stub"]),
+            |config, value| {
+                config.tools.loading_mode = normalize_tools_loading_mode(value);
+                Ok(())
+            },
         )
-        .choices(&["compact", "pop"]),
-        // Appended rather than inserted: the read-back below is positional.
-        Field::new(
-            t(
-                "Turns replayed when reopening the REPL",
-                "重开 REPL 回放的轮数",
+        .with(
+            Field::boolean(
+                t("Remember loaded tools", "记住已加载工具"),
+                config.tools.persist_loaded_tools,
             ),
-            config.display.repl_replay_turns.to_string(),
-        ),
-    ];
-    // The read-back below is by index, so an insert in the middle silently
-    // writes every later value into the wrong setting. This catches that in
-    // debug builds; new fields go on the end.
-    debug_assert_eq!(
-        fields.len(),
-        15,
-        "global settings fields changed: update the positional read-back below"
-    );
-    run_form_without_buttons(stdout, t(" GLOBAL SETTINGS ", " 全局设置 "), &mut fields)?;
-    config.tools.enabled = parse_bool_field(&fields[0].value)?;
-    config.tools.max_rounds = fields[1].value.trim().parse::<usize>()?;
-    config.tools.loading_mode = normalize_tools_loading_mode(&fields[2].value);
-    config.tools.persist_loaded_tools = parse_bool_field(&fields[3].value)?;
-    config.skills.enabled = parse_bool_field(&fields[4].value)?;
-    config.skills.allow_command_execution = parse_bool_field(&fields[5].value)?;
-    config.display.language = language_choice_value(&fields[6].value)
-        .unwrap_or("auto")
-        .to_string();
-    config.display.reasoning = fields[7].value.trim().to_string();
-    config.display.tool_calls = fields[8].value.trim().to_string();
-    config.display.command_output_lines = fields[9]
-        .value
-        .trim()
-        .parse::<usize>()?
-        .min(MAX_COMMAND_OUTPUT_LINES);
-    config.display.readable_tool_names = parse_bool_field(&fields[10].value)?;
-    config.display.show_token_usage = parse_bool_field(&fields[11].value)?;
-    config.display.mixed_model_endpoint_display = parse_mixed_endpoint_display(&fields[12].value);
-    config.context.on_overflow = fields[13].value.trim().to_string();
-    config.display.repl_replay_turns = fields[14]
-        .value
-        .trim()
-        .parse::<usize>()?
-        .min(MAX_REPL_REPLAY_TURNS);
-    Ok(())
+            |config, value| {
+                config.tools.persist_loaded_tools = parse_bool_field(value)?;
+                Ok(())
+            },
+        )
+        .with(
+            Field::boolean(t("Enable skills", "Skills 启用"), config.skills.enabled),
+            |config, value| {
+                config.skills.enabled = parse_bool_field(value)?;
+                Ok(())
+            },
+        )
+        .with(
+            Field::boolean(
+                t("Allow command execution", "允许执行命令"),
+                config.skills.allow_command_execution,
+            ),
+            |config, value| {
+                config.skills.allow_command_execution = parse_bool_field(value)?;
+                Ok(())
+            },
+        )
+        .with(
+            Field::new(t("Interface language", "界面语言"), language.to_string())
+                .choices(&["auto", "en", "zh"]),
+            |config, value| {
+                config.display.language =
+                    language_choice_value(value).unwrap_or("auto").to_string();
+                Ok(())
+            },
+        )
+        .with(
+            Field::new(
+                t("Show reasoning", "显示思考过程"),
+                config.display.reasoning.clone(),
+            )
+            .choices(&["summary", "full", "hidden"]),
+            |config, value| {
+                config.display.reasoning = value.trim().to_string();
+                Ok(())
+            },
+        )
+        .with(
+            Field::new(
+                t("Show tool call details", "显示工具调用信息"),
+                config.display.tool_calls.clone(),
+            )
+            .choices(&["summary", "full", "hidden"]),
+            |config, value| {
+                config.display.tool_calls = value.trim().to_string();
+                Ok(())
+            },
+        )
+        .with(
+            Field::new(
+                t("Command output lines", "命令输出显示行数"),
+                config.display.command_output_lines.to_string(),
+            ),
+            |config, value| {
+                config.display.command_output_lines =
+                    value.trim().parse::<usize>()?.min(MAX_COMMAND_OUTPUT_LINES);
+                Ok(())
+            },
+        )
+        .with(
+            Field::boolean(
+                t("Readable tool names", "工具名可读显示"),
+                config.display.readable_tool_names,
+            ),
+            |config, value| {
+                config.display.readable_tool_names = parse_bool_field(value)?;
+                Ok(())
+            },
+        )
+        .with(
+            Field::boolean(
+                t(
+                    "Show token usage in shell conversations",
+                    "Shell 无缝对话显示 Token 计数",
+                ),
+                config.display.show_token_usage,
+            ),
+            |config, value| {
+                config.display.show_token_usage = parse_bool_field(value)?;
+                Ok(())
+            },
+        )
+        .with(
+            Field::new(
+                t(
+                    "Show current provider/model in Mixed mode",
+                    "Mixed 时显示本次供应商/模型",
+                ),
+                parse_mixed_endpoint_display(&config.display.mixed_model_endpoint_display),
+            )
+            .choices(&["off", "interactive", "all"]),
+            |config, value| {
+                config.display.mixed_model_endpoint_display = parse_mixed_endpoint_display(value);
+                Ok(())
+            },
+        )
+        .with(
+            Field::new(
+                t("When context reaches its limit", "上下文到达上限后"),
+                config.context.on_overflow.clone(),
+            )
+            .choices(&["compact", "pop"]),
+            |config, value| {
+                config.context.on_overflow = value.trim().to_string();
+                Ok(())
+            },
+        )
+        .with(
+            Field::new(
+                t(
+                    "Turns replayed when reopening the REPL",
+                    "重开 REPL 回放的轮数",
+                ),
+                config.display.repl_replay_turns.to_string(),
+            ),
+            |config, value| {
+                config.display.repl_replay_turns =
+                    value.trim().parse::<usize>()?.min(MAX_REPL_REPLAY_TURNS);
+                Ok(())
+            },
+        );
+    run_form_without_buttons(
+        stdout,
+        t(" GLOBAL SETTINGS ", " 全局设置 "),
+        &mut form.fields,
+    )?;
+    form.apply(config)
 }
 
 pub(in crate::config_tui) fn language_choice_label(value: &str, zh: bool) -> Option<&'static str> {

@@ -748,6 +748,34 @@ pub(in crate::config_tui) fn draw_form_button(
     Ok(())
 }
 
+/// 把一个表单值写回配置。
+pub(in crate::config_tui) type ApplyField = fn(&mut AppConfig, &str) -> Result<()>;
+
+/// 表单字段连同各自的写回。字段和写回写在同一处,读回不按下标——以前
+/// `fields[13]` 式的位置读回在中间插一个字段时,会把其后每个值静默写进错误
+/// 的设置项,`debug_assert` 只查数量、release 还不生效。
+#[derive(Default)]
+pub(in crate::config_tui) struct BoundFields {
+    pub(in crate::config_tui) fields: Vec<Field>,
+    applies: Vec<ApplyField>,
+}
+
+impl BoundFields {
+    pub(in crate::config_tui) fn with(mut self, field: Field, apply: ApplyField) -> Self {
+        self.fields.push(field);
+        self.applies.push(apply);
+        self
+    }
+
+    /// 按字段顺序逐个写回;任一字段解析失败即返回错误。
+    pub(in crate::config_tui) fn apply(&self, config: &mut AppConfig) -> Result<()> {
+        for (field, apply) in self.fields.iter().zip(&self.applies) {
+            apply(config, &field.value)?;
+        }
+        Ok(())
+    }
+}
+
 pub(in crate::config_tui) struct Field {
     pub(in crate::config_tui) label: &'static str,
     pub(in crate::config_tui) value: String,

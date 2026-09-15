@@ -20,7 +20,8 @@ docs/中有所有的计划和文档，可以自行按需阅读。
 
 # 项目注意事项
 
-深挖去处：`docs/理念.md`（设计哲学正典）、`docs/compact-plan.md`（compact 唯一定论）、`docs/cache-and-prompt-plan.md`（缓存契约）、`docs/wiki/15-扩展指南.md`（新工具/迁移步骤）、`docs/fixed/`（历次排查案卷）、`docs/design/`（施工前的方案稿）、`docs/plan/`（排期与施工记录）、`docs/plan-is-true/`（全部落地的计划归档）。文档怎么放、怎么命名见 §8。
+深挖去处：`docs/理念.md`（设计哲学正典）、`docs/compact-plan.md`（compact 唯一定论）、`docs/cache-and-prompt-plan.md`（缓存契约）、`docs/wiki/15-扩展指南.md`（新工具/迁移步骤）、`docs/fixed/`（历次排查案卷）、`docs/design/`（施工前的方案稿）、`docs/plan/`（排期与施工记录）。
+- 默认不跑测试与构建，只有明确说明的时候才能跑。
 
 ## 1. 提示词与缓存（字节契约）
 
@@ -35,7 +36,7 @@ docs/中有所有的计划和文档，可以自行按需阅读。
 
 ## 2. 工具系统
 
-2.1 **描述/schema 真相源是 `src/tools/descriptions/*.json`**（经 tool_descriptions.rs 的 include_str! 宏；新增必须补宏行，忘了=JSON 静默失效）。Rust 里的描述只是占位，注册时被 JSON 整体覆盖（load_skill 例外）。权限只由 `.writes()`/`.presentation()` 决定，JSON 的 permission 字段是死字段。
+2.1 **描述/schema 真相源是 `src/tools/descriptions/*.json`**（build.rs 扫目录自动生成 include 清单，丢进目录即生效；注册了却没有 JSON 的工具由 `shape_tests::registered_built_in_tools_have_json_descriptions` 拦截）。内置插件 id/显示名/引导开关只写 `config/plugin_catalog.rs` 一行，工具注册单元写 `tools/compose.rs` 的 `UNITS` 表一行，两边一一对应有测试钉着。Rust 里的描述只是占位，注册时被 JSON 整体覆盖（load_skill 例外）。权限只由 `.writes()`/`.presentation()` 决定，JSON 的 permission 字段是死字段。
 2.2 **工具名是最强的能力广告：域内聚合、域间分名**。编辑/读取类能力并入 edit（文件系统）/kb/artifact（补丁语义）与 read（`kb:`/`artifact:` 前缀），别为新存储开新读写工具。把能力藏进描述里的前缀/参数，模型想不起来（kb: 前缀实测翻车史）。
 2.3 **输出格式改造必须双兼容**：旧回合 tool_flow 逐字节回放，旧 JSON 解析器永远保留。“结构即功能”的不改：成败判定只认输出 JSON 的 success/ok 布尔（非 JSON=默认成功），错误路径保留 ok:false JSON。
 2.4 畸形参数在 registry 统一收口（按 schema 还原字符串化的数组/对象/数字），声明为 string 的参数一个字节不碰；报错说自己真正知道的（“期望整数，收到字符串 "1"”）。
@@ -43,7 +44,7 @@ docs/中有所有的计划和文档，可以自行按需阅读。
 
 ## 3. 数据库与状态
 
-3.1 迁移只在 MIGRATIONS 末尾追加、纯增量（不回填不删列）；改 Turn 字段必须同步所有固定列序 SELECT 与 map_turn_row（全库最脆弱处）。
+3.1 迁移只在 MIGRATIONS 末尾追加、纯增量（不回填不删列）；改 Turn 字段改 `rows.rs` 的 `TURN_COLUMNS` 与 `map_turn_row`（按列名读取，不按位置）两处即可。
 3.2 追加型数据用自增子表，别塞 turns 的 JSON 数组列（读改写全量=O(N²) 写放大）。
 3.3 **DB 备份用 VACUUM INTO，禁止 fs::copy 活库**（打开再 close 会丢本进程的 POSIX 常驻锁——08-21 conversation.db 损坏根因）；db/-wal/-shm 三件同进退；手工查活库一律 `mode=ro&immutable=1` 或拷副本；quick_check 不过就别跑 vacuum。
 
@@ -60,7 +61,7 @@ docs/中有所有的计划和文档，可以自行按需阅读。
 5.2 量尺类测试标 #[ignore]；断言结果不断言耗时；性能对比看倍率不看绝对值。
 5.3 测试不受开发环境影响：终端探测（TERM/kitty）在 cfg!(test) 下走固定路径；PTY 测试等子进程真就位再断言。
 5.4 黑盒实测必须 GQY_HOME 沙箱（普通 CLI 未知子命令会把参数当对话发给生产 daemon）。“改动没生效”先查幽灵 daemon 与测试 home 的配置残值。普通单次 CLI 阅后即焚会杀后台任务，测唤醒用 shellhook 形态。
-5.5 仓库自 08-26 起 fmt-clean（`939a2feb` 全量格式化，字节基线验证提示词未变），改完直接 `cargo fmt` 即可，别再手工挑文件——遗留的「rustfmt 会顺着 mod 声明递归刷子模块」陷阱随之失效。涉及 agent/llm/registry/提示词的改动，`scripts/refactor-check.sh` 五道门禁是验收硬要求。
+5.5 仓库自 08-26 起 fmt-clean（`939a2feb` 全量格式化，字节基线验证提示词未变），改完直接 `cargo fmt` 即可，别再手工挑文件——遗留的「rustfmt 会顺着 mod 声明递归刷子模块」陷阱随之失效。涉及 agent/llm/registry/提示词的改动，`test_scripts/refactor-check.sh` 全部门禁是验收硬要求。
 5.6 报错信息是嫌疑人不是证词：先读规范/原始数据（curl 探针、协议原文、日志），最后才轮到推理。
 
 ## 6. 性能与重构

@@ -1,10 +1,30 @@
 {
-  "_说明": "Measured from the unmodified main baseline for release 0.6.0. Existing dependency debt only. New/increased edges remain failures.",
-  "source_commit": "b4d2ac929dbfa547c9e85468dfde8649f5228f88",
+  "_说明": "现存跨层引用（低层 → 高层）的白名单，层序表见 arch_dep_check.py。只允许变小，变大即失败；新增的边不在表里，直接失败。",
+  "_来源": "--write-waivers 以现状重建",
   "waivers": {
+    "agent->platforms": {
+      "count": 8,
+      "reason": "层序表启用前的既有依赖：src/agent/mod.rs, src/agent/setup.rs, src/agent/tests/prompt.rs, src/agent/tests/shared.rs"
+    },
+    "config->state": {
+      "count": 2,
+      "reason": "层序表启用前的既有依赖：src/config/persona_manifest.rs, src/config/persona_paths.rs"
+    },
     "llm->platforms": {
       "count": 1,
       "reason": "Existing at main b4d2ac92: src/llm/openai_compatible/cli_relay/mod.rs"
+    },
+    "llm->render": {
+      "count": 1,
+      "reason": "层序表启用前的既有依赖：src/llm/openai_compatible/cli_relay/mod.rs"
+    },
+    "llm->tools": {
+      "count": 15,
+      "reason": "层序表启用前的既有依赖：src/llm/openai_compatible/antigravity/mod.rs, src/llm/openai_compatible/claude_code/mod.rs, src/llm/openai_compatible/cli_relay/process.rs, src/llm/openai_compatible/codex/mod.rs"
+    },
+    "models_cache->runtime": {
+      "count": 2,
+      "reason": "层序表启用前的既有依赖：src/models_cache/mod.rs"
     },
     "platforms->web": {
       "count": 4,
@@ -14,6 +34,22 @@
       "count": 2,
       "reason": "Existing at main b4d2ac92: src/render/markdown.rs, src/render/mod.rs"
     },
+    "runtime->platforms": {
+      "count": 4,
+      "reason": "层序表启用前的既有依赖：src/runtime/actor.rs, src/runtime/run.rs, src/runtime/session_ops.rs, src/runtime/state.rs"
+    },
+    "state->tools": {
+      "count": 1,
+      "reason": "层序表启用前的既有依赖：src/state/turns.rs"
+    },
+    "terminal->cli": {
+      "count": 1,
+      "reason": "层序表启用前的既有依赖：src/terminal/kitty.rs"
+    },
+    "tools->agent": {
+      "count": 9,
+      "reason": "层序表启用前的既有依赖：src/tools/knowledge_base/mod.rs, src/tools/mod.rs, src/tools/subagent.rs, src/tools/subagent_runner.rs"
+    },
     "tools->cli": {
       "count": 2,
       "reason": "Existing at main b4d2ac92: src/tools/memes/validate.rs, src/tools/vision/print.rs"
@@ -21,6 +57,10 @@
     "tools->platforms": {
       "count": 5,
       "reason": "Existing at main b4d2ac92: src/tools/platform_outreach.rs, src/tools/vision/mod.rs"
+    },
+    "tools->runtime": {
+      "count": 1,
+      "reason": "层序表启用前的既有依赖：src/tools/vision/inline.rs"
     },
     "tools->web": {
       "count": 5,
