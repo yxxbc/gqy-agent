@@ -101,6 +101,8 @@ pub enum Command {
     Layout(LayoutArgs),
     /// 包管理器:install / remove / upgrade / search / list / tap(`gqypm` 同)
     Pm(PmArgs),
+    /// 顾清影 自己的 GitHub bot 账号:login / status / logout
+    Github(GithubArgs),
     Config(ConfigArgs),
     Reload,
     Models(ModelsArgs),

@@ -1,0 +1,70 @@
+{
+  "name": "github",
+  "display_name": "GitHub",
+  "description": "Commit, open PRs and issues, and comment on GitHub.\nThe user is always the commit author and you are appended as Co-Authored-By automatically. Never write that trailer yourself.\nRuns as the user's own gh and git login by default. Set as_bot=true only when the user explicitly asks you to use your own GitHub account.\nWhen the acting account cannot push to the repository, set fork=true on pr_create.\nThe gh action is a raw passthrough without attribution. Use the structured actions for anything that creates content.",
+  "parameters": {
+    "type": "object",
+    "properties": {
+      "action": {
+        "type": "string",
+        "enum": ["status", "commit", "pr_create", "issue_create", "comment", "gh"],
+        "description": "status shows both identities and the trailer. commit commits staged changes. pr_create pushes a branch and opens a PR. issue_create opens an issue. comment posts on an issue or PR. gh runs raw gh arguments."
+      },
+      "as_bot": {
+        "type": "boolean",
+        "description": "Act as your own GitHub account instead of the user's. Default false. Only when the user asks."
+      },
+      "message": {
+        "type": "string",
+        "description": "commit: the commit message."
+      },
+      "add_all": {
+        "type": "boolean",
+        "description": "commit: stage every change with git add -A first. Default false."
+      },
+      "repo": {
+        "type": "string",
+        "description": "owner/name. Defaults to the repository of the working directory."
+      },
+      "title": {
+        "type": "string",
+        "description": "pr_create and issue_create: the title."
+      },
+      "body": {
+        "type": "string",
+        "description": "pr_create, issue_create and comment: the Markdown body."
+      },
+      "base": {
+        "type": "string",
+        "description": "pr_create: target branch. Defaults to the repository default branch."
+      },
+      "head": {
+        "type": "string",
+        "description": "pr_create: local branch to push. Defaults to the current branch."
+      },
+      "draft": {
+        "type": "boolean",
+        "description": "pr_create: open as a draft. Default true."
+      },
+      "fork": {
+        "type": "boolean",
+        "description": "pr_create: fork the repository to the acting account and push there. Default false."
+      },
+      "number": {
+        "type": "integer",
+        "description": "comment: the issue or PR number."
+      },
+      "args": {
+        "type": "array",
+        "items": { "type": "string" },
+        "description": "gh: the arguments after gh, one per item."
+      }
+    },
+    "required": ["action"],
+    "additionalProperties": false
+  },
+  "always_loaded": false,
+  "load_policy": "summary",
+  "groups": ["dev"],
+  "timeout_seconds": 0
+}

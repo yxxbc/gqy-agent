@@ -203,9 +203,15 @@ impl Agent {
         F: FnMut(AgentEvent) -> Result<()>,
     {
         let session = self.state.session_id();
+        let model = self.turn_model();
+        // 回合 future 很大,每套一层 task-local 就按值再嵌一份。装箱挪到堆上,
+        // 否则 2MB 栈的测试线程直接溢出(09-15 compaction 前缀用例实测)。
         crate::tools::workspace::with_session(
             session,
-            self.chat_stream_turn(input, images, control, on_event),
+            crate::tools::workspace::with_turn_model(
+                model,
+                Box::pin(self.chat_stream_turn(input, images, control, on_event)),
+            ),
         )
         .await
     }

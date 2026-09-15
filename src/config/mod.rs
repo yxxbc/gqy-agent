@@ -797,6 +797,31 @@ pub struct ToolsConfig {
     /// `/sandbox` 会话沙盒的放行清单(管理员绑定时生效;成员沙盒不看)。
     #[serde(default)]
     pub sandbox: SandboxConfig,
+    /// `github` 工具:署名与开关。bot 凭据不在这里,在 `<GQY_HOME>/github/`。
+    #[serde(default)]
+    pub github: GithubToolConfig,
+}
+
+/// `github` 工具(09-15)。用户固定是 author,顾清影 以 Co-Authored-By 挂尾。
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(default)]
+pub struct GithubToolConfig {
+    pub enabled: bool,
+    /// trailer 里的名字前缀,后面自动接「【模型】 (上下文窗口)」。
+    pub coauthor_name: String,
+    /// trailer 邮箱。留空:登录了 bot 用它的 noreply 邮箱(GitHub 才会挂头像),
+    /// 否则用不会关联到任何账号的保留域兜底。
+    pub coauthor_email: String,
+}
+
+impl Default for GithubToolConfig {
+    fn default() -> Self {
+        Self {
+            enabled: true,
+            coauthor_name: "顾清影".to_string(),
+            coauthor_email: String::new(),
+        }
+    }
 }
 
 /// `/sandbox <路径>` 之外还放行什么。根、`/tmp`、系统目录、顾清影 自己的产出目录
@@ -1049,6 +1074,7 @@ impl Default for ToolsConfig {
             default_timeout_secs: default_tools_timeout_secs(),
             command_deny: default_command_deny(),
             sandbox: SandboxConfig::default(),
+            github: GithubToolConfig::default(),
         }
     }
 }

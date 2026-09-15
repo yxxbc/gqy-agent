@@ -12,6 +12,7 @@ mod default_tools;
 pub(crate) use default_tools::TOOL_SUMMARY_PREFIX;
 pub(crate) mod exchange_rate;
 mod express;
+pub(crate) mod github;
 pub mod goal;
 mod html_conversion;
 mod http_response;
@@ -309,6 +310,7 @@ fn builtin_readable_tool_name(name: &str) -> Option<&'static str> {
         "manage_script" => t("Manage scripts", "管理脚本"),
         "todowrite" => t("Todo list", "任务列表"),
         "goal" => t("Long-task goal", "长任务目标"),
+        "github" => t("GitHub", "GitHub"),
         "review_aur_package" => t("Review AUR package", "审查 AUR 包"),
         "install_aur_package" => t("Install AUR package", "安装 AUR 包"),
         _ => return None,
@@ -499,6 +501,11 @@ pub fn compose_registry(
     apply_patch::register(&mut registry);
     todowrite::register(&mut registry, paths.clone());
     goal::register(&mut registry, config.clone(), paths.clone());
+    // 不做成 persona 插件:提 PR、修 PR 是 dev 人格的主业,core_only 也要有。
+    // 不可信场所靠 trust 缺省 Owner 筛掉。
+    if config.tools.github.enabled {
+        github::register(&mut registry, config, paths);
+    }
     if plugin("alarm") {
         alarm::register(&mut registry, paths.clone());
     }

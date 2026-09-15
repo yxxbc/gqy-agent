@@ -480,6 +480,14 @@ impl Agent {
         self.client.context_window(&self.config).ok().flatten()
     }
 
+    /// 本回合的主模型与窗口,给工具读(见 `workspace::TurnModel`)。
+    pub(in crate::agent) fn turn_model(&self) -> crate::tools::workspace::TurnModel {
+        crate::tools::workspace::TurnModel {
+            model: self.client.primary_model().to_string(),
+            context_window: self.context_window(),
+        }
+    }
+
     /// 上面那个数是不是猜的。猜的时候 footer 不能拿它算百分比。
     pub fn context_window_assumed(&self) -> bool {
         if self.context_window_override.is_some() {

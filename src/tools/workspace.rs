@@ -207,6 +207,26 @@ pub fn current_bridge_depth() -> u32 {
     BRIDGE_DEPTH.try_with(|depth| *depth).unwrap_or(0)
 }
 
+/// 本回合的主模型。`github` 工具把它写进 Co-Authored-By 的名字里——注册表
+/// 跨回合缓存复用,会话中途换模型只有 task-local 跟得上。
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct TurnModel {
+    pub model: String,
+    pub context_window: Option<usize>,
+}
+
+tokio::task_local! {
+    static TURN_MODEL: TurnModel;
+}
+
+pub async fn with_turn_model<F: Future>(model: TurnModel, future: F) -> F::Output {
+    TURN_MODEL.scope(model, future).await
+}
+
+pub fn current_turn_model() -> Option<TurnModel> {
+    TURN_MODEL.try_with(|model| model.clone()).ok()
+}
+
 /// 平台回合的生图配额。计数器挂在 turn future 的 task-local 上而不是共享
 /// 注册表里:注册表在配置缓存中跨 turn 复用,放那里会让会话之间互相污染。
 pub struct ImageGenLimit {

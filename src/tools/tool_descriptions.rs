@@ -58,6 +58,7 @@ macro_rules! tool_description_files {
             include_str!("descriptions/artifact.json"),
             include_str!("descriptions/ask_question.json"),
             include_str!("descriptions/goal.json"),
+            include_str!("descriptions/github.json"),
             include_str!("descriptions/aur.json"),
             include_str!("descriptions/check_os_info.json"),
             include_str!("descriptions/edit.json"),

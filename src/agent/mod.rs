@@ -415,9 +415,14 @@ impl Agent {
         F: FnMut(AgentEvent) -> Result<()>,
     {
         let session = self.state.session_id();
+        let model = self.turn_model();
         crate::tools::workspace::with_session(
             session,
-            self.redo_stream_turn(candidate, prompts, control, on_event),
+            crate::tools::workspace::with_turn_model(
+                model,
+                // 同 chat_stream_with_images_inner:装箱,别让嵌套把栈撑爆。
+                Box::pin(self.redo_stream_turn(candidate, prompts, control, on_event)),
+            ),
         )
         .await
     }

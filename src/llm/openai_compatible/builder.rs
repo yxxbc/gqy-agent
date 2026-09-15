@@ -12,6 +12,11 @@ impl OpenAiCompatibleClient {
         &self.provider.id
     }
 
+    /// 当前主端点的模型(故障转移到别的端点时以 ChatResult 为准)。
+    pub fn primary_model(&self) -> &str {
+        &self.provider.default_model
+    }
+
     /// 该端点的 Responses 续传是否已被记为不可用(记录或本进程自愈置位)。
     pub(crate) fn responses_continuation_suppressed(&self) -> bool {
         self.continuation_health
