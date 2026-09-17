@@ -331,23 +331,55 @@ pub struct LinearResampler {
     /// 上一批的最后一个样本,用于跨批插值。
     carry: Option<f32>,
     consumed: u64,
-    /// 抗混叠滑动平均的窗长(1 = 不降采样,不滤波)。
-    taps: usize,
+    /// 抗混叠低通的系数(空 = 不降采样,不滤波)。
+    taps: Vec<f32>,
     /// 滤波窗口,跨批保留,批边界不留断点。
     history: VecDeque<f32>,
+}
+
+/// 窗函数法设计一条低通 FIR(sinc × Hamming),用于抽取前压掉目标奈奎斯特以上。
+///
+/// `cutoff` 是相对输入采样率的归一化截止频率(0~0.5)。长度取奇数,群延迟是整
+/// 数个样本;系数归一化到直流增益 1,免得整体音量被改掉——能量门和 VAD 都按
+/// 绝对电平判事。
+fn design_lowpass(cutoff: f64, length: usize) -> Vec<f32> {
+    let length = length | 1;
+    let middle = (length - 1) as f64 / 2.0;
+    let mut taps = Vec::with_capacity(length);
+    for index in 0..length {
+        let offset = index as f64 - middle;
+        let sinc = if offset.abs() < f64::EPSILON {
+            2.0 * cutoff
+        } else {
+            (std::f64::consts::TAU * cutoff * offset).sin() / (std::f64::consts::PI * offset)
+        };
+        let window = 0.54
+            - 0.46 * (std::f64::consts::TAU * index as f64 / (length - 1) as f64).cos();
+        taps.push(sinc * window);
+    }
+    let sum: f64 = taps.iter().sum();
+    taps.into_iter().map(|tap| (tap / sum) as f32).collect()
 }
 
 impl LinearResampler {
     pub fn new(source_rate: u32, target_rate: u32) -> Self {
         let ratio = f64::from(source_rate) / f64::from(target_rate);
-        // 降采样才需要抗混叠:窗长取抽取比,把 target_rate/2 以上压下去。
-        // 线性插值自己那点低通远远不够——48k→16k 是 3:1 抽取,8kHz 以上会整体
-        // 折叠回语音带,毁掉 q/x/sh 这类擦音的判别特征(09-13 macOS 实测)。
-        // 只有在拿不到 16kHz 输入时才走到这儿,见 `preferred_input_config`。
+        // 降采样才需要抗混叠:把 target_rate/2 以上压下去,否则 8kHz 以上的能量
+        // 整个折回语音带,毁掉 q/x/sh 这类擦音的高频判别特征,KWS 于是永不命中。
+        //
+        // 09-13 先试的是"优先向设备要 16kHz,让系统自己转",但那条路要设备肯报
+        // 16kHz。MacBook Air 内置麦只报 44.1/48/88.2/96k(09-16 实测),`preferred_
+        // input_config` 必然退回 48k,每次都落到这里——所以这条路必须自己滤干净。
+        //
+        // 此前是 taps 个样本的滑动平均(boxcar)。boxcar 的阻带衰减只有 -13dB
+        // 量级:3:1 抽取下 12kHz 过完还剩三分之一幅度,压根挡不住。换成窗函数法
+        // 的低通 FIR,截止留在目标奈奎斯特的 0.45 倍(给过渡带留余量),长度按抽
+        // 取比给足。48kHz 下约 3M 次乘加/秒,待机占用照样看不见。
         let taps = if ratio > 1.0 {
-            (ratio.round() as usize).clamp(2, 16)
+            let length = ((ratio * 16.0).round() as usize).clamp(31, 127);
+            design_lowpass(0.45 / ratio, length)
         } else {
-            1
+            Vec::new()
         };
         Self {
             ratio,
@@ -359,19 +391,27 @@ impl LinearResampler {
         }
     }
 
-    /// 抽取前的滑动平均(boxcar FIR)。窗口跨批保留,批边界不会留下断点。
+    /// 抽取前的低通。窗口跨批保留,批边界不会留下断点。
     fn antialias(&mut self, input: &[f32]) -> Vec<f32> {
-        if self.taps <= 1 {
+        if self.taps.is_empty() {
             return input.to_vec();
         }
         let mut out = Vec::with_capacity(input.len());
         for &sample in input {
             self.history.push_back(sample);
-            while self.history.len() > self.taps {
+            while self.history.len() > self.taps.len() {
                 self.history.pop_front();
             }
-            let sum: f32 = self.history.iter().copied().sum();
-            out.push(sum / self.history.len() as f32);
+            // 窗口还没填满时按已有的样本算,起头几个样本会偏轻——那是开流的
+            // 头两毫秒,落不到任何判定上。
+            let sum: f32 = self
+                .history
+                .iter()
+                .rev()
+                .zip(self.taps.iter())
+                .map(|(sample, tap)| sample * tap)
+                .sum();
+            out.push(sum);
         }
         out
     }
@@ -416,6 +456,52 @@ impl LinearResampler {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    /// 48kHz 下生成一段单频正弦。
+    fn tone(freq: f32) -> Vec<f32> {
+        (0..48_000)
+            .map(|i| (std::f32::consts::TAU * freq * i as f32 / 48_000.0).sin())
+            .collect()
+    }
+
+    fn rms(samples: &[f32]) -> f32 {
+        (samples.iter().map(|s| s * s).sum::<f32>() / samples.len() as f32).sqrt()
+    }
+
+    #[test]
+    fn antialias_keeps_speech_band_and_rejects_what_would_fold_back() {
+        // 48k→16k 抽取,目标奈奎斯特是 8kHz。1kHz(语音带内)该基本原样过去,
+        // 12kHz 若不压掉会折回 4kHz,正好落在擦音的判别区——MacBook Air 拿不到
+        // 16kHz 直通,每次采集都走这条路,压不住 KWS 就永不命中。
+        let mut low = LinearResampler::new(48_000, 16_000);
+        let low_out = low.process(&tone(1_000.0));
+        assert!(
+            rms(&low_out) > 0.6,
+            "1kHz 被削掉了太多: rms={}",
+            rms(&low_out)
+        );
+
+        let mut high = LinearResampler::new(48_000, 16_000);
+        let high_out = high.process(&tone(12_000.0));
+        assert!(
+            rms(&high_out) < 0.05,
+            "12kHz 没压住,会折叠回语音带: rms={}",
+            rms(&high_out)
+        );
+    }
+
+    #[test]
+    fn antialias_preserves_overall_level() {
+        // 系数归一化到直流增益 1:能量门和 VAD 都按绝对电平判事,滤波不能顺手
+        // 把整体音量改掉。
+        let mut resampler = LinearResampler::new(48_000, 16_000);
+        let out = resampler.process(&tone(300.0));
+        assert!(
+            (rms(&out) - std::f32::consts::FRAC_1_SQRT_2).abs() < 0.05,
+            "整体电平被改了: rms={}",
+            rms(&out)
+        );
+    }
 
     #[test]
     fn resampler_halves_rate() {

@@ -58,6 +58,11 @@ static WAKE_NOTICE_GEN: std::sync::atomic::AtomicU64 = std::sync::atomic::Atomic
 /// 语音会话"代":快捷键把窗口关掉一次加一。回合在跑/在合成时被这样关掉,
 /// 回合完成后的通知与播报一律作废,免得关了还念。
 static VOICE_WINDOW_GEN: std::sync::atomic::AtomicU64 = std::sync::atomic::AtomicU64::new(0);
+/// hold 的代际。hold 压着追问窗口的计时,而「谁开的谁关」在并发下不成立:
+/// 上一轮被打断后返回 cancelled,它那句 hold off 会把**新一轮**刚压下去的
+/// hold 掀掉,于是新一轮还在推理,30 秒追问窗口就已经开始倒计时了。只有仍是
+/// 最新一代的回合才准放 hold。
+static HOLD_GEN: std::sync::atomic::AtomicU64 = std::sync::atomic::AtomicU64::new(0);
 const WAKE_NOTICE_DELAY_MS: u64 = 1200;
 /// 浏览器录音转写的在途请求。
 static TRANSCRIBES: Mutex<Option<HashMap<String, oneshot::Sender<Result<String, String>>>>> =
@@ -298,8 +303,9 @@ fn handle_worker_event(state: &DaemonState, kind: &str, data: Value) {
             *DEVICE.lock().unwrap() = Some(text_field(&data, "device"));
         }
         "voice.wake" => {
-            // 唤醒时若上一轮还在回复,先打断。
-            cancel_active_run(state);
+            // 唤醒只是「我要开口了」,指令还没到:掐嘴不掐活。真要换指令,下面
+            // voice.command 那条自会取消上一轮。
+            send_signal("voice.stop_speaking", json!({}));
             let generation = WAKE_NOTICE_GEN.fetch_add(1, Ordering::Relaxed) + 1;
             if cfg!(target_os = "linux") {
                 // 提示音在前端即刻响,通知也即刻弹,和音效同步;同口气带指令时
@@ -326,7 +332,11 @@ fn handle_worker_event(state: &DaemonState, kind: &str, data: Value) {
             }
         }
         "voice.speech_start" => {
-            cancel_active_run(state);
+            // 起势人声:让她闭嘴,但**别动正在跑的回合**。以前这里直接取消,于是
+            // 她在改文件时你插一句「等一下」,活就白干了(GPT-Live 的同款结论:
+            // 打断语音不该连带取消后台工作)。明确要停有两条路:说新指令(走
+            // voice.command)、或按快捷键(走 reason=listen)。
+            send_signal("voice.stop_speaking", json!({}));
         }
         "voice.command" => {
             let text = text_field(&data, "text");
@@ -467,30 +477,201 @@ pub(crate) fn clip(text: &str, max: usize) -> String {
     }
 }
 
-/// 语音会话的专属 lane:id 记在 state 目录,坏了(被删)就重建。
-fn resolve_voice_session(state: &DaemonState) -> Result<String> {
-    let marker = state.paths.state_dir.join(SESSION_ID_FILE);
-    if let Ok(saved) = std::fs::read_to_string(&marker) {
-        let saved = saved.trim().to_string();
-        if !saved.is_empty()
-            && state
-                .state_store
-                .session_record(&saved)?
-                .is_some_and(|record| !record.archived)
-        {
-            return Ok(saved);
+/// 播报文本切一刀:先播的第一句 + 剩下的。剩下的为空表示不值得切。
+///
+/// 只切一刀,不逐句切碎:每段都是一次独立合成,接缝多了句子之间的语气就断得
+/// 明显。第一句足够短就能把首声延迟压下来,后面整段合成保住连贯。
+///
+/// 太短的开头(「好的。」)不单独成段——为一个词多跑一次请求、多一个接缝,不
+/// 划算;长到没有标点也不硬切,宁可整段合成。
+fn split_first_sentence(text: &str) -> (&str, &str) {
+    /// 第一句至少这么多字才值得单独合成。
+    const MIN_CHARS: usize = 6;
+    /// 这么多字还没见到句末标点就别切了。
+    const MAX_CHARS: usize = 60;
+    /// 尾巴短于这个就并回去。
+    const TAIL_MIN_CHARS: usize = 4;
+
+    let mut chars = text.char_indices().peekable();
+    let mut count = 0usize;
+    let mut cut = None;
+    while let Some((index, ch)) = chars.next() {
+        count += 1;
+        if count > MAX_CHARS {
+            return (text, "");
+        }
+        let ends_sentence = matches!(ch, '。' | '！' | '？' | '；' | '\n')
+            // 英文标点要后面跟空白才算句末,否则 "3.5" 会被切开。
+            || (matches!(ch, '.' | '!' | '?' | ';')
+                && chars.peek().is_none_or(|(_, next)| next.is_whitespace()));
+        if ends_sentence && count >= MIN_CHARS {
+            cut = Some(index + ch.len_utf8());
+            break;
         }
     }
+    let Some(cut) = cut else {
+        return (text, "");
+    };
+    let tail = text[cut..].trim_start();
+    if tail.chars().count() < TAIL_MIN_CHARS {
+        return (text, "");
+    }
+    (text[..cut].trim_end(), tail)
+}
+
+/// 语音回合落在**终端那条 REPL 会话**上:语音和终端是同一个顾清影,不是两
+/// 个摊子。
+///
+/// 会话指针存在库里,终端关掉它也还在——所以没开终端时语音照样往这条会话里
+/// 说,下次 `gqy` 进来 `ensure_repl_session` 拿到的是同一条,刚才用嘴聊的全
+/// 在历史里接着聊。09-16 之前这里开的是一条专属 lane(id 记在 state 目录),
+/// 于是终端里说过的话语音问不到,只能等记忆整理完靠联想撞运气。
+///
+/// 固定走 normal 人格车道,不跟随终端当时在 dev 还是 normal:人不在终端前的
+/// 时候根本不知道当时是哪条,投错了很难受;随口问的东西也不该跑进 dev。
+fn resolve_voice_session(state: &DaemonState) -> Result<String> {
     let persona = state.manager.lock().unwrap().config.active_persona_scope();
-    let record = state.state_store.create_session(
-        &persona,
-        crate::i18n::text("Voice chat", "语音会话"),
-        crate::state::VOICE_SESSION_KIND,
-        None,
-    )?;
-    std::fs::write(&marker, &record.session_id)
-        .with_context(|| format!("写入 {}", marker.display()))?;
-    Ok(record.session_id)
+    state.state_store.ensure_repl_session(&persona)
+}
+
+/// 起这一轮并把回复文本收回来。
+///
+/// 不走自己的 IPC 口回环提交:那条路上 `job_wake` 写死 false、`display_content`
+/// 等于 `content`。这里照 `goal_driver` 的做法直接进 actor,于是
+/// ① `job_wake=true` 让 REPL 客户端发现并挂上实时渲染——终端开着的时候,语音
+///    这一轮和手打的那一轮长得一模一样;② 原话与协议包裹能分开。
+///
+/// 终端没开也照跑:没人渲染而已,回复照样落进这条会话,TTS 照样念。
+async fn collect_voice_reply(
+    state: &DaemonState,
+    session_id: &str,
+    content: String,
+    display_content: String,
+) -> Result<(String, &'static str)> {
+    use tokio::sync::broadcast::error::RecvError;
+
+    let run_id = crate::runtime::random_id("run", 18);
+    let (cancel_tx, cancel_rx) = tokio::sync::watch::channel(false);
+    {
+        let mut manager = state.manager.lock().unwrap();
+        if manager.admin_blocks_session(session_id) {
+            anyhow::bail!(crate::ipc::ADMIN_BUSY_MESSAGE);
+        }
+        manager.active_runs.insert(
+            run_id.clone(),
+            crate::runtime::RunInfo {
+                session_id: session_id.into(),
+                mode: crate::agent::AgentMode::Normal,
+                audience: crate::config::PromptAudience::Owner,
+                cancel: cancel_tx,
+                turn_id: None,
+                queue_target: None,
+                supersede: std::sync::Arc::new(crate::agent::TurnSupersedeSignal::default()),
+                platform_followup: None,
+                operation: crate::runtime::RunOperation::Create,
+                // 复用 job_wake 这条可见性通道(goal 续轮同款):REPL 客户端靠
+                // 它发现 daemon 自己发起的回合。不开的话,语音这一轮在终端里
+                // 是完全看不见的。
+                job_wake: true,
+                turn_origin: crate::tools::workspace::TurnOrigin::Human,
+                job_wake_label: Some(crate::i18n::text("voice", "语音").to_string()),
+            },
+        );
+    }
+    *ACTIVE_RUN.lock().unwrap() = Some(run_id.clone());
+
+    let after = state.events.latest_id();
+    let mut subscription = state.events.subscribe_after(after);
+    if state
+        .actor_tx
+        .send(crate::runtime::ActorCommand::StartTurn {
+            run_id: run_id.clone(),
+            session_id: session_id.into(),
+            content,
+            display_content,
+            attachment_run_id: None,
+            mode: crate::agent::AgentMode::Normal,
+            images: Vec::new(),
+            cwd: None,
+            origin_tty: None,
+            audience: crate::config::PromptAudience::Owner,
+            profile: None,
+            overrides: None,
+            cancel: cancel_rx,
+            turn_origin: Box::new(crate::tools::workspace::TurnOrigin::Human),
+        })
+        .is_err()
+    {
+        crate::runtime::finish_run(&state.manager, &run_id, None);
+        anyhow::bail!("GQY core worker is unavailable");
+    }
+
+    let mut reply = String::new();
+    let mut last_id = after;
+    loop {
+        let record = match subscription.pending.pop_front() {
+            Some(record) => record,
+            None => match subscription.receiver.recv().await {
+                Ok(record) => record,
+                Err(RecvError::Lagged(_)) => {
+                    subscription.pending = state.events.replay_after(last_id);
+                    continue;
+                }
+                Err(RecvError::Closed) => return Ok((reply, "disconnected")),
+            },
+        };
+        if record.kind == "resync_required" {
+            // 别的会话刷屏把本轮事件挤出了共享缓冲(ipc_server 同款处理):回合
+            // 还在跑就续流,已经结束就按完成收尾——不谎报取消,否则那边刚说完
+            // 这边就把播报吞了。
+            last_id = serde_json::from_str::<Value>(&record.data)
+                .ok()
+                .and_then(|data| data.get("latest_event_id").and_then(Value::as_u64))
+                .unwrap_or(last_id);
+            let still_running = state
+                .manager
+                .lock()
+                .unwrap()
+                .active_runs
+                .contains_key(&run_id);
+            if still_running {
+                continue;
+            }
+            return Ok((reply, "completed"));
+        }
+        last_id = record.id;
+        let Ok(data) = serde_json::from_str::<Value>(&record.data) else {
+            continue;
+        };
+        if data.get("run_id").and_then(Value::as_str) != Some(run_id.as_str()) {
+            continue;
+        }
+        match record.kind.as_str() {
+            "assistant.delta" => {
+                if let Some(delta) = data.get("delta").and_then(Value::as_str) {
+                    reply.push_str(delta);
+                }
+            }
+            "run.completed" => return Ok((reply, "completed")),
+            "run.cancelled" => return Ok((reply, "cancelled")),
+            "run.failed" => {
+                let message = data
+                    .get("error")
+                    .or_else(|| data.get("message"))
+                    .and_then(Value::as_str)
+                    .unwrap_or("unknown error");
+                anyhow::bail!("{message}");
+            }
+            _ => {}
+        }
+    }
+}
+
+/// 放开 hold——仅当 `gen` 仍是最新一代。见 [`HOLD_GEN`]。
+fn release_hold(generation: u64) {
+    if HOLD_GEN.load(Ordering::Relaxed) == generation {
+        send_signal("voice.hold", json!({ "on": false }));
+    }
 }
 
 /// 打断进行中的语音回合(有就取消,没有无操作)。
@@ -530,62 +711,14 @@ async fn run_voice_turn(state: &DaemonState, content: String) -> Result<()> {
         )
     };
     // 语音协议(agent::prompt::VOICE_PROTOCOL):用户消息带这个包裹,模型才会
-    // 在回复末尾给 <speak> 口语版。
+    // 在回复末尾给 <speak> 口语版。包裹只喂模型,`display_content` 给的是原
+    // 话——这一轮现在在终端里看得见了,不该让用户读到一串尖括号。
+    let display_content = content.clone();
     let content = format!("<voice_input>{content}</voice_input>");
-    let socket = state.paths.ipc_socket();
     let window_gen = VOICE_WINDOW_GEN.load(Ordering::Relaxed);
+    let hold_gen = HOLD_GEN.fetch_add(1, Ordering::Relaxed) + 1;
     send_signal("voice.hold", json!({ "on": true }));
-    let outcome = async {
-        let mut stream = crate::ipc::connect(&socket).await?;
-        crate::ipc::send(
-            &mut stream,
-            &crate::ipc::Request::new(crate::ipc::Command::StartTurn {
-                content: content.clone(),
-                mode: "normal".to_string(),
-                images: Vec::new(),
-                origin_tty: None,
-                cwd: None,
-                session_id: Some(session_id.clone()),
-                overrides: None,
-            }),
-        )
-        .await?;
-        let mut reply = String::new();
-        let mut my_run: Option<String> = None;
-        loop {
-            let Some(frame) = crate::ipc::receive::<crate::ipc::Frame>(&mut stream).await? else {
-                return Ok((reply, "disconnected"));
-            };
-            match frame {
-                crate::ipc::Frame::Accepted { run_id, .. } => {
-                    *ACTIVE_RUN.lock().unwrap() = Some(run_id.clone());
-                    my_run = Some(run_id);
-                }
-                crate::ipc::Frame::Event { kind, data, .. } => match kind.as_str() {
-                    "assistant.delta" => {
-                        if let Some(delta) = data.get("delta").and_then(Value::as_str) {
-                            reply.push_str(delta);
-                        }
-                    }
-                    "run.completed" => return Ok((reply, "completed")),
-                    "run.cancelled" => return Ok((reply, "cancelled")),
-                    "run.failed" => {
-                        let message = data
-                            .get("error")
-                            .or_else(|| data.get("message"))
-                            .and_then(Value::as_str)
-                            .unwrap_or("unknown error");
-                        anyhow::bail!("{message}");
-                    }
-                    _ => {}
-                },
-                crate::ipc::Frame::Error { message, .. } => anyhow::bail!("{message}"),
-                _ => {}
-            }
-            let _ = &my_run;
-        }
-    }
-    .await;
+    let outcome = collect_voice_reply(state, &session_id, content, display_content).await;
     // 只有当前仍是这一轮时才清 ACTIVE_RUN(被打断时新一轮可能已经接管)。
     let finished = outcome.as_ref().ok().map(|(_, how)| *how);
     if finished.is_some() || outcome.is_err() {
@@ -599,7 +732,7 @@ async fn run_voice_turn(state: &DaemonState, content: String) -> Result<()> {
     let (reply, how) = match outcome {
         Ok(pair) => pair,
         Err(error) => {
-            send_signal("voice.hold", json!({ "on": false }));
+            release_hold(hold_gen);
             return Err(error);
         }
     };
@@ -607,47 +740,75 @@ async fn run_voice_turn(state: &DaemonState, content: String) -> Result<()> {
     match how {
         "completed" if window_closed() => {
             // 回合跑完前窗口已被关(快捷键再按 / 没事了 / 超时):不念不弹。
-            send_signal("voice.hold", json!({ "on": false }));
+            release_hold(hold_gen);
             tracing::debug!("语音回合完成时窗口已关,跳过播报");
         }
         "completed" => {
             // 通知正文与播报用同一份口语版:有 <speak> 用 <speak>,没有就清洗正文。
             let spoken = crate::web::voice_tts::spoken_text(&reply, &tts);
             let summary = clip(&spoken, reply_chars);
-            // 先合成再通知:合成要一到三秒,通知若先弹,用户看到文字却要等
-            // 好几秒才听到声音(09-05)。合成好了通知与播放同一瞬间发出。
-            let synthesized = if tts.is_active() && !spoken.trim().is_empty() {
-                match synthesize_to_cache(state, &tts, spoken.trim()).await {
-                    Ok(path) => Some(path),
-                    Err(error) => {
-                        tracing::warn!("播报失败: {error:#}");
-                        None
-                    }
+            let spoken = spoken.trim().to_string();
+            if !tts.is_active() || spoken.is_empty() {
+                release_hold(hold_gen);
+                if window_closed() {
+                    tracing::debug!("窗口已关,跳过提示音");
+                    return Ok(());
                 }
-            } else {
-                None
+                notify(state, "顾清影", &summary);
+                send_signal("voice.cue", json!({ "name": "done" }));
+                return Ok(());
+            }
+            // 分句流水线(09-16):整段合成要一到三秒,这期间是全静默的干等。
+            // 切一刀,第一句短、合得快,先出声;剩下的在它播的时候合,接上排队
+            // 播出。首声延迟从「整段合成」降到「第一句合成」。
+            let (head, tail) = split_first_sentence(&spoken);
+            // 先合成再通知:通知若先弹,用户看到文字却要等好几秒才听到声音
+            // (09-05)。合成好了通知与播放同一瞬间发出。
+            let first = match synthesize_to_cache(state, &tts, head).await {
+                Ok(path) => Some(path),
+                Err(error) => {
+                    tracing::warn!("播报失败: {error:#}");
+                    None
+                }
             };
-            send_signal("voice.hold", json!({ "on": false }));
+            release_hold(hold_gen);
             if window_closed() {
                 // 合成这一两秒里被关掉了:音频作废。
-                if let Some(path) = synthesized {
+                if let Some(path) = first {
                     let _ = std::fs::remove_file(path);
                 }
                 tracing::debug!("合成期间窗口已关,丢弃播报");
                 return Ok(());
             }
             notify(state, "顾清影", &summary);
-            match synthesized {
-                Some(path) => send_signal(
+            let Some(first) = first else {
+                send_signal("voice.cue", json!({ "name": "done" }));
+                return Ok(());
+            };
+            send_signal(
+                "voice.play",
+                json!({ "wav_path": first.display().to_string(), "more": !tail.is_empty() }),
+            );
+            if tail.is_empty() {
+                return Ok(());
+            }
+            // 后半段在第一句播着的时候合。合不出来也不用补救:前端等不到下一
+            // 段会在宽限期后自己收状态,掐掉正在播的第一句反而更糟。
+            match synthesize_to_cache(state, &tts, tail).await {
+                Ok(path) if window_closed() => {
+                    let _ = std::fs::remove_file(path);
+                    tracing::debug!("后半段合成期间窗口已关,丢弃");
+                }
+                Ok(path) => send_signal(
                     "voice.play",
-                    json!({ "wav_path": path.display().to_string() }),
+                    json!({ "wav_path": path.display().to_string(), "more": false }),
                 ),
-                None => send_signal("voice.cue", json!({ "name": "done" })),
+                Err(error) => tracing::warn!("后半段播报合成失败: {error:#}"),
             }
         }
-        "cancelled" => send_signal("voice.hold", json!({ "on": false })),
+        "cancelled" => release_hold(hold_gen),
         _ => {
-            send_signal("voice.hold", json!({ "on": false }));
+            release_hold(hold_gen);
             notify(
                 state,
                 t("GQY voice", "顾清影 语音"),
@@ -782,7 +943,12 @@ pub(crate) async fn handle_voice_speak(
     Ok(())
 }
 
-/// VoiceReset 处理:删掉语音会话与 id 标记,下次唤醒重建。
+/// VoiceReset 处理:掐掉在跑的语音回合,并清掉 09-16 之前那条专属语音会话的
+/// 残留。
+///
+/// **不碰当前会话**——语音现在跟终端共用一条会话(见 [`resolve_voice_session`]),
+/// 再照老样子按标记删会话,删掉的就是用户自己的终端对话了。所以只删 kind 确实
+/// 是 `voice` 的那条遗留会话,顺手把标记文件清掉。
 pub(crate) async fn handle_voice_reset(
     state: &DaemonState,
     stream: &mut tokio::net::UnixStream,
@@ -791,9 +957,16 @@ pub(crate) async fn handle_voice_reset(
     let marker = state.paths.state_dir.join(SESSION_ID_FILE);
     if let Ok(saved) = std::fs::read_to_string(&marker) {
         let saved = saved.trim();
-        if !saved.is_empty() {
+        let legacy = !saved.is_empty()
+            && state
+                .state_store
+                .session_record(saved)
+                .ok()
+                .flatten()
+                .is_some_and(|record| record.kind == crate::state::VOICE_SESSION_KIND);
+        if legacy {
             if let Err(error) = state.state_store.delete_session(saved) {
-                tracing::warn!("删除语音会话 {saved} 失败: {error:#}");
+                tracing::warn!("删除遗留语音会话 {saved} 失败: {error:#}");
             }
         }
     }
@@ -1007,12 +1180,55 @@ pub(crate) async fn transcribe_wav(state: &DaemonState, wav: &[u8]) -> Result<St
 
 #[cfg(test)]
 mod tests {
-    use super::clip;
+    use super::{clip, split_first_sentence};
 
     #[test]
     fn clip_strips_markdown_and_truncates() {
         let text = "# 标题\n\n**重点**:今天 `晴`。\n```rust\nlet x = 1;\n```\n- 第二行";
         assert_eq!(clip(text, 100), "标题 重点:今天 晴。 第二行");
         assert_eq!(clip("一二三四五六", 4), "一二三…");
+    }
+
+    #[test]
+    fn first_sentence_is_split_off_for_early_playback() {
+        assert_eq!(
+            split_first_sentence("日志我看过了。问题出在重连那段,退避没有上限。"),
+            ("日志我看过了。", "问题出在重连那段,退避没有上限。")
+        );
+        assert_eq!(
+            split_first_sentence("Checked the log. The backoff has no ceiling."),
+            ("Checked the log.", "The backoff has no ceiling.")
+        );
+    }
+
+    #[test]
+    fn short_lead_ins_are_not_split_off() {
+        // 「好的。」单独合成一段不划算:多一次请求、多一个接缝。
+        let text = "好的。我这就去看看那个文件到底写了什么。";
+        assert_eq!(split_first_sentence(text), (text, ""));
+    }
+
+    #[test]
+    fn a_lone_sentence_stays_whole() {
+        let text = "这一句里没有句号所以整段合成";
+        assert_eq!(split_first_sentence(text), (text, ""));
+        // 尾巴太短也并回去。
+        let text = "我看完日志了,没发现问题。好";
+        assert_eq!(split_first_sentence(text), (text, ""));
+    }
+
+    #[test]
+    fn decimals_are_not_sentence_boundaries() {
+        let text = "版本升到 3.5 之后重连就正常了,昨天那批告警也没再出现。";
+        let (head, tail) = split_first_sentence(text);
+        assert_eq!(head, text);
+        assert_eq!(tail, "");
+    }
+
+    #[test]
+    fn a_long_run_on_is_left_whole() {
+        // 六十字还没见到标点:宁可整段合成,也不硬切出怪断句。
+        let text = "这段话很长但是一个标点都没有所以不应该被切开因为硬切出来的断句听起来会很奇怪还不如整段合成来得自然一些就这样吧";
+        assert_eq!(split_first_sentence(text), (text, ""));
     }
 }

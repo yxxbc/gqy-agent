@@ -18,7 +18,7 @@
 //! | d→w | voice.audio | {pcm16: base64 的 16kHz 单声道 PCM16 LE}(stream 听写期间) |
 //! | d→w | voice.transcribe | {request_id, wav_path} |
 //! | d→w | voice.cue | {name} |
-//! | d→w | voice.play | {wav_path}(daemon 已合成好的音频,播完删文件) |
+//! | d→w | voice.play | {wav_path, more}(daemon 已合成好的音频,读完即删;more=后面还有段) |
 //! | d→w | voice.stop_speaking | {} |
 //! | w→d | voice.speaking | {on}(播报开始/结束;播报期间麦克风帧丢弃) |
 //!
@@ -163,8 +163,6 @@ pub fn run_worker() -> Result<()> {
             let _ = event_tx.send(WorkerEvent::Speaking(on));
         }))?
     };
-    // 正在播的 daemon 合成文件,播完删。
-    let mut playing_file: Option<String> = None;
 
     let device = service
         .as_ref()
@@ -229,10 +227,15 @@ pub fn run_worker() -> Result<()> {
                         .and_then(Value::as_str)
                         .unwrap_or_default()
                         .to_string();
+                    // daemon 说后面还有一段(分句流水线),播完别急着收 speaking。
+                    let more = data.get("more").and_then(Value::as_bool).unwrap_or(false);
                     match std::fs::read(&path) {
                         Ok(bytes) => {
-                            playing_file = Some(path);
-                            speaker.play_wav(bytes);
+                            // 读进内存就把文件删了。以前是记着路径等播完再删,
+                            // 一次只记得住一个——分成两段送时前一段的路径会被
+                            // 顶掉,临时文件就留在 cache 里了。
+                            let _ = std::fs::remove_file(&path);
+                            speaker.play_wav(bytes, more);
                         }
                         Err(error) => tracing::warn!("读取播报音频失败 {path}: {error}"),
                     }
@@ -298,11 +301,6 @@ pub fn run_worker() -> Result<()> {
             WorkerEvent::Speaking(on) => {
                 control(Control::Playback(on));
                 send("voice.speaking", json!({ "on": on }));
-                if !on {
-                    if let Some(path) = playing_file.take() {
-                        let _ = std::fs::remove_file(path);
-                    }
-                }
             }
             WorkerEvent::AttachLost => {
                 tracing::info!("daemon 信令连接断开,worker 退出");

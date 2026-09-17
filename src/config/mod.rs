@@ -391,10 +391,19 @@ impl MiniMaxTtsConfig {
 /// 叠词不是凑数:音节长、声学特征明显,唤醒检测命中率高、误触少——所以是
 /// 「清影清影」而不是「清影」。中文与拼音两条识别路径各留一条。
 fn default_wake_keywords() -> Vec<String> {
-    ["清影清影", "顾清影", "qing1 ying3 qing1 ying3"]
-        .into_iter()
-        .map(str::to_string)
-        .collect()
+    // 「影」标准读音是三声,但实际喊出来常是二声:「清影」不是常用词,「轻盈」
+    // 是,嘴会往高频词上滑(09-16 实测——KWS 把整句听成「轻盈轻盈」,而带调韵母
+    // 是建模单元,ǐng 与 íng 是两个 token,序列对不上就永不命中)。默认把两个声
+    // 调都注册上,任一命中即唤醒;两者只差一个 token 的调号,误触发面增量很小。
+    [
+        "清影清影",
+        "顾清影",
+        "qing1 ying3 qing1 ying3",
+        "qing1 ying2 qing1 ying2",
+    ]
+    .into_iter()
+    .map(str::to_string)
+    .collect()
 }
 
 /// 把 "清影清影, 小影" 这样的文本拆成唤醒词列表(逗号/顿号/分号/换行分隔,去重)。

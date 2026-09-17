@@ -2,15 +2,23 @@
 //!
 //! 播放期间通过 `on_state(true/false)` 通知宿主(worker 据此让管线丢掉麦克风
 //! 帧,并告诉 daemon 正在播报);`stop()` 立即打断。
+//!
+//! **播报是排队的**(09-16):daemon 把一段回复拆成先后两段合成,第一句先到先
+//! 播,剩下的边播边合成。此前播放中送来的段会被直接丢弃,后半句就没了。
+//!
+//! 段与段之间的 `on_state` 必须保持 `true` 不许抖:哪怕只掉下去一瞬,管线就
+//! 会恢复喂麦克风帧,把喇叭里正在播的下一段当成用户开口,于是她自己把自己
+//! 打断。`more` 标记说明「后面还有」,播完这段会留一个宽限期等下一段。
 
 use anyhow::{Context, Result};
+use std::collections::VecDeque;
 use std::io::Cursor;
 use std::sync::mpsc;
 use std::time::Duration;
 
 pub enum SpeakerCommand {
-    /// 播一段完整 wav。
-    PlayWav(Vec<u8>),
+    /// 播一段完整 wav。`more` = daemon 说后面还有一段,别急着收状态。
+    PlayWav { wav: Vec<u8>, more: bool },
     /// 打断当前播放并清空队列。
     Stop,
 }
@@ -29,8 +37,8 @@ impl Speaker {
         Ok(Self { tx })
     }
 
-    pub fn play_wav(&self, wav: Vec<u8>) {
-        let _ = self.tx.send(SpeakerCommand::PlayWav(wav));
+    pub fn play_wav(&self, wav: Vec<u8>, more: bool) {
+        let _ = self.tx.send(SpeakerCommand::PlayWav { wav, more });
     }
 
     pub fn stop(&self) {
@@ -42,26 +50,43 @@ impl Speaker {
 /// 会让播报比通知晚一拍;关掉是为了不说话时不挂着音频设备)。
 const OUTPUT_IDLE: Duration = Duration::from_secs(30);
 
+/// `more` 段播完后等下一段的宽限期。等不到就照常收状态——合成失败或 daemon
+/// 掉线时不能把 speaking 永久钉在 true,那会让麦克风一直被丢帧。
+const NEXT_SEGMENT_GRACE: Duration = Duration::from_secs(3);
+
 fn run(rx: mpsc::Receiver<SpeakerCommand>, on_state: Box<dyn Fn(bool) + Send>) {
     let mut output: Option<(rodio::OutputStream, rodio::OutputStreamHandle)> = None;
+    let mut queue: VecDeque<(Vec<u8>, bool)> = VecDeque::new();
+    let mut speaking = false;
     loop {
-        let command = if output.is_some() {
-            match rx.recv_timeout(OUTPUT_IDLE) {
-                Ok(command) => command,
-                Err(mpsc::RecvTimeoutError::Timeout) => {
-                    output = None;
-                    continue;
+        let (wav, more) = match queue.pop_front() {
+            Some(segment) => segment,
+            None => {
+                // 队列空了:上一段的状态到这里才收。
+                if speaking {
+                    on_state(false);
+                    speaking = false;
                 }
-                Err(mpsc::RecvTimeoutError::Disconnected) => return,
+                let command = if output.is_some() {
+                    match rx.recv_timeout(OUTPUT_IDLE) {
+                        Ok(command) => command,
+                        Err(mpsc::RecvTimeoutError::Timeout) => {
+                            output = None;
+                            continue;
+                        }
+                        Err(mpsc::RecvTimeoutError::Disconnected) => return,
+                    }
+                } else {
+                    match rx.recv() {
+                        Ok(command) => command,
+                        Err(_) => return,
+                    }
+                };
+                match command {
+                    SpeakerCommand::PlayWav { wav, more } => (wav, more),
+                    SpeakerCommand::Stop => continue,
+                }
             }
-        } else {
-            match rx.recv() {
-                Ok(command) => command,
-                Err(_) => return,
-            }
-        };
-        let SpeakerCommand::PlayWav(wav) = command else {
-            continue;
         };
         if output.is_none() {
             match rodio::OutputStream::try_default() {
@@ -82,27 +107,62 @@ fn run(rx: mpsc::Receiver<SpeakerCommand>, on_state: Box<dyn Fn(bool) + Send>) {
             tracing::warn!("播报音频解码失败");
             continue;
         };
-        on_state(true);
+        if !speaking {
+            on_state(true);
+            speaking = true;
+        }
         sink.append(source);
-        wait_for_sink(&rx, &sink);
-        on_state(false);
+        if wait_for_sink(&rx, &sink, &mut queue) {
+            // 被打断:连同还没播的段一起作废。
+            queue.clear();
+            if speaking {
+                on_state(false);
+                speaking = false;
+            }
+            continue;
+        }
+        if more && queue.is_empty() {
+            // 后面还有,但还没送到:等一会儿,别把状态收了。
+            match rx.recv_timeout(NEXT_SEGMENT_GRACE) {
+                Ok(SpeakerCommand::PlayWav { wav, more }) => queue.push_back((wav, more)),
+                Ok(SpeakerCommand::Stop) => {
+                    queue.clear();
+                    if speaking {
+                        on_state(false);
+                        speaking = false;
+                    }
+                }
+                Err(mpsc::RecvTimeoutError::Timeout) => {
+                    tracing::warn!("等后续播报段超时,按播完收尾");
+                }
+                Err(mpsc::RecvTimeoutError::Disconnected) => return,
+            }
+        }
     }
 }
 
-/// 等 sink 播完;期间收到 Stop 立即停。其他命令先丢弃(播报不排队)。
-fn wait_for_sink(rx: &mpsc::Receiver<SpeakerCommand>, sink: &rodio::Sink) {
+/// 等 sink 播完;期间把送来的段收进 `queue`,收到 Stop 立即停并返回 true。
+fn wait_for_sink(
+    rx: &mpsc::Receiver<SpeakerCommand>,
+    sink: &rodio::Sink,
+    queue: &mut VecDeque<(Vec<u8>, bool)>,
+) -> bool {
     while !sink.empty() {
         let mut stop = false;
         while let Ok(command) = rx.try_recv() {
-            if matches!(command, SpeakerCommand::Stop) {
-                stop = true;
+            match command {
+                // 以前这里只认 Stop,PlayWav 取出来就丢——一段回复拆成两段送
+                // 时后半句会凭空消失。
+                SpeakerCommand::PlayWav { wav, more } => queue.push_back((wav, more)),
+                SpeakerCommand::Stop => stop = true,
             }
         }
         if stop {
             sink.stop();
-            return;
+            return true;
         }
         std::thread::sleep(Duration::from_millis(30));
     }
     sink.sleep_until_end();
+    false
 }
