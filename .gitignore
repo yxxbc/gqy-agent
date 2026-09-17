@@ -37,3 +37,6 @@ testkit/cli/home-demo/
 testkit/cli/out/
 testkit/cli/out-demo/
 testkit/cli/xdg-run/
+
+# 一些ai工具的产物
+.workbuddy-ai/
