@@ -16,37 +16,23 @@ pub(crate) use identity::{BotAccount, BotHome};
 use super::{ToolRegistry, ToolSpec};
 use crate::config::{AppConfig, GithubToolConfig};
 use crate::paths::GqyPaths;
-use crate::tools::workspace::TurnModel;
 use std::sync::Arc;
 
 pub(super) struct GithubContext {
     home: BotHome,
     config: GithubToolConfig,
-    /// 回合外(工具桥、子代理)读不到本回合 task-local 时的兜底:注册时的主模型。
-    fallback_model: Option<TurnModel>,
 }
 
 impl GithubContext {
     fn new(config: &AppConfig, paths: &GqyPaths) -> Self {
-        let fallback_model = config
-            .active_provider_model_choices()
-            .into_iter()
-            .next()
-            .map(|choice| TurnModel {
-                model: choice.model,
-                context_window: config.active_context_window().ok().flatten(),
-            });
         Self {
             home: BotHome::new(paths),
             config: config.tools.github.clone(),
-            fallback_model,
         }
     }
 
     fn co_author(&self) -> attribution::CoAuthor {
-        let model =
-            crate::tools::workspace::current_turn_model().or_else(|| self.fallback_model.clone());
-        attribution::CoAuthor::resolve(&self.config, self.home.account().as_ref(), model.as_ref())
+        attribution::CoAuthor::resolve(&self.config, self.home.account().as_ref())
     }
 }
 

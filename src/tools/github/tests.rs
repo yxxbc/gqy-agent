@@ -1,7 +1,6 @@
-use super::attribution::{append_trailer, format_window, CoAuthor, FALLBACK_EMAIL};
+use super::attribution::{append_trailer, CoAuthor, NameStyle, FALLBACK_EMAIL};
 use super::identity::{gitconfig_text, hosts_token, BotAccount, BotHome};
 use crate::config::GithubToolConfig;
-use crate::tools::workspace::TurnModel;
 use std::ffi::OsStr;
 
 fn account() -> BotAccount {
@@ -19,62 +18,56 @@ fn co_author(email: &str) -> CoAuthor {
 }
 
 #[test]
-fn co_author_carries_model_and_context_window() {
-    let model = TurnModel {
-        model: "claude-opus-5".to_string(),
-        context_window: Some(200_000),
-    };
-    let resolved = CoAuthor::resolve(&GithubToolConfig::default(), Some(&account()), Some(&model));
+fn co_author_is_just_the_name() {
+    let resolved = CoAuthor::resolve(&GithubToolConfig::default(), Some(&account()));
     assert_eq!(
         resolved.trailer(),
-        "Co-Authored-By: 顾清影【claude-opus-5】 (200K) <42+gqy-bot@users.noreply.github.com>"
+        "Co-Authored-By: 顾清影 <42+gqy-bot@users.noreply.github.com>"
+    );
+}
+
+#[test]
+fn linked_style_wraps_only_the_name() {
+    let resolved = CoAuthor::resolve(&GithubToolConfig::default(), Some(&account()));
+    assert_eq!(
+        resolved.trailer_with(NameStyle::Linked),
+        "Co-Authored-By: [顾清影](https://github.com/yxxbc/gqy-agent) \
+<42+gqy-bot@users.noreply.github.com>"
     );
 }
 
 #[test]
 fn co_author_email_prefers_config_then_bot_then_fallback() {
     let mut config = GithubToolConfig::default();
-    assert_eq!(CoAuthor::resolve(&config, None, None).email, FALLBACK_EMAIL);
+    assert_eq!(CoAuthor::resolve(&config, None).email, FALLBACK_EMAIL);
     assert_eq!(
-        CoAuthor::resolve(&config, Some(&account()), None).email,
+        CoAuthor::resolve(&config, Some(&account())).email,
         "42+gqy-bot@users.noreply.github.com"
     );
     config.coauthor_email = "me@example.com".to_string();
     assert_eq!(
-        CoAuthor::resolve(&config, Some(&account()), None).email,
+        CoAuthor::resolve(&config, Some(&account())).email,
         "me@example.com"
     );
 }
 
 #[test]
 fn co_author_name_cannot_break_the_ident() {
-    let model = TurnModel {
-        model: "evil<model>\nx".to_string(),
-        context_window: None,
-    };
-    let resolved = CoAuthor::resolve(&GithubToolConfig::default(), None, Some(&model));
+    let mut config = GithubToolConfig::default();
+    config.coauthor_name = "evil<name>\nx".to_string();
+    let resolved = CoAuthor::resolve(&config, None);
     assert!(!resolved.name.contains(['<', '>', '\n']));
-}
-
-#[test]
-fn context_window_is_abbreviated() {
-    assert_eq!(format_window(999), "999");
-    assert_eq!(format_window(128_000), "128K");
-    assert_eq!(format_window(200_000), "200K");
-    assert_eq!(format_window(1_000_000), "1M");
-    assert_eq!(format_window(1_048_576), "1M");
-    assert_eq!(format_window(1_500_000), "1.5M");
 }
 
 #[test]
 fn trailer_goes_after_a_blank_line() {
     let co = co_author("a@b.c");
     assert_eq!(
-        append_trailer("fix: handle empty config", &co),
+        append_trailer("fix: handle empty config", &co, NameStyle::Plain),
         "fix: handle empty config\n\nCo-Authored-By: 顾清影 <a@b.c>"
     );
     assert_eq!(
-        append_trailer("fix: x\n\nLonger body.\n", &co),
+        append_trailer("fix: x\n\nLonger body.\n", &co, NameStyle::Plain),
         "fix: x\n\nLonger body.\n\nCo-Authored-By: 顾清影 <a@b.c>"
     );
 }
@@ -83,7 +76,7 @@ fn trailer_goes_after_a_blank_line() {
 fn trailer_joins_an_existing_trailer_block() {
     let co = co_author("a@b.c");
     assert_eq!(
-        append_trailer("fix: x\n\nSigned-off-by: Me <me@x.y>", &co),
+        append_trailer("fix: x\n\nSigned-off-by: Me <me@x.y>", &co, NameStyle::Plain),
         "fix: x\n\nSigned-off-by: Me <me@x.y>\nCo-Authored-By: 顾清影 <a@b.c>"
     );
 }
@@ -91,16 +84,16 @@ fn trailer_joins_an_existing_trailer_block() {
 #[test]
 fn trailer_is_idempotent_per_email() {
     let co = co_author("a@b.c");
-    let once = append_trailer("fix: x", &co);
-    assert_eq!(append_trailer(&once, &co), once);
+    let once = append_trailer("fix: x", &co, NameStyle::Plain);
+    assert_eq!(append_trailer(&once, &co, NameStyle::Plain), once);
     let manual = "fix: x\n\nco-authored-by: someone <A@B.C>";
-    assert_eq!(append_trailer(manual, &co), manual);
+    assert_eq!(append_trailer(manual, &co, NameStyle::Plain), manual);
 }
 
 #[test]
 fn empty_body_becomes_the_trailer() {
     assert_eq!(
-        append_trailer("  \n", &co_author("a@b.c")),
+        append_trailer("  \n", &co_author("a@b.c"), NameStyle::Plain),
         "Co-Authored-By: 顾清影 <a@b.c>"
     );
 }

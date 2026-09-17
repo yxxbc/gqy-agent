@@ -1,7 +1,7 @@
 //! `github` 工具的各个 action。每个 action 是几条 git / gh 子进程串起来,身份在
 //! [`Runner`] 里一次定好,后面每条命令吃同一份环境。
 
-use super::attribution::append_trailer;
+use super::attribution::{append_trailer, NameStyle};
 use super::identity::{apply_non_interactive, BotCredentials, Identity};
 use super::GithubContext;
 use anyhow::{anyhow, bail, Context, Result};
@@ -209,7 +209,8 @@ async fn commit(context: &GithubContext, runner: &Runner<'_>, args: &Value) -> R
         runner.run("git", &["add", "-A"]).await?;
     }
     let co_author = context.co_author();
-    let message = append_trailer(message, &co_author);
+    // commit message 是纯文本,名字不加链接。
+    let message = append_trailer(message, &co_author, NameStyle::Plain);
     // 用户固定是 author。宿主身份下 git 自己就这么填;bot 身份下 committer 是
     // bot,author 得显式按用户自己的 git 配置填回去。
     let author = match runner.identity {
@@ -294,7 +295,10 @@ async fn pr_create(context: &GithubContext, runner: &Runner<'_>, args: &Value) -
         branch.clone()
     };
 
-    let body = append_trailer(body, &context.co_author());
+    // PR 正文是 Markdown,名字可以点。注意 squash 合并会把正文抄进 commit
+    // message,那条链接在 git log 里就是字面量——GitHub 的 co-author 归属认的
+    // 是 commit trailer,而 commit 那条(上面 `commit`)始终是纯文本版。
+    let body = append_trailer(body, &context.co_author(), NameStyle::Linked);
     let mut gh_args = vec![
         "pr", "create", "--repo", &repo, "--head", &head, "--title", title, "--body", &body,
     ];
@@ -338,6 +342,7 @@ async fn issue_create(
     let body = append_trailer(
         optional_str(args, "body").unwrap_or(""),
         &context.co_author(),
+        NameStyle::Linked,
     );
     let repo = runner.repo(args).await?;
     let output = runner

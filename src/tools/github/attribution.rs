@@ -3,9 +3,19 @@
 
 use super::identity::BotAccount;
 use crate::config::GithubToolConfig;
-use crate::tools::workspace::TurnModel;
 
 const DEFAULT_NAME: &str = "顾清影";
+
+/// 名字在 Markdown 正文里链到的去处(09-16 用户拍板)。
+const PROFILE_URL: &str = "https://github.com/yxxbc/gqy-agent";
+
+/// 名字怎么写。commit message 是纯文本,写成 Markdown 只会看到一串方括号;
+/// issue / PR 正文是 Markdown,名字可以点。
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub(crate) enum NameStyle {
+    Plain,
+    Linked,
+}
 
 /// 没登录 bot、也没配邮箱时的兜底。`.invalid` 是保留顶级域(RFC 2606),保证
 /// 不会被 GitHub 关联到任何真实账号——宁可不挂头像,也不能挂错人。
@@ -18,19 +28,11 @@ pub(crate) struct CoAuthor {
 }
 
 impl CoAuthor {
-    pub(crate) fn resolve(
-        config: &GithubToolConfig,
-        account: Option<&BotAccount>,
-        model: Option<&TurnModel>,
-    ) -> Self {
+    pub(crate) fn resolve(config: &GithubToolConfig, account: Option<&BotAccount>) -> Self {
         let base = config.coauthor_name.trim();
-        let mut name = if base.is_empty() { DEFAULT_NAME } else { base }.to_string();
-        if let Some(model) = model.filter(|model| !model.model.trim().is_empty()) {
-            name.push_str(&format!("【{}】", model.model.trim()));
-            if let Some(window) = model.context_window {
-                name.push_str(&format!(" ({})", format_window(window)));
-            }
-        }
+        // 09-16 用户拍板:名字后面不再缀「【模型】 (窗口)」。署名是她的名字,
+        // 不是运行时铭牌;换个模型就换个署名,历史里同一个人看着像好几个。
+        let name = if base.is_empty() { DEFAULT_NAME } else { base }.to_string();
         // ident 里的尖括号与换行会把 trailer 劈成两半。
         let name = name.replace(['<', '>', '\n', '\r'], "");
         let email = match config.coauthor_email.trim() {
@@ -43,24 +45,24 @@ impl CoAuthor {
     }
 
     pub(crate) fn trailer(&self) -> String {
-        format!("Co-Authored-By: {} <{}>", self.name, self.email)
+        self.trailer_with(NameStyle::Plain)
     }
-}
 
-pub(crate) fn format_window(tokens: usize) -> String {
-    if tokens >= 1_000_000 {
-        let millions = format!("{:.1}", tokens as f64 / 1_000_000.0);
-        format!("{}M", millions.trim_end_matches(".0"))
-    } else if tokens >= 1_000 {
-        format!("{}K", (tokens + 500) / 1_000)
-    } else {
-        tokens.to_string()
+    pub(crate) fn trailer_with(&self, style: NameStyle) -> String {
+        let name = match style {
+            NameStyle::Plain => self.name.clone(),
+            NameStyle::Linked => format!("[{}]({})", self.name, PROFILE_URL),
+        };
+        format!("Co-Authored-By: {} <{}>", name, self.email)
     }
 }
 
 /// 把 trailer 接到正文末尾。同一邮箱已经挂过就原样返回(模型手写过、或者
 /// 重试同一条消息)。末段本身就是 trailer 块时紧贴着接,否则空一行另起。
-pub(crate) fn append_trailer(text: &str, co_author: &CoAuthor) -> String {
+///
+/// `style` 只影响名字怎么写,去重认的始终是邮箱——所以纯文本版与链接版互相
+/// 认得出,不会在同一段正文里叠两条。
+pub(crate) fn append_trailer(text: &str, co_author: &CoAuthor, style: NameStyle) -> String {
     let body = text.trim_end();
     let needle = format!("<{}>", co_author.email.to_ascii_lowercase());
     let already = body.lines().any(|line| {
@@ -70,7 +72,7 @@ pub(crate) fn append_trailer(text: &str, co_author: &CoAuthor) -> String {
     if already {
         return body.to_string();
     }
-    let trailer = co_author.trailer();
+    let trailer = co_author.trailer_with(style);
     if body.is_empty() {
         return trailer;
     }
