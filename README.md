@@ -58,13 +58,55 @@
 
 
 
-### 环境准备
+## 安装
+
+### 一键安装（推荐）
+
+不用装 Rust，也不用自己编译。复制下面这行到终端运行：
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/yxxbc/gqy-agent/gqy/install.sh | sh
+```
+
+- 支持 **Linux**（x86_64 / ARM64）和 **macOS**（Apple 芯片 / Intel），自动识别。
+- 从 [Releases](https://github.com/yxxbc/gqy-agent/releases) 下载云端编译好的包，校验 sha256 后装到 `~/.local`，**不需要 root**。
+- 包里已经带好字体、本地向量模型、默认知识库和 ONNX Runtime，装完即可使用。
+- 再次运行同一行命令就是升级。
+
+可选的环境变量：
+
+```bash
+# 安装指定版本
+curl -fsSL https://raw.githubusercontent.com/yxxbc/gqy-agent/gqy/install.sh | GQY_VERSION=v0.6.0 sh
+
+# 安装到别的目录（默认 ~/.local）
+curl -fsSL https://raw.githubusercontent.com/yxxbc/gqy-agent/gqy/install.sh | GQY_PREFIX=/opt/gqy sh
+```
+
+> [!NOTE]
+> 如果安装完提示 `~/.local/bin` 不在 `PATH` 里，把 `export PATH="$HOME/.local/bin:$PATH"` 加到 `~/.zshrc` 或 `~/.bashrc` 后重新打开终端。
+
+### 手动下载
+
+在 [Releases](https://github.com/yxxbc/gqy-agent/releases/latest) 下载对应平台的 `gqy-<平台>.tar.gz`，解压后把里面的 `bin`、`lib`、`share` 三个目录一起放到同一个前缀下（例如 `~/.local`）。程序会在「`gqy` 所在目录的上一级 `/share/gqy`」里找资源，所以三个目录要放在一起。
+
+| 平台 | 文件 |
+| :-- | :-- |
+| Linux x86_64 | `gqy-x86_64-unknown-linux-gnu.tar.gz` |
+| Linux ARM64 | `gqy-aarch64-unknown-linux-gnu.tar.gz` |
+| macOS Apple 芯片 | `gqy-aarch64-apple-darwin.tar.gz` |
+| macOS Intel | `gqy-x86_64-apple-darwin.tar.gz` |
+
+> [!NOTE]
+> 预编译包暂不包含语音前端 `gqy-voice`（依赖 sherpa-onnx 静态库）。需要本地语音功能的话，请按下面的步骤从源码编译。
+
+### 从源码构建
+
+适合想修改人格提示词、或需要语音功能的开发者。
 
 - **Rust 工具链**：1.89 及以上版本（附带 `cargo`）
 - **操作系统**：Linux / macOS
 - *(推荐)* **终端模拟器**：[Kitty](https://sw.kovidgoyal.net/kitty/)（可获得最佳的终端图文渲染体验）
-
-### 从源码构建
 
 ```bash
 # 1. 克隆代码仓库
@@ -84,6 +126,10 @@ cargo build --release --features voice
 
 > [!TIP]
 > 编译完成后，建议将 `target/release/gqy`（以及可选的 `gqy-voice`）放置在相同的系统 `PATH` 路径下（如 `~/.local/bin` 或 `/usr/local/bin`）。GQY 守护进程启动时会自动在同级目录寻找 `gqy-voice`。
+
+### 发布新版本（维护者）
+
+预编译包由 [`.github/workflows/publish-release.yml`](.github/workflows/publish-release.yml) 在 GitHub 云端编译并发布：推送 `v` 开头的 tag（例如 `v0.6.1`），或在 Actions 页面手动运行「发布 Release（云端构建）」。
 
 ### 初始化与启动
 

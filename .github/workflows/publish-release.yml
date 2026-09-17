@@ -1,0 +1,192 @@
+name: 发布 Release（云端构建）
+
+# 在 GitHub 云端编译 gqy 主程序，按平台打包成开箱即用的压缩包，发布到 Releases。
+# install.sh 从这里下载最新版本，别人不用自己编译。
+#
+# 触发方式：
+#   - 推送 v 开头的 tag（例如 v0.6.1）
+#   - 在 Actions 页面手动运行，可以填 tag；留空就用 Cargo.toml 里的版本
+#
+# 包里的布局和系统安装一致：bin/gqy + share/gqy/{fonts,models,scripts,default-kb}
+# + lib/gqy/libonnxruntime。程序会在「二进制所在目录/../share/gqy」下找资源，
+# 所以整包解压到任何前缀（比如 ~/.local）都能直接用。
+#
+# 语音前端 gqy-voice 依赖 sherpa-onnx 静态库，暂不在这里发布，需要的话从源码编译。
+
+on:
+  push:
+    tags: ['v*']
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: 发布到哪个 tag（例如 v0.6.0）。留空就用 Cargo.toml 里的版本。
+        type: string
+        default: ''
+
+permissions:
+  contents: read
+
+concurrency:
+  group: publish-release-${{ github.ref }}
+  cancel-in-progress: false
+
+env:
+  RUSTUP_TOOLCHAIN: '1.96.1'
+  ORT_VERSION: '1.23.2'
+
+jobs:
+  build:
+    name: 编译 ${{ matrix.target }}
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 120
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - target: x86_64-unknown-linux-gnu
+            os: ubuntu-22.04
+            ort: linux-x64
+          - target: aarch64-unknown-linux-gnu
+            os: ubuntu-22.04-arm
+            ort: linux-aarch64
+          - target: aarch64-apple-darwin
+            os: macos-15
+            ort: osx-arm64
+          - target: x86_64-apple-darwin
+            os: macos-15
+            ort: osx-x86_64
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: 安装 Linux 编译依赖
+        if: runner.os == 'Linux'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libasound2-dev pkg-config clang cmake
+
+      - name: 安装 Rust 工具链
+        run: rustup toolchain install "$RUSTUP_TOOLCHAIN" --profile minimal --target "${{ matrix.target }}"
+
+      - name: 编译 gqy
+        run: cargo build --release --locked --bin gqy --target "${{ matrix.target }}"
+
+      - name: 打包
+        shell: bash
+        run: |
+          set -euo pipefail
+          name="gqy-${{ matrix.target }}"
+          stage="out/stage/$name"
+          mkdir -p "$stage/bin" "$stage/share/gqy/fonts" "$stage/share/gqy/models" \
+            "$stage/share/gqy/default-kb" "$stage/share/licenses/gqy" "$stage/lib/gqy" out/dist
+
+          install -m 0755 "target/${{ matrix.target }}/release/gqy" "$stage/bin/gqy"
+
+          # 资源，和 packaging/common/assets.json 里 core 组件的布局一致
+          install -m 0644 assets/fonts/NotoSansCJK-Regular.ttc "$stage/share/gqy/fonts/"
+          install -m 0644 assets/fonts/NotoColorEmoji.ttf "$stage/share/gqy/fonts/"
+          install -m 0644 assets/fonts/JetBrainsMono-Regular.ttf "$stage/share/gqy/fonts/"
+          cp -R assets/models/bge-small-zh-v1.5-int8 "$stage/share/gqy/models/"
+          cp -R src/scripts "$stage/share/gqy/scripts"
+          cp -R kb "$stage/share/gqy/default-kb/kb"
+
+          install -m 0644 LICENSE "$stage/share/licenses/gqy/LICENSE"
+          install -m 0644 assets/fonts/NotoSansCJK.LICENSE "$stage/share/licenses/gqy/"
+          install -m 0644 assets/fonts/NotoColorEmoji.LICENSE "$stage/share/licenses/gqy/"
+          install -m 0644 assets/fonts/JetBrainsMono.LICENSE "$stage/share/licenses/gqy/"
+          install -m 0644 assets/models/bge-small-zh-v1.5-int8/LICENSE "$stage/share/licenses/gqy/bge-small-zh-v1.5.LICENSE"
+
+          # ONNX Runtime：本地知识库的向量检索要用。下载失败只是这个功能不可用，不影响发布
+          ort="onnxruntime-${{ matrix.ort }}-${ORT_VERSION}"
+          if curl -fL --retry 3 --retry-all-errors -o "out/$ort.tgz" \
+              "https://github.com/microsoft/onnxruntime/releases/download/v${ORT_VERSION}/$ort.tgz"; then
+            tar -xzf "out/$ort.tgz" -C out
+            cp -P out/"$ort"/lib/libonnxruntime* "$stage/lib/gqy/"
+            install -m 0644 out/"$ort"/LICENSE "$stage/share/licenses/gqy/onnxruntime.LICENSE"
+            if [ -f out/"$ort"/ThirdPartyNotices.txt ]; then
+              install -m 0644 out/"$ort"/ThirdPartyNotices.txt "$stage/share/licenses/gqy/onnxruntime.ThirdPartyNotices.txt"
+            fi
+          else
+            echo "::warning::没有下载到 $ort，这个平台的包里不带 ONNX Runtime，本地向量检索会不可用。"
+          fi
+
+          tar -czf "out/dist/$name.tar.gz" -C out/stage "$name"
+          ( cd out/dist && shasum -a 256 "$name.tar.gz" > "$name.tar.gz.sha256" )
+          cat "out/dist/$name.tar.gz.sha256"
+
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: dist-${{ matrix.target }}
+          path: out/dist/*
+          compression-level: 0
+          if-no-files-found: error
+
+  publish:
+    name: 发布到 Releases
+    needs: build
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+        with:
+          pattern: dist-*
+          merge-multiple: true
+          path: dist
+
+      - name: 确定版本号
+        id: tag
+        env:
+          INPUT_TAG: ${{ inputs.tag }}
+        run: |
+          if [ "$GITHUB_REF_TYPE" = "tag" ]; then
+            tag="$GITHUB_REF_NAME"
+          elif [ -n "$INPUT_TAG" ]; then
+            tag="$INPUT_TAG"
+          else
+            tag="v$(grep -m1 '^version' Cargo.toml | cut -d'"' -f2)"
+          fi
+          echo "tag=$tag" >> "$GITHUB_OUTPUT"
+          echo "发布版本：$tag"
+
+      - name: 汇总校验和，附上安装脚本
+        run: |
+          cp install.sh dist/install.sh
+          ( cd dist && sha256sum gqy-*.tar.gz > SHA256SUMS )
+          ls -la dist
+          cat dist/SHA256SUMS
+
+      - name: 创建或更新 Release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TAG: ${{ steps.tag.outputs.tag }}
+        run: |
+          cat > notes.md <<EOF
+          ## 一键安装
+
+          \`\`\`bash
+          curl -fsSL https://raw.githubusercontent.com/${GITHUB_REPOSITORY}/${{ github.event.repository.default_branch }}/install.sh | sh
+          \`\`\`
+
+          支持 Linux（x86_64 / ARM64）和 macOS（Apple 芯片 / Intel）。安装到 \`~/.local\`，不需要 root。
+
+          ## 手动下载
+
+          下载对应平台的 \`gqy-<平台>.tar.gz\`，解压后把整个目录里的 \`bin\`、\`lib\`、\`share\` 放到同一个前缀下（例如 \`~/.local\`）。校验和见 \`SHA256SUMS\`。
+
+          语音前端 \`gqy-voice\` 暂不在预编译包里，需要的话请从源码编译：\`cargo build --release --features voice\`。
+
+          由 GitHub Actions 在云端从提交 ${GITHUB_SHA} 编译。
+          EOF
+
+          if gh release view "$TAG" >/dev/null 2>&1; then
+            gh release upload "$TAG" dist/* --clobber
+            gh release edit "$TAG" --notes-file notes.md
+          else
+            gh release create "$TAG" dist/* --target "$GITHUB_SHA" --title "顾清影 $TAG" --notes-file notes.md --latest
+          fi
