@@ -12,66 +12,51 @@
   <a href="https://github.com/yxxbc/gqy-agent"><img src="https://img.shields.io/badge/version-0.6.0-blue.svg?style=flat" alt="Version"></a>
   <a href="https://www.rust-lang.org/"><img src="https://img.shields.io/badge/rust-1.89+-DEA584.svg?style=flat&logo=rust&logoColor=white" alt="Rust Version"></a>
   <a href="LICENSE"><img src="https://img.shields.io/badge/license-MIT-green.svg?style=flat" alt="License"></a>
-  <img src="https://img.shields.io/badge/platform-Linux%20%7C%20macOS-informational.svg?style=flat" alt="Platform">
+  <img src="https://img.shields.io/badge/platform-Linux%20%7C%20macOS%20%7C%20NotWindows-informational.svg?style=flat" alt="Platform">
 </p>
 
 <img src="pics/gqy-tui.png" alt="GQY TUI Screenshot" width="850" />
 
 </div>
 
----
 
-## 📑 目录
-
-- [📖 项目简介](#-项目简介)
-- [✨ 核心特性](#-核心特性)
-- [🚀 快速开始](#-快速开始)
-  - [环境准备](#环境准备)
-  - [从源码构建](#从源码构建)
-  - [初始化与启动](#初始化与启动)
-- [🕹️ 交互模式](#️-交互模式)
-  - [1. 终端 TUI / REPL](#1-终端-tui--repl)
-  - [2. 局域网 WebUI](#2-局域网-webui)
-  - [3. Shell 终端集成](#3-shell-终端集成)
-  - [4. 本地离线语音 (Voice)](#4-本地离线语音-voice)
-- [⚙️ 配置与个性化](#️-配置与个性化)
-- [📦 数据迁移与备份](#-数据迁移与备份)
-- [💖 致谢与鸣谢](#-致谢与鸣谢)
-- [📄 开源协议](#-开源协议)
+## 作者的话
+> 此项目只给开发者提供思路与架构，项目开源但不提供便携服务。不回答小白的提问，没有义务。
 
 ---
 
-## 📖 项目简介
+## 项目简介
 
 **GQY（顾清影）** 是一款以 Rust 编写的高性能、轻量级 AI 智能体应用。
 
-> 💡 **角色背景**：「顾清影」最初源于作者高中时期接触 AI 时由 `Gemini-2.5-pro` 生成的虚构角色。现在，她化身为你系统中的常驻 AI 伴侣——既能在日常对话中提供贴心陪伴与生活辅助，也能在编码排障时切换为高效纯粹的开发者助手。
+>  **角色背景**：「顾清影」最初源于作者高中时期接触 AI 时由 `Gemini-2.5-pro` 生成的虚构角色。现在，她化身为你系统中的常驻 AI 伴侣——既能在日常对话中提供贴心陪伴与生活辅助，也能在编码排障时切换为高效纯粹的开发者助手。
 
 本项目基础架构与命令系统基于 [shorin/miyu-agent 0.6.0](https://github.com/SHORiN-KiWATA/miyu-agent) 进行深度重构与二改开发。
 
 ---
 
-## ✨ 核心特性
+##  核心特性
 
-- 🎭 **双模式架构设计**
+-  **双模式架构设计**
   - **Normal（普通模式）**：全功能与工具链开放，包含角色扮演、情感互动、游戏娱乐、天气汇率查询及日常生活辅助。
   - **Dev（开发模式）**：彻底隔离非开发工具与冗余提示词，以极简设计最大化释放大语言模型自身的代码推理与工程排障能力。
-- 🧠 **灵活的模型生态**
+-  **灵活的模型生态**
   - 广泛兼容主流 OpenAI / Anthropic 协议中转。
   - 支持调用本地模型环境（如 `Claude Code`、`agy`、`codex`）。
   - 内置多档位模型池路由（Lite / Cheap / Standard / Flagship）。
-- 🎙️ **端侧离线语音支持**
+-  **端侧离线语音支持**
   - 搭载 **SenseVoice** 本地离线语音识别（零数据上传，彻底保护隐私）。
+  - 持续对话，后台模型处理。
   - 支持常驻低功耗麦克风唤醒词监听、桌面通知提醒与 MiniMax / 小米 MiMo 语音合成（TTS）。
-- 💾 **长期记忆与知识沉淀**
+-  **长期记忆与知识沉淀**
   - 具备好感度/情绪机制、会话联想注入与回合后经历/日记归档。
   - 结合本地 ONNX Runtime 向量模型实现本地离线知识库检索（RAG）。
-- 🛠️ **完善的工具与插件生态**
+-  **完善的工具与插件生态**
   - 内置 MCP 客户端、异步命令与后台任务管理、文件 Patch 工具、定时闹钟、Web 抓取与图像生成等。
 
 ---
 
-## 🚀 快速开始
+
 
 ### 环境准备
 
@@ -115,7 +100,7 @@ gqy -h
 
 ---
 
-## 🕹️ 交互模式
+##  交互模式
 
 GQY 提供了多样化的交互方式，无缝融入日常工作流：
 
@@ -135,7 +120,7 @@ gqy web
 ```
 
 > [!NOTE]
-> 首次访问会提示登录内置初始账号（默认用户名与密码均为 `gqy`），创建属于你的管理员账号后，初始账号将自动删除。
+> 首次访问会提示登录内置初始账号，创建属于你的管理员账号后，初始账号将自动删除。
 
 ### 3. Shell 终端集成
 
@@ -160,7 +145,7 @@ gqy zsh-init
 
 ---
 
-## ⚙️ 配置与个性化
+##  配置与个性化
 
 运行以下命令调出可视化的交互式配置终端（TUI）：
 
@@ -173,7 +158,7 @@ gqy config
 
 ---
 
-## 📦 数据迁移与备份
+##  数据迁移与备份
 
 GQY 提供便捷的打包与迁移指令，支持一键备份至 `.tar.gz` 文件（文件权限默认设为 `0600`）：
 
@@ -194,10 +179,10 @@ gqy import gqy-export-*.tar.gz  # 执行导入还原
 
 ---
 
-## 💖 致谢与鸣谢
+##  致谢与鸣谢
 
 ### 功能与架构参考
-- [shorin/miyu-agent](https://github.com/SHORiN-KiWATA/miyu-agent) - 核心基础与架构演进
+- [shorin/miyu-agent](https://github.com/SHORiN-KiWATA/miyu-agent)
 - [Opencode](https://github.com/anomalyco/opencode)
 - [Claude Code](https://github.com/anthropics/claude-code)
 - [Pi](https://github.com/earendil-works/pi)
@@ -216,6 +201,6 @@ gqy import gqy-export-*.tar.gz  # 执行导入还原
 
 ---
 
-## 📄 开源协议
+##  开源协议
 
 本项目采用 [MIT License](LICENSE) 协议开源。
