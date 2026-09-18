@@ -40,3 +40,7 @@ testkit/cli/xdg-run/
 
 # 一些ai工具的产物
 .workbuddy-ai/
+
+# nix build 的结果链接
+/result
+/result-*

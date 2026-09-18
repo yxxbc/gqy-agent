@@ -60,7 +60,25 @@
 
 ## 安装
 
-### 一键安装（推荐）
+### 用 Nix 安装（推荐）
+
+装过 [Nix](https://nixos.org/download/)（需要开启 flakes）就只要一行：
+
+```bash
+nix profile install github:yxxbc/gqy-agent/gqy
+```
+
+- 支持 **Linux**（x86_64 / ARM64，含 NixOS）和 **macOS Apple 芯片**。Intel Mac 已不受 nixpkgs 支持，请用下面的一键安装脚本。
+- **不用本地编译**：直接下载 [Releases](https://github.com/yxxbc/gqy-agent/releases) 里云端编译好的包，按仓库里记录的 sha256 校验。
+- 字体、本地向量模型、默认知识库和 ONNX Runtime 都一起装好，不写 `~/.local`，**不需要 root**。
+- 升级：`nix profile upgrade gqy-agent`；卸载：`nix profile remove gqy-agent`；升级出问题退回：`nix profile rollback`。
+- 不想安装、只想试一下：`nix run github:yxxbc/gqy-agent/gqy`。
+- 想自己从源码编译：`nix profile install github:yxxbc/gqy-agent/gqy#gqy-src`（指定版本把 `gqy` 换成 tag，例如 `v0.6.0`）。
+- NixOS / home-manager 可以把 `github:yxxbc/gqy-agent/gqy` 加为 flake input，使用 `packages.<system>.gqy`。
+- 以前用 `install.sh` 装过：运行 `curl -fsSL https://raw.githubusercontent.com/yxxbc/gqy-agent/gqy/nix/migrate.sh | sh`，它会先用 Nix 装好，再把旧程序挪去备份（数据不动）。
+- 开发、发布流程和常见问题见 [docs/wiki/18-Nix安装开发与发布](docs/wiki/18-Nix安装开发与发布.md)。
+
+### 一键安装脚本（没有 Nix 或 Intel Mac）
 
 不用装 Rust，也不用自己编译。复制下面这行到终端运行：
 
@@ -124,12 +142,14 @@ cargo build --release
 cargo build --release --features voice
 ```
 
+用 Nix 的话，`nix build .#gqy-src` 会在 `./result` 下得到和安装版一样的完整布局；`nix develop` 进入带 Rust 工具链和 ONNX Runtime 的开发环境。
+
 > [!TIP]
 > 编译完成后，建议将 `target/release/gqy`（以及可选的 `gqy-voice`）放置在相同的系统 `PATH` 路径下（如 `~/.local/bin` 或 `/usr/local/bin`）。GQY 守护进程启动时会自动在同级目录寻找 `gqy-voice`。
 
 ### 发布新版本（维护者）
 
-预编译包由 [`.github/workflows/publish-release.yml`](.github/workflows/publish-release.yml) 在 GitHub 云端编译并发布：推送 `v` 开头的 tag（例如 `v0.6.1`），或在 Actions 页面手动运行「发布 Release（云端构建）」。
+预编译包由 [`.github/workflows/publish-release.yml`](.github/workflows/publish-release.yml) 在 GitHub 云端编译并发布：推送 `v` 开头的 tag（例如 `v0.6.1`），或在 Actions 页面手动运行「发布 Release（云端构建）」。发布完成后，工作流会把新版本的校验和写进 `gqy` 分支的 `nix/release.json`，Nix 用户 `nix profile upgrade gqy-agent` 就能拿到新版。完整步骤见 [docs/wiki/18-Nix安装开发与发布](docs/wiki/18-Nix安装开发与发布.md)。
 
 ### 初始化与启动
 

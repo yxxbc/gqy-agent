@@ -90,7 +90,7 @@ cat > "$ROOT/with-chafa" <<EOF
 set -euo pipefail
 ver="\$1"; shift
 dir=$OLD/v\$ver
-[ -x "\$dir/usr/bin/chafa" ] || { echo "没有 \$ver，先跑 testkit/chafa-compat/fetch-old-chafa.sh" >&2; exit 1; }
+[ -x "\$dir/usr/bin/chafa" ] || { echo "没有 \${ver}，先跑 testkit/chafa-compat/fetch-old-chafa.sh" >&2; exit 1; }
 shim=\$(mktemp -d)
 cat > "\$shim/chafa" <<SHIM
 #!/bin/sh

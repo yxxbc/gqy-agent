@@ -8,6 +8,7 @@
 #   GQY_VERSION=v0.6.0        装指定版本，默认最新
 #   GQY_PREFIX=/opt/gqy       装到别的前缀，默认 ~/.local
 #   GQY_DOWNLOAD_BASE=...     换下载地址（镜像），默认 https://github.com/yxxbc/gqy-agent/releases
+#   GQY_FORCE=1               已经用 Nix 装过也照样装
 
 set -eu
 
@@ -19,18 +20,32 @@ BASE="${GQY_DOWNLOAD_BASE:-https://github.com/$REPO/releases}"
 say() { printf '%s\n' "$*"; }
 die() { printf '\n顾清影安装失败：%s\n' "$*" >&2; exit 1; }
 
+# ── 已经用 Nix 装过就别再装一份，两份会在 PATH 里互相遮挡 ──
+if [ -z "${GQY_FORCE:-}" ]; then
+  for nix_gqy in "$HOME/.nix-profile/bin/gqy" "/etc/profiles/per-user/${USER:-}/bin/gqy" /run/current-system/sw/bin/gqy; do
+    if [ -x "$nix_gqy" ]; then
+      die "已经用 Nix 装过顾清影（${nix_gqy}）。升级请用：nix profile upgrade gqy-agent
+确实要再装一份到 $PREFIX 的话，设置 GQY_FORCE=1 再运行。"
+    fi
+  done
+fi
+if command -v nix >/dev/null 2>&1; then
+  say "提示：检测到 Nix，推荐改用 nix profile install github:${REPO}/gqy 安装，升级和卸载更干净。"
+  say ""
+fi
+
 # ── 看看是什么电脑 ──
 os="$(uname -s)"
 arch="$(uname -m)"
 case "$os" in
   Linux) os_part="unknown-linux-gnu" ;;
   Darwin) os_part="apple-darwin" ;;
-  *) die "暂时只支持 Linux 和 macOS，当前系统是 $os。" ;;
+  *) die "暂时只支持 Linux 和 macOS，当前系统是 ${os}。" ;;
 esac
 case "$arch" in
   x86_64 | amd64) arch_part="x86_64" ;;
   aarch64 | arm64) arch_part="aarch64" ;;
-  *) die "暂时不支持这个 CPU 架构：$arch。" ;;
+  *) die "暂时不支持这个 CPU 架构：${arch}。" ;;
 esac
 # 在 Apple 芯片的 Mac 上用 Rosetta 跑的终端，也装原生 ARM 版
 if [ "$os" = "Darwin" ] && [ "$arch_part" = "x86_64" ]; then
@@ -70,7 +85,7 @@ sha256_of() {
 tmp="$(mktemp -d 2>/dev/null || mktemp -d -t gqy)"
 trap 'rm -rf "$tmp"' EXIT INT TERM
 
-say "正在下载顾清影（$target，版本：$VERSION）"
+say "正在下载顾清影（${target}，版本：${VERSION}）"
 fetch "$url" "$tmp/$name.tar.gz" || die "下载失败：$url
 如果网络访问 GitHub 很慢，可以设置 GQY_DOWNLOAD_BASE 换一个下载地址。"
 fetch "$url.sha256" "$tmp/$name.tar.gz.sha256" || die "校验文件下载失败：$url.sha256"
@@ -84,7 +99,7 @@ src="$tmp/$name"
 [ -x "$src/bin/gqy" ] || die "安装包里没有找到 gqy。"
 
 # ── 装进 ~/.local（或 GQY_PREFIX） ──
-mkdir -p "$PREFIX/bin" "$PREFIX/share" "$PREFIX/lib" || die "没法写入 $PREFIX，可以用 GQY_PREFIX 换一个目录。"
+mkdir -p "$PREFIX/bin" "$PREFIX/share" "$PREFIX/lib" || die "没法写入 ${PREFIX}，可以用 GQY_PREFIX 换一个目录。"
 
 # 先写到临时文件再改名，正在运行的 gqy 不会被写坏
 cp "$src/bin/gqy" "$PREFIX/bin/.gqy.new"

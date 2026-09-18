@@ -73,7 +73,12 @@ docs/中有所有的计划和文档，可以自行按需阅读。
 ## 7. 构建与发布（默认不处理）
 
 7.1 `src/prompts/*`、web/ 静态资源、assets 词表全部编译进二进制——改完必须重新构建，daemon 按 GQY_BUILD_ID 判断重启。
-7.2 发版链照 v0.4.5 流程：release commit → tag → 资产必须含 fonts/（`tar -tf` 验 + 包内二进制自报版本）→ AUR 包装包 → 本地 pacman 轮换。仓库 packaging/ 三份 PKGBUILD 是真相源，别让它与 AUR 克隆脱节。
+7.2 **Nix 是分发主路**，正典是 `docs/wiki/18-Nix安装开发与发布.md`，动打包/发布前先读它。发版链：改 `Cargo.toml` 版本 → release commit → 推 tag `vX.Y.Z` → `publish-release.yml` 云端编 4 平台发 Release 并自动提交 `nix/release.json` → 本地 `git pull`。`nix/release.json` 只由 `nix/update-release.py` 生成，禁止手改 hash。
+7.3 资源/外部命令/平台的增减要三处同步：`publish-release.yml` 打包步骤、`nix/package.nix`（及 `nix/prebuilt.nix` 的 wrapProgram PATH）、Arch 的 `packaging/common/assets.json`。改完 `nix flake check --no-build --all-systems`。Intel Mac 不在 flake 里（nixpkgs 已弃），走 install.sh。
+7.4 Nix 下程序路径是 `/nix/store/<hash>-…`，每次升级都变：`gqy_executable()` 只用于起子进程或每次都会重建的配置，禁止写进 shell rc、launchd/systemd、用户配置等持久文件（写 `gqy` 靠 PATH）。
+7.5 预编译包和 Nix 包都不带 `gqy-voice`。开发机用 `cargo install --path . --locked --features voice`，不要同机再 `nix profile install`（`~/.cargo/bin` 会遮住它）；验收 Nix 版用 `GQY_HOME=$(mktemp -d) nix run github:yxxbc/gqy-agent/gqy`。
+7.6 shell 脚本里紧挨中文的变量必须加花括号（`${var}，`）：macOS 的 sh 在中文 locale 下会把全角标点的首字节吞进变量名，`set -u` 直接报错。
+7.7 AUR/Arch 是备用路线：`packaging/` 三份 PKGBUILD 仍是其真相源，别让它与 AUR 克隆脱节；`install.sh` 给没有 Nix 的用户，检测到 Nix 版会拒绝重复安装。
 
 ## 8.添加/删除一个功能时必看
 

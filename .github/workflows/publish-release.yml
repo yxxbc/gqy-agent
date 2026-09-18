@@ -190,3 +190,36 @@ jobs:
           else
             gh release create "$TAG" dist/* --target "$GITHUB_SHA" --title "顾清影 $TAG" --notes-file notes.md --latest
           fi
+
+      # `nix profile install github:<仓库>` 按默认分支上的 nix/release.json 下载上面的包，
+      # 这里把新版本的校验和写回去。重新发布旧 tag 时不会把它降级。
+      - name: 更新 Nix 安装用的校验和
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TAG: ${{ steps.tag.outputs.tag }}
+          DEFAULT_BRANCH: ${{ github.event.repository.default_branch }}
+        run: |
+          set -euo pipefail
+          remote="https://x-access-token:${GH_TOKEN}@github.com/${GITHUB_REPOSITORY}.git"
+          git fetch --depth 1 "$remote" "$DEFAULT_BRANCH"
+          git worktree add --detach nix-update FETCH_HEAD
+          cd nix-update
+          if [ ! -f nix/update-release.py ]; then
+            echo "默认分支上还没有 nix/update-release.py，跳过"
+            exit 0
+          fi
+          current="$(python3 -c 'import json; print(json.load(open("nix/release.json"))["tag"])' 2>/dev/null || echo v0.0.0)"
+          if [ "$(printf '%s\n%s\n' "$current" "$TAG" | sort -V | tail -n1)" != "$TAG" ]; then
+            echo "release.json 已经是更新的 $current，不降级到 $TAG"
+            exit 0
+          fi
+          python3 nix/update-release.py "$TAG" ../dist/SHA256SUMS
+          if git diff --quiet; then
+            echo "release.json 没有变化"
+            exit 0
+          fi
+          git add nix/release.json
+          git -c user.name='github-actions[bot]' \
+              -c user.email='41898282+github-actions[bot]@users.noreply.github.com' \
+              commit -m "chore(nix): 预编译包更新到 $TAG"
+          git push "$remote" "HEAD:$DEFAULT_BRANCH"
