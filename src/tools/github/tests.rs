@@ -76,7 +76,11 @@ fn trailer_goes_after_a_blank_line() {
 fn trailer_joins_an_existing_trailer_block() {
     let co = co_author("a@b.c");
     assert_eq!(
-        append_trailer("fix: x\n\nSigned-off-by: Me <me@x.y>", &co, NameStyle::Plain),
+        append_trailer(
+            "fix: x\n\nSigned-off-by: Me <me@x.y>",
+            &co,
+            NameStyle::Plain
+        ),
         "fix: x\n\nSigned-off-by: Me <me@x.y>\nCo-Authored-By: 顾清影 <a@b.c>"
     );
 }

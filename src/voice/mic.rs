@@ -353,8 +353,8 @@ fn design_lowpass(cutoff: f64, length: usize) -> Vec<f32> {
         } else {
             (std::f64::consts::TAU * cutoff * offset).sin() / (std::f64::consts::PI * offset)
         };
-        let window = 0.54
-            - 0.46 * (std::f64::consts::TAU * index as f64 / (length - 1) as f64).cos();
+        let window =
+            0.54 - 0.46 * (std::f64::consts::TAU * index as f64 / (length - 1) as f64).cos();
         taps.push(sinc * window);
     }
     let sum: f64 = taps.iter().sum();
