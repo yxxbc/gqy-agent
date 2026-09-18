@@ -3,7 +3,7 @@ name: Source checks
 on:
   pull_request:
   push:
-    branches: [main]
+    branches: [gqy]
   workflow_dispatch:
 
 permissions:
@@ -14,25 +14,23 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
-  format-and-python:
+  format:
     runs-on: ${{ vars.LINUX_X64_RUNNER || 'ubuntu-24.04' }}
     timeout-minutes: 20
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
-      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
-        with:
-          python-version: '3.11'
       - name: Install the locked formatting toolchain
         run: rustup toolchain install 1.96.1 --profile minimal --component rustfmt
       - name: Check Rust formatting
         run: cargo +1.96.1 fmt --check
-      - name: Test packaging contracts
-        run: python3 -m unittest discover -s packaging/ci/tests -v
+      - uses: cachix/install-nix-action@13d8dd58da0234aa297dedd986986ccb8e7f3e24 # v31.11.1
+      - name: Check the Nix flake
+        run: nix flake check --no-build --all-systems
 
   rust:
-    needs: format-and-python
+    needs: format
     runs-on: ${{ vars.LINUX_X64_RUNNER || 'ubuntu-24.04' }}
     timeout-minutes: 75
     strategy:
@@ -47,9 +45,6 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
-      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
-        with:
-          python-version: '3.11'
       - name: Install native development libraries and test runtime dependencies
         run: |
           sudo apt-get update
@@ -58,9 +53,20 @@ jobs:
         env:
           RUST_VERSION: ${{ matrix.toolchain }}
         run: rustup toolchain install "$RUST_VERSION" --profile minimal
+      # 测试跑在一次性的 HOME/GQY_HOME/XDG 目录里，碰不到 runner 上的任何真实数据
       - name: Run isolated source unit tests
         if: matrix.toolchain == '1.96.1'
-        run: python3 packaging/ci/run_tests.py --suite source-unit --report-dir out/ci/source-unit --timeout 3600
+        shell: bash
+        run: |
+          set -euo pipefail
+          box="$(mktemp -d)"
+          mkdir -p "$box"/{home,gqy,tmp,runtime,cache,config,data,state} out/ci
+          chmod 700 "$box/runtime"
+          env CARGO_HOME="$HOME/.cargo" RUSTUP_HOME="$HOME/.rustup" \
+              HOME="$box/home" GQY_HOME="$box/gqy" TMPDIR="$box/tmp" \
+              XDG_RUNTIME_DIR="$box/runtime" XDG_CACHE_HOME="$box/cache" XDG_CONFIG_HOME="$box/config" \
+              XDG_DATA_HOME="$box/data" XDG_STATE_HOME="$box/state" \
+            cargo test --locked --lib 2>&1 | tee out/ci/source-unit.log
       - name: Check the declared MSRV without hiding failures
         if: matrix.toolchain == '1.89.0'
         shell: bash

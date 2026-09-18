@@ -44,7 +44,7 @@ rustPlatform.buildRustPackage {
     licenses=$out/share/licenses/gqy
     mkdir -p $share/fonts $share/models $share/default-kb $licenses $out/lib/gqy
 
-    # 资源，和 packaging/common/assets.json 里 core 组件的布局一致
+    # 资源，布局和 publish-release.yml 打出的 Release 包一致
     install -m 0644 assets/fonts/NotoSansCJK-Regular.ttc $share/fonts/
     install -m 0644 assets/fonts/NotoColorEmoji.ttf $share/fonts/
     install -m 0644 assets/fonts/JetBrainsMono-Regular.ttf $share/fonts/

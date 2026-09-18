@@ -83,7 +83,7 @@ jobs:
 
           install -m 0755 "target/${{ matrix.target }}/release/gqy" "$stage/bin/gqy"
 
-          # 资源，和 packaging/common/assets.json 里 core 组件的布局一致
+          # 资源，布局和 nix/package.nix 的 postInstall 保持一致
           install -m 0644 assets/fonts/NotoSansCJK-Regular.ttc "$stage/share/gqy/fonts/"
           install -m 0644 assets/fonts/NotoColorEmoji.ttf "$stage/share/gqy/fonts/"
           install -m 0644 assets/fonts/JetBrainsMono-Regular.ttf "$stage/share/gqy/fonts/"
@@ -167,13 +167,21 @@ jobs:
           TAG: ${{ steps.tag.outputs.tag }}
         run: |
           cat > notes.md <<EOF
-          ## 一键安装
+          ## 用 Nix 安装（推荐）
+
+          \`\`\`bash
+          nix profile install github:${GITHUB_REPOSITORY}/${{ github.event.repository.default_branch }}   # 已安装的：nix profile upgrade gqy-agent
+          \`\`\`
+
+          支持 Linux（x86_64 / ARM64）和 Apple 芯片 Mac，直接使用下面的预编译包，不在本地编译。
+
+          ## 没有 Nix 或 Intel Mac：一键安装
 
           \`\`\`bash
           curl -fsSL https://raw.githubusercontent.com/${GITHUB_REPOSITORY}/${{ github.event.repository.default_branch }}/install.sh | sh
           \`\`\`
 
-          支持 Linux（x86_64 / ARM64）和 macOS（Apple 芯片 / Intel）。安装到 \`~/.local\`，不需要 root。
+          安装到 \`~/.local\`，不需要 root。
 
           ## 手动下载
 

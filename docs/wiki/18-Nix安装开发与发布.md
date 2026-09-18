@@ -1,6 +1,6 @@
 # 18 · Nix：安装、开发与发布
 
-顾清影以 **Nix** 为主要的安装和分发方式。这一页讲清三件事：用户怎么装、开发者平时怎么干活、维护者怎么发版。`install.sh` 和 AUR 包仍然保留，但只是备用路线。
+顾清影以 **Nix** 为主要的安装和分发方式。这一页讲清三件事：用户怎么装、开发者平时怎么干活、维护者怎么发版。`install.sh` 作为备用路线保留，给没有 Nix 的用户用。以前从上游继承的 Arch/DEB/RPM 打包体系（`packaging/`）已经删除，需要时可以从 git 历史里找回。
 
 支持的平台：Linux x86_64 / ARM64（含 NixOS）、macOS Apple 芯片。**Intel Mac 不走 Nix**：nixpkgs 从 26.11 起不再支持 x86_64-darwin，Release 里仍然发布 Intel 包，这部分用户用 `install.sh` 安装。
 
@@ -113,7 +113,7 @@ cargo build --release
 
 | 改动 | 还要改哪里 |
 |---|---|
-| 新增要随程序一起发布的资源（字体、模型、脚本……） | `publish-release.yml` 的「打包」一步 **和** `nix/package.nix` 的 `postInstall`（布局保持一致），Arch 包对应改 `packaging/common/assets.json` |
+| 新增要随程序一起发布的资源（字体、模型、脚本……） | `publish-release.yml` 的「打包」一步 **和** `nix/package.nix` 的 `postInstall`（布局保持一致） |
 | 新增运行时要从 PATH 调用的外部命令 | `nix/prebuilt.nix` 和 `nix/package.nix` 里的 `wrapProgram ... --suffix PATH` |
 | 新增 Linux 系统库依赖（链接期） | `nix/package.nix` 的 `buildInputs`；预编译版 `nix/prebuilt.nix` 的 `buildInputs`（给 autoPatchelf 用） |
 | 新增发布平台 | `publish-release.yml` 的 matrix、`nix/update-release.py` 的 `TARGETS`、`flake.nix` 的 `systems`（要确认 nixpkgs 还支持这个平台） |
