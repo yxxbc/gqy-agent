@@ -1,5 +1,7 @@
 ## Main
 
+## Feats
+
 - webui再safari上的移动端适配和界面固定，其次是移动端点击输入框整体界面不在上移动，或者考虑兼容方案，移动端浏览器：safari
 - webui的提问和终端同步，不会再出现`错误: pending question not found`这种情况，复现：一个会话提出问题，终端的不点用webui点击会导致tui不同步【因为部分webui功能在tui中没有，但是项目没有对其进行处理的专属逻辑】。完成修复后看看其他的有没有此类相同问题（大部分是webui到tui的信息不同步。
 - 修复“ 运行命令 · 5m 00s · 已中断 · gh pr checks 46 --repo SHORiN-KiWATA/miyu-agent -…
@@ -11,9 +13,6 @@
 - 修复上下文圆环点击后的浮窗对应的数据要准确,增加agy、claude、codex的订阅时效额度，参考codexbar、(https://github.com/tungcorn/antigravity-usage-checker)、(https://github.com/skainguyen1412/antigravity-usage)、(https://github.com/phuryn/claude-usage)
 - tui 美化意见
 - webui 美化意见
-
-## Feats
-
 - 多发行版打包工作流，MacOS适配
 - Live2D
 - 支持QQ官方机器人
