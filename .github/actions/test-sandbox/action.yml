@@ -5,7 +5,10 @@ runs:
   steps:
     - shell: bash
       run: |
-        box="$(mktemp -d)"
+        # 建在 /tmp 下而不是默认 TMPDIR:macOS runner 的 TMPDIR 是 /var/folders/…/T/，
+        # 测试再往里套 tempdir 后 daemon 的 core.sock 路径到 113 字符，超过 macOS
+        # AF_UNIX 103 字符上限，daemon 绑不上 socket 直接退出（daemon_reload 集成测试）
+        box="$(mktemp -d /tmp/gqy-ci.XXXXXX)"
         mkdir -p "$box"/{home,gqy,tmp,runtime,cache,config,data,state} out/ci
         chmod 700 "$box/runtime"
         {
