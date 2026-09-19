@@ -133,25 +133,31 @@ Nix 版的程序在 `/nix/store/<hash>-gqy-<版本>/` 下，**每次升级路径
 
 ## 4. 维护者：发布新版本
 
-1. 确认要发布的内容都已经合进 `gqy` 分支，并通过验收；发布说明写在 `docs/releases/<版本>/release-notes.md`。
-2. 修改 `Cargo.toml` 的 `version`（README 顶部的版本徽章也一起改），然后提交：
+1. 确认要发布的内容都已经合进 `gqy` 分支，并通过验收。
+2. 把草稿目录改名为版本号，并把标题从「下一个版本（草稿）」改成正式标题：
    ```bash
+   git mv docs/releases/next docs/releases/X.Y.Z
+   ```
+   `docs/releases/X.Y.Z/release-notes.md` 会原样成为 GitHub Release 的正文，后面自动附上安装说明。找不到这个文件时发布工作流会在编译前直接失败。
+3. 修改 `Cargo.toml` 的 `version`（README 顶部的版本徽章也一起改），然后提交：
+   ```bash
+   git add -A docs/releases
    git commit -am "release: vX.Y.Z"
    git push gqy gqy
    ```
-3. 打 tag 并推送，会触发云端构建：
+4. 打 tag 并推送，会触发云端构建：
    ```bash
    git tag vX.Y.Z
    git push gqy vX.Y.Z
    ```
-4. 在 GitHub Actions 里看「发布 Release（云端构建）」跑完。它会：
-   - 编译 4 个平台并发布到 Releases；
+5. 在 GitHub Actions 里看「发布 Release（云端构建）」跑完。它会：
+   - 先检查 `docs/releases/X.Y.Z/release-notes.md` 存在，再编译 4 个平台并发布到 Releases，正文取自这份说明；
    - 自动往 `gqy` 分支提交一个 `chore(nix): 预编译包更新到 vX.Y.Z`，更新 `nix/release.json`。
-5. 把 CI 的提交拉回本地，免得下次推送冲突：
+6. 把 CI 的提交拉回本地，免得下次推送冲突：
    ```bash
    git pull gqy gqy
    ```
-6. 验收：
+7. 验收：
    ```bash
    GQY_HOME=$(mktemp -d) nix run github:yxxbc/gqy-agent/gqy --refresh -- --version   # 应该输出新版本号
    ```
@@ -165,6 +171,32 @@ Nix 版的程序在 `/nix/store/<hash>-gqy-<版本>/` 下，**每次升级路径
 | 用户安装时报 `hash mismatch` | Release 里的包被重新上传过，`release.json` 还是旧 hash。重新跑一次发布工作流，或者按上一行手动更新 |
 | 某个平台编译失败 | 那个平台的包不在 Release 里，`update-release.py` 会报「SHA256SUMS 里没有 …」并退出，`release.json` 保持旧版本，不会写出坏数据。修好后重新跑工作流（可以手动运行并填同一个 tag） |
 | 重新发布旧 tag | 工作流会跳过回写，`release.json` 不会被降级到旧版本 |
+| 发布工作流开头就失败：找不到发布说明 | 打 tag 前没把 `docs/releases/next` 改名为版本号。补上改名并提交后，手动运行工作流、填同一个 tag |
+
+### 版本发出去后发现 bug
+
+**首选：发补丁版**（vX.Y.Z 有问题就发 vX.Y.Z+1）。修好、验收、新建 `docs/releases/<补丁版本>/release-notes.md`，照常发版。用户照常升级就能拿到修复，旧版本原样留档。
+
+如果 `gqy` 分支已经合进了不打算发布的新功能，就从旧 tag 拉 hotfix 分支，只修这个 bug（tag 打在哪个提交上都能触发发布）：
+
+```bash
+git switch -c hotfix/X.Y.Z+1 vX.Y.Z
+# 修 bug、写发布说明、改版本号，然后提交
+git tag vX.Y.Z+1 && git push gqy vX.Y.Z+1
+git switch gqy && git merge hotfix/X.Y.Z+1   # 修复合回主线
+```
+
+**不推荐：用同一个版本号重新发布**（强推同名 tag 再重跑工作流）。同一个版本号下的包内容变了，用户手里的校验和对不上，已经安装的人也察觉不到该升级。只在刚发布几分钟、基本还没人下载时才考虑。
+
+**紧急止损：先退回上一版**。bug 很严重、补丁一时修不好时用，修好后仍然要发补丁版：
+
+- install.sh 默认下载 GitHub 的 latest 版本。把出问题的版本设成预发布：`gh release edit vX.Y.Z --prerelease`，latest 就会落回上一版。
+- 工作流不会让 `release.json` 降级，Nix 这边要手动退回：
+  ```bash
+  gh release download v<上一版> -p SHA256SUMS
+  python3 nix/update-release.py v<上一版> SHA256SUMS
+  git commit -am "chore(nix): 回退预编译包到 v<上一版>" && git push gqy gqy
+  ```
 
 ### 为什么 `github:yxxbc/gqy-agent/vX.Y.Z` 装不了预编译版
 

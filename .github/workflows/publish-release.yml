@@ -7,6 +7,9 @@ name: 发布 Release（云端构建）
 #   - 推送 v 开头的 tag（例如 v0.6.1）
 #   - 在 Actions 页面手动运行，可以填 tag；留空就用 Cargo.toml 里的版本
 #
+# Release 正文取自 docs/releases/<版本号去掉 v>/release-notes.md，后面附上安装说明。
+# 找不到这份说明就在编译前失败——发版提交里要先把 docs/releases/next 改名为版本号。
+#
 # 包里的布局和系统安装一致：bin/gqy + share/gqy/{fonts,models,scripts,default-kb}
 # + lib/gqy/libonnxruntime。程序会在「二进制所在目录/../share/gqy」下找资源，
 # 所以整包解压到任何前缀（比如 ~/.local）都能直接用。
@@ -35,8 +38,43 @@ env:
   ORT_VERSION: '1.23.2'
 
 jobs:
+  # 编译前先定版本号、确认发布说明存在：缺说明几秒内失败，不白编 4 个平台
+  preflight:
+    name: 确定版本号并检查发布说明
+    runs-on: ubuntu-24.04
+    outputs:
+      tag: ${{ steps.tag.outputs.tag }}
+      notes: ${{ steps.tag.outputs.notes }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: 确定版本号
+        id: tag
+        env:
+          INPUT_TAG: ${{ inputs.tag }}
+        run: |
+          set -euo pipefail
+          if [ "$GITHUB_REF_TYPE" = "tag" ]; then
+            tag="$GITHUB_REF_NAME"
+          elif [ -n "$INPUT_TAG" ]; then
+            tag="$INPUT_TAG"
+          else
+            tag="v$(grep -m1 '^version' Cargo.toml | cut -d'"' -f2)"
+          fi
+          notes="docs/releases/${tag#v}/release-notes.md"
+          echo "发布版本：${tag}，发布说明：${notes}"
+          if [ ! -s "$notes" ]; then
+            echo "::error file=${notes}::找不到发布说明 ${notes}。发版提交里先把 docs/releases/next 改名为 ${tag#v}"
+            exit 1
+          fi
+          echo "tag=$tag" >> "$GITHUB_OUTPUT"
+          echo "notes=$notes" >> "$GITHUB_OUTPUT"
+
   build:
     name: 编译 ${{ matrix.target }}
+    needs: preflight
     runs-on: ${{ matrix.os }}
     timeout-minutes: 120
     strategy:
@@ -124,7 +162,7 @@ jobs:
 
   publish:
     name: 发布到 Releases
-    needs: build
+    needs: [preflight, build]
     runs-on: ubuntu-24.04
     permissions:
       contents: write
@@ -139,21 +177,6 @@ jobs:
           merge-multiple: true
           path: dist
 
-      - name: 确定版本号
-        id: tag
-        env:
-          INPUT_TAG: ${{ inputs.tag }}
-        run: |
-          if [ "$GITHUB_REF_TYPE" = "tag" ]; then
-            tag="$GITHUB_REF_NAME"
-          elif [ -n "$INPUT_TAG" ]; then
-            tag="$INPUT_TAG"
-          else
-            tag="v$(grep -m1 '^version' Cargo.toml | cut -d'"' -f2)"
-          fi
-          echo "tag=$tag" >> "$GITHUB_OUTPUT"
-          echo "发布版本：$tag"
-
       - name: 汇总校验和，附上安装脚本
         run: |
           cp install.sh dist/install.sh
@@ -164,9 +187,13 @@ jobs:
       - name: 创建或更新 Release
         env:
           GH_TOKEN: ${{ github.token }}
-          TAG: ${{ steps.tag.outputs.tag }}
+          TAG: ${{ needs.preflight.outputs.tag }}
+          NOTES: ${{ needs.preflight.outputs.notes }}
         run: |
-          cat > notes.md <<EOF
+          # 正文 = docs/releases/<版本>/release-notes.md 原文 + 安装说明
+          cp "$NOTES" notes.md
+          printf '\n\n---\n\n' >> notes.md
+          cat >> notes.md <<EOF
           ## 用 Nix 安装（推荐）
 
           \`\`\`bash
@@ -204,7 +231,7 @@ jobs:
       - name: 更新 Nix 安装用的校验和
         env:
           GH_TOKEN: ${{ github.token }}
-          TAG: ${{ steps.tag.outputs.tag }}
+          TAG: ${{ needs.preflight.outputs.tag }}
           DEFAULT_BRANCH: ${{ github.event.repository.default_branch }}
         run: |
           set -euo pipefail
