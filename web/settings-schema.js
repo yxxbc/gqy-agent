@@ -1839,6 +1839,16 @@
           unit: "秒",
           default: 86400,
         },
+        {
+          key: "warm_idle_seconds",
+          label: "预热进程保留时长",
+          hint: "一轮结束后提前拉起下一轮的 agy,省约 6 秒;这么久没人用就关掉。0 = 不预热",
+          kind: "number",
+          integer: true,
+          min: 0,
+          unit: "秒",
+          default: 300,
+        },
       ],
     },
     codex: {

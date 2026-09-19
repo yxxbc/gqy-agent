@@ -44,6 +44,8 @@ pub(in crate::llm::openai_compatible) struct AntigravityRuntime {
     pub(in crate::llm::openai_compatible) gqy_tools_eager: bool,
     pub(in crate::llm::openai_compatible) idle_timeout: Duration,
     pub(in crate::llm::openai_compatible) print_timeout: Duration,
+    /// 预热进程晾多久没人领就收摊;零 = 不预热。
+    pub(in crate::llm::openai_compatible) warm_idle: Duration,
     /// agy 的用户配置根(`~/.gemini/config`):代理文件与 MCP 注册都落这里。
     /// 测试经 `GQY_AGY_CONFIG_DIR` 改道,免得碰真实配置。
     pub(in crate::llm::openai_compatible) config_dir: PathBuf,
@@ -64,6 +66,7 @@ impl AntigravityRuntime {
             gqy_tools_eager: plugin.gqy_tools_eager,
             idle_timeout: Duration::from_secs(plugin.idle_timeout_seconds.max(30)),
             print_timeout: Duration::from_secs(plugin.print_timeout_seconds.max(60)),
+            warm_idle: Duration::from_secs(plugin.warm_idle_seconds),
             config_dir: setup::default_config_dir(),
         }
     }
@@ -234,7 +237,10 @@ impl OpenAiCompatibleClient {
             if let Some(conversation_id) = &outcome.session_id {
                 setup::remove_conversation_files(conversation_id);
             }
-        } else if crate::daemon::is_resident() && gqy_session.is_some() {
+        } else if crate::daemon::is_resident()
+            && gqy_session.is_some()
+            && !runtime.warm_idle.is_zero()
+        {
             // 会话回合才预热:辅助请求不续传,单次 CLI 一退进程就成孤儿。
             if let Some(conversation_id) = &outcome.session_id {
                 self.prewarm_next_turn(
@@ -344,6 +350,7 @@ impl OpenAiCompatibleClient {
                     workdir: workdir.to_path_buf(),
                 },
                 process,
+                runtime.warm_idle,
             ),
             Err(error) => tracing::debug!(%error, "antigravity pre-warm failed"),
         }

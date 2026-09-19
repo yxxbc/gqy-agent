@@ -56,6 +56,10 @@ pub(in crate::config_tui) fn edit_antigravity_provider_form(
             ),
             plugin.print_timeout_seconds.to_string(),
         ),
+        Field::new(
+            t("Pre-warm idle seconds (0 = off)", "预热进程保留(秒,0=关)"),
+            plugin.warm_idle_seconds.to_string(),
+        ),
     ];
     loop {
         if !run_form(
@@ -85,6 +89,7 @@ pub(in crate::config_tui) fn edit_antigravity_provider_form(
         plugin.gqy_tools_eager = eager;
         plugin.idle_timeout_seconds = fields[6].value.trim().parse().unwrap_or(300);
         plugin.print_timeout_seconds = fields[7].value.trim().parse().unwrap_or(24 * 60 * 60);
+        plugin.warm_idle_seconds = fields[8].value.trim().parse().unwrap_or(300);
         if !enabled {
             // 关掉即清理 agy 侧落盘物:代理目录与全局 mcp_config 的桥条目,
             // 否则用户交互式开 agy 还会一直挂着一个指向旧二进制的 gqy 服务器。

@@ -21,9 +21,8 @@ use std::sync::atomic::{AtomicU64, Ordering};
 use std::sync::Mutex;
 use std::time::{Duration, Instant};
 
-/// 晾多久就放弃。agy 的 `--print-timeout` 默认 24 小时,管不到这里;真正的
-/// 代价是内存,所以取一个「用户大概率已经走开」的短值。
-const TTL: Duration = Duration::from_secs(300);
+// 晾多久由 `plugins.antigravity.warm_idle_seconds` 决定(默认 300,0 = 不预热)。
+// agy 的 `--print-timeout` 默认 24 小时,管不到这里;真正的代价是内存。
 
 /// 复用的判据:命令行、环境、工作目录三者逐字节相同才是同一个位置的下一轮。
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -39,6 +38,7 @@ struct Slot {
     process: RelayProcess,
     generation: u64,
     at: Instant,
+    ttl: Duration,
 }
 
 static POOL: Mutex<Option<Slot>> = Mutex::new(None);
@@ -59,7 +59,7 @@ fn pool() -> std::sync::MutexGuard<'static, Option<Slot>> {
 pub(super) fn take(key: &WarmKey) -> Option<RelayProcess> {
     let mut guard = pool();
     let slot = guard.take()?;
-    if slot.at.elapsed() >= TTL {
+    if slot.at.elapsed() >= slot.ttl {
         slot.process.kill();
         return None;
     }
@@ -71,7 +71,7 @@ pub(super) fn take(key: &WarmKey) -> Option<RelayProcess> {
 }
 
 /// 把预热好的进程存进池子。已经有一个的话先杀掉旧的——只留一个。
-pub(super) fn stash(key: WarmKey, process: RelayProcess) {
+pub(super) fn stash(key: WarmKey, process: RelayProcess, ttl: Duration) {
     let generation = GENERATION.fetch_add(1, Ordering::Relaxed) + 1;
     let mut guard = pool();
     if let Some(previous) = guard.take() {
@@ -82,11 +82,12 @@ pub(super) fn stash(key: WarmKey, process: RelayProcess) {
         process,
         generation,
         at: Instant::now(),
+        ttl,
     });
     drop(guard);
     // 到点没人领就自己收摊,免得白占一个 agy 加一条 MCP 桥。
     tokio::spawn(async move {
-        tokio::time::sleep(TTL).await;
+        tokio::time::sleep(ttl).await;
         let mut guard = pool();
         if guard
             .as_ref()
@@ -94,7 +95,7 @@ pub(super) fn stash(key: WarmKey, process: RelayProcess) {
         {
             if let Some(slot) = guard.take() {
                 slot.process.kill();
-                tracing::debug!("antigravity warm process expired after {}s", TTL.as_secs());
+                tracing::debug!("antigravity warm process expired after {}s", ttl.as_secs());
             }
         }
     });

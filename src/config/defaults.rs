@@ -477,6 +477,11 @@ pub(crate) fn default_antigravity_print_timeout_seconds() -> u64 {
     24 * 60 * 60
 }
 
+/// 预热进程晾多久没人领就收摊。0 = 不预热。
+pub(crate) fn default_antigravity_warm_idle_seconds() -> u64 {
+    300
+}
+
 pub(crate) fn default_codex_native_tools() -> String {
     "all".to_string()
 }
