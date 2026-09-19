@@ -469,6 +469,9 @@ impl AppConfig {
         if !(5..=600).contains(&mem.organizer_timeout_seconds) {
             bail!("memory.organizer_timeout_seconds must be between 5 and 600");
         }
+        if mem.review_idle_seconds != 0 && !(300..=86400).contains(&mem.review_idle_seconds) {
+            bail!("memory.review_idle_seconds must be 0 (off) or between 300 and 86400");
+        }
         if !(0.0..=1.0).contains(&self.plugins.knowledge_base.semantic_min_score) {
             bail!("plugins.knowledge_base.semantic_min_score must be between 0.0 and 1.0");
         }

@@ -1,7 +1,8 @@
 /*
  * 记忆面板(09-04 扩完整)。
  *
- * 人格作用域 → 统计卡 → 事实 / 经历 / 归档回合三个标签 → 过滤条 → 表 → 分页。
+ * 人格作用域 → 统计卡 → 事实 / 经历 / 归档回合 / 复盘四个标签 → 过滤条 → 表 → 分页。
+ * 复盘栏只读:聊后复盘(src/agent/review.rs)的历次结果,不走勾选与批量删除。
  * 点行开抽屉:事实/经历可编辑(内容、状态、重要度、类型、真值、标签),
  * 事实带修订历史与来源经历;归档回合看全文。顶部动作:新增事实、清空待处理、
  * 清空归档、清空人格的全部记忆。数据全部来自 /api/dash/memory/*。
@@ -17,7 +18,7 @@
     personas: [],
     tab: "facts",
     q: "",
-    filters: { facts: {}, episodes: {}, evicted: {} },
+    filters: { facts: {}, episodes: {}, evicted: {}, reviews: {} },
     offset: 0,
     limit: 50,
     total: 0,
@@ -29,14 +30,14 @@
 
   const STATUS = { active: "活跃", forgotten: "已遗忘" };
   const STATUS_CLASS = { active: "is-active", forgotten: "is-muted" };
-  const TYPE = { fact: "事实", preference: "偏好", relationship: "关系", task: "任务", self: "自我", other: "其他" };
+  const TYPE = { fact: "事实", preference: "偏好", relationship: "关系", task: "任务", self: "自我", correction: "纠正", other: "其他" };
   const TRUTH = { accepted: "已确认", reported: "转述", uncertain: "不确定", fictional: "虚构", rejected: "已否定" };
   const TRUTH_CLASS = { accepted: "is-active", uncertain: "is-warn", fictional: "is-warn", rejected: "is-danger" };
   const VISIBILITY = { public: "公开", principal: "本人", privileged: "特权" };
   const RETENTION = { short_term: "短期", long_term: "长期" };
   const ORIGIN = { local: "本地", platform: "平台", "": "—" };
   const ROLE = { user: "用户", assistant: "助手" };
-  const TAB_LABEL = { facts: "事实", episodes: "经历", evicted: "归档回合" };
+  const TAB_LABEL = { facts: "事实", episodes: "经历", evicted: "归档回合", reviews: "复盘" };
 
   const opts = (map, allLabel) => [{ value: "all", label: allLabel }, ...Object.entries(map).map(([value, label]) => ({ value, label }))];
 
@@ -68,14 +69,18 @@
       D.el("button.dash-button.is-danger", { type: "button", onclick: resetPersona }, D.icon("rotate-ccw"), "清空此人格全部记忆"));
 
     ui.tabs = D.segmented(Object.entries(TAB_LABEL).map(([value, label]) => ({ value, label })), state.tab, (value) => {
-      state.tab = value; state.offset = 0; state.q = ""; ui.search.value = ""; state.selected.clear(); renderFilters(); loadItems();
+      state.tab = value; state.offset = 0; state.q = ""; ui.search.value = ""; state.selected.clear();
+      ui.searchBox.hidden = value === "reviews";
+      renderFilters(); loadItems();
     });
     ui.filters = D.el("div.dash-filters");
     ui.search = D.el("input.dash-search", { type: "search", placeholder: "搜索内容…", oninput: () => {
       clearTimeout(ui.searchTimer);
       ui.searchTimer = setTimeout(() => { state.q = ui.search.value.trim(); state.offset = 0; loadItems(); }, 250);
     } });
-    const toolbar = D.el("div.dash-toolbar", null, ui.tabs.el, ui.filters, D.el("label.dash-search-box", null, D.icon("search"), ui.search));
+    ui.searchBox = D.el("label.dash-search-box", null, D.icon("search"), ui.search);
+    ui.searchBox.hidden = state.tab === "reviews";
+    const toolbar = D.el("div.dash-toolbar", null, ui.tabs.el, ui.filters, ui.searchBox);
 
     ui.list = D.el("div.dash-table-wrap");
     ui.pager = D.el("div");
@@ -107,7 +112,7 @@
         filterSelect("stage", { unconsolidated: "未整理", consolidated: "已整理", promotion_pending: "待晋升", promoted: "已晋升" }, "全部阶段"),
         filterSelect("origin_kind", { local: "本地", platform: "平台" }, "全部来源"),
         tagInput(f));
-    } else {
+    } else if (state.tab === "evicted") {
       const start = D.el("input.dash-select", { type: "date", title: "起始日期", value: f.startDate || "", onchange: () => { f.startDate = start.value; state.offset = 0; loadItems(); } });
       const end = D.el("input.dash-select", { type: "date", title: "截止日期", value: f.endDate || "", onchange: () => { f.endDate = end.value; state.offset = 0; loadItems(); } });
       ui.filters.append(filterSelect("role", ROLE, "全部角色"), start, D.el("span.dash-filter-sep", { text: "→" }), end);
@@ -174,7 +179,9 @@
     ui.stamp.textContent = "载入中…";
     const f = state.filters[state.tab];
     let url;
-    if (state.tab === "evicted") {
+    if (state.tab === "reviews") {
+      url = `/api/dash/memory/reviews?${new URLSearchParams({ persona: state.persona, limit: String(state.limit), offset: String(state.offset) })}`;
+    } else if (state.tab === "evicted") {
       const { start, end } = dayBounds(f);
       url = `/api/dash/memory/evicted?${new URLSearchParams({ persona: state.persona, q: state.q, role: f.role || "all", start, end, limit: String(state.limit), offset: String(state.offset) })}`;
     } else {
@@ -188,7 +195,7 @@
     try {
       const payload = await D.api(url);
       if (seq !== state.loadSeq) return;
-      state.items = payload.items || [];
+      state.items = (payload.items || []).map((item) => item.review_id != null ? { ...item, id: item.review_id } : item);
       state.total = payload.total || 0;
       // 翻页 / 换筛选后,列表里已经没有的条目不再算选中。
       const present = new Set(state.items.map((item) => `${state.tab}:${item.id}`));
@@ -206,8 +213,15 @@
   function renderList() {
     ui.list.textContent = "";
     if (!state.items.length) {
-      ui.list.append(D.el("p.dash-empty", { text: state.q ? "没有匹配的条目。" : `这个人格还没有${TAB_LABEL[state.tab]}。` }));
+      const empty = state.tab === "reviews"
+        ? "还没有复盘。终端或 WebUI 里的对话安静一段时间后(设置 → 记忆 → 聊后复盘等待秒数),她会在后台复盘,结果出现在这里。"
+        : state.q ? "没有匹配的条目。" : `这个人格还没有${TAB_LABEL[state.tab]}。`;
+      ui.list.append(D.el("p.dash-empty", { text: empty }));
       ui.pager.replaceChildren();
+      return;
+    }
+    if (state.tab === "reviews") {
+      renderReviews();
       return;
     }
     let grid;
@@ -243,6 +257,32 @@
       ? D.el("div.dash-pager", null, D.el("span.dash-pager-text", { text: `搜索命中 ${state.total} 条(最多 50)` }))
       : D.pager({ offset: state.offset, limit: state.limit, total: state.total, onChange: (offset) => { state.offset = offset; loadItems(); } });
     ui.pager.replaceChildren(pagerNode);
+  }
+
+  function renderReviews() {
+    const grid = D.table([
+      { label: "时间", width: "140px" }, { label: "会话", width: "minmax(120px, 1fr)" },
+      { label: "复盘提醒", width: "minmax(260px, 4fr)" }, { label: "状态", width: "92px" }]);
+    for (const item of state.items) grid.append(reviewRow(item));
+    ui.list.append(grid);
+    ui.bulk.textContent = "";
+    ui.pager.replaceChildren(D.pager({ offset: state.offset, limit: state.limit, total: state.total, onChange: (offset) => { state.offset = offset; loadItems(); } }));
+  }
+
+  // 同一会话只有最新一次复盘生效;notes 为空表示「复盘过、没发现要调整的」,
+  // 那一版会把上一版提醒撤掉。
+  function reviewRow(item) {
+    const notes = item.notes || [];
+    const status = !item.current ? chip("已被替换", "is-muted")
+      : notes.length ? chip("生效中", "is-active") : chip("无需调整", "");
+    const body = notes.length
+      ? D.el("span.dash-cell-main", null, ...notes.map((note) => D.el("div", { text: `· ${note}` })))
+      : D.el("span.dash-cell-muted", { text: "没有需要调整的地方" });
+    return D.el("div.dash-row", { role: "row" },
+      D.el("span.dash-cell-muted", { text: D.formatTime(item.created_at) }),
+      D.el("span.dash-cell-muted", { text: item.session_name || item.session_id, title: item.session_id }),
+      body,
+      D.el("span", null, status));
   }
 
   const chip = (label, cls) => D.el(`span.dash-chip${cls ? `.${cls}` : ""}`, { text: label });

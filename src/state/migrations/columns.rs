@@ -330,3 +330,20 @@ pub(in crate::state) fn apply_v36_sandbox_root(conn: &Connection) -> Result<()> 
     )?;
     Ok(())
 }
+
+/// 聊后复盘（09-19）：每次复盘追加一行，读取只取该会话最新一行。空 notes
+/// 也落一行——表示「复盘过、没问题」，下一轮据此撤掉上一版提示。
+pub(in crate::state) fn apply_v37_session_reviews(conn: &Connection) -> Result<()> {
+    conn.execute_batch(
+        "CREATE TABLE IF NOT EXISTS session_reviews (
+            review_id    INTEGER PRIMARY KEY,
+            session_id   TEXT NOT NULL REFERENCES sessions(session_id) ON DELETE CASCADE,
+            last_turn_id TEXT NOT NULL,
+            notes_json   TEXT NOT NULL DEFAULT '[]',
+            created_at   TEXT NOT NULL
+        );
+        CREATE INDEX IF NOT EXISTS idx_session_reviews_session
+            ON session_reviews(session_id, review_id);",
+    )?;
+    Ok(())
+}

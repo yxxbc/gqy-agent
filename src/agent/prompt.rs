@@ -74,6 +74,16 @@ pub(in crate::agent) fn with_memory_preamble(
     system_prompt
 }
 
+/// 聊后复盘块(09-19):追加在 system 提示词最末。`None` 一个字节都不加,
+/// 两次复盘之间字节恒定。
+pub(in crate::agent) fn with_self_review(mut system_prompt: String, block: Option<&str>) -> String {
+    if let Some(block) = block {
+        system_prompt.push_str("\n\n");
+        system_prompt.push_str(block);
+    }
+    system_prompt
+}
+
 /// 工具期风格锁(08-23 工具体制 A/B 实测 n=12/臂:探针全过 5/12→8/12,无换行
 /// 6/12→10/12)。所有人格会话共用,dev 不带。
 pub(in crate::agent) const STYLE_LOCK: &str = "\n\n<style-lock>Stay in character across tool calls. Tool results are working material; they are not a reason to switch into an assistant reporting tone.</style-lock>";

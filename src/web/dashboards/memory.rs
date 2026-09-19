@@ -429,3 +429,29 @@ pub(in crate::web) async fn dash_memory_reset(
     blocking(move || store.reset_all(false)).await?;
     Ok(Json(json!({ "ok": true })))
 }
+
+#[derive(Deserialize)]
+pub(in crate::web) struct ReviewParams {
+    #[serde(default)]
+    persona: String,
+    #[serde(default = "default_limit")]
+    limit: usize,
+    #[serde(default)]
+    offset: usize,
+}
+
+/// 记忆页「复盘」栏:该人格下各会话的聊后复盘,新→旧。复盘只对属主的终端/
+/// WebUI 会话开(`Agent::enable_chat_review`),所以只给管理员看。
+pub(in crate::web) async fn dash_memory_reviews(
+    State(state): State<DaemonState>,
+    headers: HeaderMap,
+    Query(params): Query<ReviewParams>,
+) -> std::result::Result<Json<Value>, ApiError> {
+    require_admin(&headers, &state)?;
+    let persona = super::persona_scoped_config(&state, &params.persona)?.active_persona_scope();
+    let store = state.state_store.clone();
+    let limit = params.limit.clamp(1, 200);
+    let (items, total) =
+        blocking(move || store.list_session_reviews(&persona, limit, params.offset)).await?;
+    Ok(Json(json!({ "ok": true, "items": items, "total": total })))
+}

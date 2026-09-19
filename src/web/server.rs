@@ -465,6 +465,7 @@ pub(in crate::web) fn router(state: DaemonState) -> Router {
         )
         .route("/api/dash/memory/facts", post(dash_memory_add_fact))
         .route("/api/dash/memory/evicted", get(dash_memory_evicted))
+        .route("/api/dash/memory/reviews", get(dash_memory_reviews))
         .route(
             "/api/dash/memory/evicted/clear",
             post(dash_memory_evicted_clear),

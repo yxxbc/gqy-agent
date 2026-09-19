@@ -390,7 +390,13 @@ impl MemoryStore {
             if let Some(memory_type) = patch.memory_type.as_deref().map(str::trim) {
                 if !matches!(
                     memory_type,
-                    "fact" | "preference" | "relationship" | "task" | "self" | "other"
+                    "fact"
+                        | "preference"
+                        | "relationship"
+                        | "task"
+                        | "self"
+                        | "correction"
+                        | "other"
                 ) {
                     bail!("invalid memory_type");
                 }

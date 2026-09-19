@@ -185,6 +185,10 @@ pub(crate) fn default_memory_organizer_timeout_seconds() -> u64 {
     120
 }
 
+pub(crate) fn default_memory_review_idle_seconds() -> u64 {
+    900
+}
+
 pub(crate) fn default_memory_association_episodes() -> usize {
     1
 }

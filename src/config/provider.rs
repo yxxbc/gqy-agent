@@ -170,13 +170,16 @@ pub enum AuxRole {
     MemoryOrganizer,
     /// WebUI selected-text menu: explain / translate the selection.
     SelectionAssist,
+    /// Post-conversation self-review: notes for the next turns (09-19).
+    ChatReview,
 }
 
 impl AuxRole {
-    pub const ALL: [Self; 3] = [
+    pub const ALL: [Self; 4] = [
         Self::SessionTitle,
         Self::MemoryOrganizer,
         Self::SelectionAssist,
+        Self::ChatReview,
     ];
 
     /// Role keys that used to exist. Old configs still carry them under
@@ -190,6 +193,7 @@ impl AuxRole {
             Self::SessionTitle => "session_title",
             Self::MemoryOrganizer => "memory_organizer",
             Self::SelectionAssist => "selection_assist",
+            Self::ChatReview => "chat_review",
         }
     }
 
@@ -203,6 +207,8 @@ impl AuxRole {
             // 系统里最吃判断力的一步;放最便宜的池产出的是通用知识大杂烩(09-10
             // 真实库取证:123 条里六成是技术问答全文)。
             Self::MemoryOrganizer => ModelTier::Standard,
+            // 复盘要判断读错情绪、附和、无据断言,同样吃判断力。
+            Self::ChatReview => ModelTier::Standard,
         }
     }
 

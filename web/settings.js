@@ -1781,6 +1781,8 @@ window.GqySettings = (() => {
     { key: "memory_organizer", label: "日记整理", fallback: "standard" },
     // 聊天正文选中文字右键「解释 / 翻译」(2026-09-14,web/selectionmenu.js)。
     { key: "selection_assist", label: "划词解释 / 翻译", fallback: "lite" },
+    // 对话安静一段时间后的自我复盘(2026-09-19,src/agent/review.rs)。
+    { key: "chat_review", label: "聊后复盘", fallback: "standard" },
   ];
 
   function auxRolesCard() {

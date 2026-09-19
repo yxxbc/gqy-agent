@@ -483,6 +483,17 @@
           default: 120,
         },
         {
+          path: "plugins.memory.review_idle_seconds",
+          label: "聊后复盘等待秒数",
+          hint: "对话安静这么久后，她在后台复盘这段对话，下一轮起按复盘结果调整。0 关闭，最少 300",
+          kind: "number",
+          integer: true,
+          min: 0,
+          max: 86400,
+          unit: "秒",
+          default: 900,
+        },
+        {
           path: "plugins.memory.association_facts",
           label: "联想知识条数",
           kind: "number",

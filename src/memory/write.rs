@@ -22,7 +22,32 @@ impl MemoryStore {
     }
 
     pub fn remember_fact(&self, content: &str, source: &str) -> Result<i64> {
-        if !self.config.enabled || !self.writes_enabled || content.trim().is_empty() {
+        self.insert_manual_fact(content.trim(), source, "fact", 3)
+    }
+
+    /// 用户纠正过的事:原因并进正文，importance 顶格，让联想记忆把它排在前面——
+    /// 她下次在相似场景里先看到「上次错在哪」。
+    pub fn remember_correction(&self, content: &str, reason: &str, source: &str) -> Result<i64> {
+        let (content, reason) = (content.trim(), reason.trim());
+        if content.is_empty() || reason.is_empty() {
+            return Ok(0);
+        }
+        self.insert_manual_fact(
+            &format!("{content}（原因：{reason}）"),
+            source,
+            "correction",
+            5,
+        )
+    }
+
+    fn insert_manual_fact(
+        &self,
+        content: &str,
+        source: &str,
+        memory_type: &str,
+        importance: i64,
+    ) -> Result<i64> {
+        if !self.config.enabled || !self.writes_enabled || content.is_empty() {
             return Ok(0);
         }
         self.init()?;
@@ -32,10 +57,11 @@ impl MemoryStore {
         conn.execute(
             "INSERT INTO facts (
                 content, source, status, confidence, recall_count, created_at, updated_at,
-                visibility, owner_principal, owner_display_name, subjects, origin_session_id
-             ) VALUES (?1, ?2, 'active', 1.0, 0, ?3, ?3, ?4, ?5, ?6, ?7, ?8)",
+                visibility, owner_principal, owner_display_name, subjects, origin_session_id,
+                memory_type, importance
+             ) VALUES (?1, ?2, 'active', 1.0, 0, ?3, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10)",
             params![
-                content.trim(),
+                content,
                 source.trim(),
                 now(),
                 ownership.visibility,
@@ -43,6 +69,8 @@ impl MemoryStore {
                 ownership.owner_display_name,
                 subjects,
                 self.write_session_id(),
+                memory_type,
+                importance,
             ],
         )?;
         Ok(conn.last_insert_rowid())

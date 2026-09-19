@@ -314,3 +314,41 @@ fn organizer_never_recreates_a_moved_persona_database() {
         )
         .is_err());
 }
+
+#[test]
+fn correction_is_typed_ranked_first_and_carries_its_reason() {
+    let temp = tempfile::tempdir().unwrap();
+    let store = MemoryStore::new(&AppConfig::default(), &test_paths(&temp));
+    store.init().unwrap();
+    let id = store
+        .remember_correction(
+            "报告里的请求次数是 13 不是 16",
+            "没核对原图就写了",
+            "conversation",
+        )
+        .unwrap();
+    assert!(id > 0);
+    let (content, memory_type, importance): (String, String, i64) = store
+        .data_conn()
+        .unwrap()
+        .query_row(
+            "SELECT content, memory_type, importance FROM facts WHERE id = ?1",
+            [id],
+            |row| Ok((row.get(0)?, row.get(1)?, row.get(2)?)),
+        )
+        .unwrap();
+    assert_eq!(
+        content,
+        "报告里的请求次数是 13 不是 16（原因：没核对原图就写了）"
+    );
+    assert_eq!(memory_type, "correction");
+    assert_eq!(importance, 5);
+
+    // 没有原因的纠正不落库：原因才是下次改正的依据
+    assert_eq!(
+        store
+            .remember_correction("只有结论", "  ", "conversation")
+            .unwrap(),
+        0
+    );
+}

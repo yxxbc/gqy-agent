@@ -1,7 +1,7 @@
 {
   "name": "remember_fact",
   "display_name": "记录记忆",
-  "description": "Remember a fact or useful knowledge long-term in GQY's memory.",
+  "description": "Remember a fact or useful knowledge long-term in GQY's memory. Use kind=correction when the user corrects something you said or did.",
   "parameters": {
     "type": "object",
     "properties": {
@@ -12,6 +12,18 @@
       "source": {
         "type": "string",
         "description": "Optional source label."
+      },
+      "kind": {
+        "type": "string",
+        "enum": [
+          "fact",
+          "correction"
+        ],
+        "description": "fact (default) or correction."
+      },
+      "reason": {
+        "type": "string",
+        "description": "Required for kind=correction: why you got it wrong."
       }
     },
     "required": [

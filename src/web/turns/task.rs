@@ -482,6 +482,17 @@ async fn run_turn_task_inner(
                 agent.set_memory_organizer(organizer);
             }
         }
+        // 聊后复盘只给属主的终端/WebUI 人类回合(方案稿 §3.5):平台 profile、
+        // 程序驱动覆盖(`gqy ask --tools` 等,iMessage 桥接走的就是这条)、
+        // WebUI 成员都不开。模式与记忆开关在 Agent 里再判一次。
+        if profile.is_none()
+            && overrides
+                .as_ref()
+                .is_none_or(|overrides| overrides.is_empty())
+            && store.usage_account().is_empty()
+        {
+            agent.enable_chat_review();
+        }
         agent.prepare_for_turn()?;
         let mut control = AgentTurnControl::new(mode, normal_tools, dev_tools);
         if let Some(signal) = manager

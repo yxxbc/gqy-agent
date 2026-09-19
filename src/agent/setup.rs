@@ -149,6 +149,8 @@ impl Agent {
             context_images: Vec::new(),
             context_files: Vec::new(),
             persona_reminder: None,
+            chat_review_enabled: false,
+            self_review: None,
             preset_dialogs,
             last_request_snapshot: None,
             pending_remote_tool_calls: std::sync::Mutex::new(Vec::new()),
@@ -278,9 +280,49 @@ impl Agent {
             )?;
             self.state.recover_stale_turns()?;
         }
+        self.self_review = self.load_self_review();
         self.system_prompt = self.assemble_system_prompt(mode_prompt);
         self.apply_situational_tools();
         Ok(())
+    }
+
+    /// 属主的终端/WebUI 人类回合由入口调用：本回合结束后排聊后复盘，
+    /// 回合开始时读本会话最新复盘进 system 侧。
+    pub(crate) fn enable_chat_review(&mut self) {
+        self.chat_review_enabled = true;
+    }
+
+    fn chat_review_applies(&self) -> bool {
+        self.chat_review_enabled
+            && self.mode == AgentMode::Normal
+            && self.config.memory_config().enabled
+            && self.config.memory_config().review_idle_seconds > 0
+    }
+
+    fn load_self_review(&self) -> Option<String> {
+        if !self.chat_review_applies() {
+            return None;
+        }
+        match self.state.latest_session_review(&self.state.session_id()) {
+            Ok(review) => review.and_then(|(_, notes)| review::self_review_block(&notes)),
+            Err(error) => {
+                tracing::warn!(error = %error, "loading chat review failed");
+                None
+            }
+        }
+    }
+
+    /// 回合落库后调用。
+    pub(in crate::agent) fn schedule_chat_review(&self, turn_id: &str) {
+        if self.chat_review_applies() {
+            review::schedule(
+                self.config.clone(),
+                self.paths.clone(),
+                self.state.clone(),
+                self.state.session_id().to_string(),
+                turn_id.to_string(),
+            );
+        }
     }
 
     /// 情境化工具的回合级增删(dev 专用,09-09)。
@@ -326,6 +368,14 @@ impl Agent {
     /// 有整体替换覆盖时:覆盖文本顶掉模式提示词、模式提醒与属主主机环境块;
     /// 运行时追加段与记忆前言照旧。
     fn assemble_system_prompt(&self, mode_prompt: String) -> String {
+        // 复盘块永远在最末:append-only,既有段落的字节顺序不动。
+        with_self_review(
+            self.assemble_base_system_prompt(mode_prompt),
+            self.self_review.as_deref(),
+        )
+    }
+
+    fn assemble_base_system_prompt(&self, mode_prompt: String) -> String {
         match &self.system_prompt_override {
             Some(override_prompt) => with_memory_preamble(
                 with_runtime_system_context(override_prompt.clone(), &self.runtime_system_context),

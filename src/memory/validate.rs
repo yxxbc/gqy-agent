@@ -158,7 +158,7 @@ pub(crate) fn validate_knowledge_action(
     }
     if !matches!(
         action.memory_type.as_str(),
-        "fact" | "preference" | "relationship" | "task" | "self" | "other"
+        "fact" | "preference" | "relationship" | "task" | "self" | "correction" | "other"
     ) {
         bail!("invalid knowledge type");
     }

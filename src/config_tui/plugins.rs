@@ -960,6 +960,24 @@ fn plugin_fields(config: &AppConfig, plugin: TuiPlugin) -> BoundFields {
             )
             .with(
                 Field::new(
+                    t(
+                        "Chat review idle seconds (0 = off)",
+                        "聊后复盘等待秒数（0 关闭）",
+                    ),
+                    memory.review_idle_seconds.to_string(),
+                ),
+                |config, value| {
+                    let seconds = value.trim().parse::<u64>()?;
+                    config.plugins.memory.review_idle_seconds = if seconds == 0 {
+                        0
+                    } else {
+                        seconds.clamp(300, 86400)
+                    };
+                    Ok(())
+                },
+            )
+            .with(
+                Field::new(
                     t("Associated facts", "联想知识条数"),
                     memory.association_facts.to_string(),
                 ),

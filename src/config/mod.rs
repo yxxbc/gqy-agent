@@ -907,6 +907,10 @@ pub struct MemoryConfig {
     pub diary_promotion_recalls: u64,
     #[serde(default = "default_memory_organizer_timeout_seconds")]
     pub organizer_timeout_seconds: u64,
+    /// 对话安静多久后跑一次聊后复盘(秒);0 = 关闭。下限 300:复盘结果改
+    /// system 侧,缓存还热着就换会作废整段历史缓存。
+    #[serde(default = "default_memory_review_idle_seconds")]
+    pub review_idle_seconds: u64,
     #[serde(default)]
     pub auto_skill_enabled: bool,
     #[serde(default = "default_memory_association_facts")]
@@ -1110,6 +1114,7 @@ impl Default for MemoryConfig {
             short_diary_retention_days: default_memory_short_diary_retention_days(),
             diary_promotion_recalls: default_memory_diary_promotion_recalls(),
             organizer_timeout_seconds: default_memory_organizer_timeout_seconds(),
+            review_idle_seconds: default_memory_review_idle_seconds(),
             auto_skill_enabled: false,
             association_facts: default_memory_association_facts(),
             association_episodes: default_memory_association_episodes(),

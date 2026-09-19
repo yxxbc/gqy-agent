@@ -295,11 +295,12 @@ async fn organize_batch(
     let task_prompt = format!(
         "请整理以下日记。\n\
 \n\
-值得保存为知识点的只有四类：\n\
+值得保存为知识点的只有五类：\n\
 1. 具体人物的稳定事实：身份、设备与环境、偏好与厌恶、习惯、关系、正在做的事、对我的态度。\n\
 2. 这个环境独有的事实：本机或本项目的配置、路径、约定、已验证的结论。\n\
 3. 有明确日期的实测结论、决定与约定（写清日期，例如「2026-09-09 实测…」）。\n\
 4. 我自己的认知、立场与原则。\n\
+5. 用户纠正过我的说法或做法：memory_type 用 correction，content 写清错在哪、为什么错，importance 给 5。\n\
 不保存：模型本来就知道的通用知识、技术科普、操作教程、排错步骤、产品介绍、新闻与传闻、对一次性问题的解答。判断标准：这条内容换一个人来问答案也一样，就不是记忆，不要存。\n\
 每条知识点是一句话，不超过 120 字，只写结论不写过程。原日记里再长的解答也只提炼与具体人物或本环境有关的那一点，提炼不出来就不存。\n\
 长期日记只保留以后可能被问起、影响后续互动或对当前人格具有回溯价值的经历，同样一段一句、不复述解答内容。\n\
@@ -316,7 +317,7 @@ force_long_term=true 的日记必须至少被一条长期日记引用。其他�
 truth_status 使用 accepted、reported、uncertain、fictional 或 rejected。importance 使用 1 到 5，confidence 使用 0 到 1。\n\
 每项必须引用本批次 diary id。knowledge 与 long_diaries 合计不得超过 20 条。\n\
 严格返回：\n\
-{{\"knowledge\":[{{\"operation\":\"create|update\",\"target_id\":null,\"memory_type\":\"fact|preference|relationship|task|self|other\",\"content\":\"\",\"truth_status\":\"reported\",\"importance\":3,\"confidence\":0.8,\"visibility\":\"public|principal|privileged\",\"subjects\":[{{\"principal\":\"principal:...\",\"name\":\"\"}}],\"tags\":[],\"diary_ids\":[]}}],\"long_diaries\":[{{\"content\":\"\",\"importance\":3,\"confidence\":0.8,\"visibility\":\"principal|privileged\",\"subjects\":[{{\"principal\":\"principal:...\",\"name\":\"\"}}],\"tags\":[],\"diary_ids\":[]}}]}}\n\
+{{\"knowledge\":[{{\"operation\":\"create|update\",\"target_id\":null,\"memory_type\":\"fact|preference|relationship|task|self|correction|other\",\"content\":\"\",\"truth_status\":\"reported\",\"importance\":3,\"confidence\":0.8,\"visibility\":\"public|principal|privileged\",\"subjects\":[{{\"principal\":\"principal:...\",\"name\":\"\"}}],\"tags\":[],\"diary_ids\":[]}}],\"long_diaries\":[{{\"content\":\"\",\"importance\":3,\"confidence\":0.8,\"visibility\":\"principal|privileged\",\"subjects\":[{{\"principal\":\"principal:...\",\"name\":\"\"}}],\"tags\":[],\"diary_ids\":[]}}]}}\n\
 \n\
 材料：\n{}",
         serde_json::to_string(&payload)?

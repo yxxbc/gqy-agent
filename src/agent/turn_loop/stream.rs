@@ -209,6 +209,7 @@ impl Agent {
         )? {
             self.wake_memory_organizer();
         }
+        self.schedule_chat_review(&turn_id);
         if let Some(usage) = result.usage.clone() {
             let meta = crate::state::UsageMeta {
                 source: self.usage_source(),

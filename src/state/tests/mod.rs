@@ -11,6 +11,7 @@ mod goals;
 mod platform;
 mod queue;
 mod redo;
+mod reviews;
 mod sessions;
 mod shared;
 mod sponsors;

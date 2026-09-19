@@ -207,10 +207,15 @@ const MIGRATIONS: &[Migration] = &[
         name: "sandbox_root",
         apply: apply_v36_sandbox_root,
     },
+    Migration {
+        version: 37,
+        name: "session_reviews",
+        apply: apply_v37_session_reviews,
+    },
 ];
 
 /// Latest schema version this build produces.
-pub const LATEST_VERSION: i64 = 36;
+pub const LATEST_VERSION: i64 = 37;
 
 /// Returns the schema version currently recorded in the database.
 pub fn current_version(conn: &Connection) -> Result<i64> {

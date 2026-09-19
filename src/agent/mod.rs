@@ -12,6 +12,7 @@ pub(crate) use prompt::prompt_strip_tagged;
 mod pruning;
 mod reasoning;
 mod reports;
+mod review;
 mod setup;
 mod tool_report;
 use artifacts::*;
@@ -292,6 +293,12 @@ pub struct Agent {
     /// `request_messages`,永不进 `messages`,因此不化石化、不落库——
     /// 见 persona_hint 模块头注释。
     persona_reminder: Option<String>,
+    /// 聊后复盘只对属主的终端/WebUI 人类回合开，由入口显式打开
+    /// (`enable_chat_review`)：平台、程序驱动 CLI、WebUI 成员都不开。
+    chat_review_enabled: bool,
+    /// 本会话最新复盘的 `<self-review>` 块，`prepare_for_turn` 时读库。
+    /// 进 system 侧末尾、每请求重组、不化石(§1.4)。
+    self_review: Option<String>,
     /// 人类新输入(新回合/排队插话)重置;注入的提醒只进本轮工作消息,
     /// 不进化石。
     /// 预设对话(begin_dialogs):system 之后、真实历史之前的 user/assistant

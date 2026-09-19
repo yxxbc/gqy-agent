@@ -305,7 +305,21 @@ async fn remember_fact(
         writer_principal,
         writer_display_name,
     );
-    let id = store.remember_fact(content, source)?;
+    let id = match args.get("kind").and_then(Value::as_str).map(str::trim) {
+        None | Some("") | Some("fact") => store.remember_fact(content, source)?,
+        Some("correction") => {
+            let reason = args
+                .get("reason")
+                .and_then(Value::as_str)
+                .map(str::trim)
+                .filter(|reason| !reason.is_empty());
+            let Some(reason) = reason else {
+                bail!("kind=correction requires reason");
+            };
+            store.remember_correction(content, reason, source)?
+        }
+        Some(other) => bail!("kind must be fact or correction, got {other:?}"),
+    };
     Ok(json!({
         "ok": true,
         "id": id,

@@ -661,3 +661,23 @@ impl MemoryStore {
         Ok(())
     }
 }
+
+impl MemoryStore {
+    /// 最近的纠正记忆（新→旧），给聊后复盘当输入。不做 principal 过滤：
+    /// 复盘只对属主会话开（`Agent::enable_chat_review`），属主本就能看全部。
+    pub(crate) fn recent_corrections(&self, limit: usize) -> Result<Vec<String>> {
+        if !self.config.enabled || limit == 0 || !self.data_db.is_file() {
+            return Ok(Vec::new());
+        }
+        let conn = self.data_conn_existing()?;
+        let mut stmt = conn.prepare(
+            "SELECT content FROM facts
+             WHERE memory_type = 'correction' AND status = 'active'
+             ORDER BY id DESC LIMIT ?1",
+        )?;
+        let rows = stmt
+            .query_map([limit as i64], |row| row.get::<_, String>(0))?
+            .collect::<std::result::Result<Vec<_>, _>>()?;
+        Ok(rows)
+    }
+}

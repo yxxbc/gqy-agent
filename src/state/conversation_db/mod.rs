@@ -8,6 +8,8 @@ pub use goals::*;
 mod history;
 mod platform;
 mod queue;
+mod reviews;
+pub use reviews::SessionReviewRow;
 mod rows;
 pub(crate) use rows::*;
 pub use rows::{interrupted_text, pending_placeholder};
