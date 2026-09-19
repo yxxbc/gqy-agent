@@ -1,0 +1,15 @@
+name: Install build dependencies
+description: System packages needed to compile gqy (ALSA, OpenSSL, clang, ripgrep for tests)
+runs:
+  using: composite
+  steps:
+    - name: Linux packages
+      if: runner.os == 'Linux'
+      shell: bash
+      run: |
+        sudo apt-get update
+        sudo apt-get install -y libasound2-dev libssl-dev pkg-config clang cmake ripgrep
+    - name: macOS packages
+      if: runner.os == 'macOS'
+      shell: bash
+      run: command -v rg >/dev/null || brew install ripgrep

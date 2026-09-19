@@ -1,0 +1,22 @@
+name: Test sandbox
+description: Point HOME/GQY_HOME/TMPDIR/XDG_* at a throwaway directory so tests never touch real runner data
+runs:
+  using: composite
+  steps:
+    - shell: bash
+      run: |
+        box="$(mktemp -d)"
+        mkdir -p "$box"/{home,gqy,tmp,runtime,cache,config,data,state} out/ci
+        chmod 700 "$box/runtime"
+        {
+          echo "CARGO_HOME=$HOME/.cargo"
+          echo "RUSTUP_HOME=$HOME/.rustup"
+          echo "HOME=$box/home"
+          echo "GQY_HOME=$box/gqy"
+          echo "TMPDIR=$box/tmp"
+          echo "XDG_RUNTIME_DIR=$box/runtime"
+          echo "XDG_CACHE_HOME=$box/cache"
+          echo "XDG_CONFIG_HOME=$box/config"
+          echo "XDG_DATA_HOME=$box/data"
+          echo "XDG_STATE_HOME=$box/state"
+        } >> "$GITHUB_ENV"
