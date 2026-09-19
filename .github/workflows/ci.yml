@@ -3,8 +3,14 @@ name: Source checks
 on:
   pull_request:
   push:
-    branches: [gqy]
+    # 任何分支 push 都跑全套；dependabot 分支由它自己开的 PR 覆盖，免得重复跑
+    branches: ['**', '!dependabot/**']
   workflow_dispatch:
+    inputs:
+      run_ignored:
+        description: 'Also run #[ignore] tests (live API / benchmarks; failures do not fail the run)'
+        type: boolean
+        default: false
 
 permissions:
   contents: read
@@ -30,10 +36,29 @@ jobs:
       - name: Check the Nix flake
         run: nix flake check --no-build --all-systems
 
+  # test_scripts/refactor-check.sh 里不需要编译的三道门禁，拆开跑，红了能直接看出是哪道
+  gates:
+    name: Gate scripts
+    runs-on: ${{ vars.LINUX_X64_RUNNER || 'ubuntu-24.04' }}
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: Model-visible text stays English
+        run: bash test_scripts/check-model-english.sh
+      - name: File size budget
+        run: python3 test_scripts/refactor_size_report.py --check
+      - name: Module dependency direction
+        run: python3 test_scripts/arch_dep_check.py
+
   test:
     name: Test (${{ matrix.name }})
     runs-on: ${{ matrix.runner }}
     timeout-minutes: 60
+    # 没有 rust-toolchain.toml，不设这个的话 cargo 用的是 runner 预装的 stable
+    env:
+      RUSTUP_TOOLCHAIN: '1.96.1'
     strategy:
       fail-fast: false
       matrix:
@@ -63,47 +88,62 @@ jobs:
           fi
 
       - name: Install Rust toolchain
-        run: rustup toolchain install 1.96.1 --profile minimal
+        run: rustup toolchain install "$RUSTUP_TOOLCHAIN" --profile minimal
 
       # 测试跑在一次性的 HOME/GQY_HOME/XDG 目录里，碰不到 runner 上的任何真实数据
-      - name: Run unit tests (--lib & --bins)
+      - name: Prepare the test sandbox
         shell: bash
         run: |
-          set -euo pipefail
           box="$(mktemp -d)"
           mkdir -p "$box"/{home,gqy,tmp,runtime,cache,config,data,state} out/ci
           chmod 700 "$box/runtime"
-          env CARGO_HOME="$HOME/.cargo" RUSTUP_HOME="$HOME/.rustup" \
-              HOME="$box/home" GQY_HOME="$box/gqy" TMPDIR="$box/tmp" \
-              XDG_RUNTIME_DIR="$box/runtime" XDG_CACHE_HOME="$box/cache" XDG_CONFIG_HOME="$box/config" \
-              XDG_DATA_HOME="$box/data" XDG_STATE_HOME="$box/state" \
-            cargo test --locked --lib --bins 2>&1 | tee out/ci/unit-tests.log
+          {
+            echo "CARGO_HOME=$HOME/.cargo"
+            echo "RUSTUP_HOME=$HOME/.rustup"
+            echo "HOME=$box/home"
+            echo "GQY_HOME=$box/gqy"
+            echo "TMPDIR=$box/tmp"
+            echo "XDG_RUNTIME_DIR=$box/runtime"
+            echo "XDG_CACHE_HOME=$box/cache"
+            echo "XDG_CONFIG_HOME=$box/config"
+            echo "XDG_DATA_HOME=$box/data"
+            echo "XDG_STATE_HOME=$box/state"
+          } >> "$GITHUB_ENV"
 
-      - name: Run integration tests (tests/)
+      # --tests 已包含 lib 与 bins 的单元测试，不再单独跑 --lib --bins
+      - name: Run unit & integration tests
         shell: bash
-        run: |
-          set -euo pipefail
-          box="$(mktemp -d)"
-          mkdir -p "$box"/{home,gqy,tmp,runtime,cache,config,data,state} out/ci
-          chmod 700 "$box/runtime"
-          env CARGO_HOME="$HOME/.cargo" RUSTUP_HOME="$HOME/.rustup" \
-              HOME="$box/home" GQY_HOME="$box/gqy" TMPDIR="$box/tmp" \
-              XDG_RUNTIME_DIR="$box/runtime" XDG_CACHE_HOME="$box/cache" XDG_CONFIG_HOME="$box/config" \
-              XDG_DATA_HOME="$box/data" XDG_STATE_HOME="$box/state" \
-            cargo test --locked --tests 2>&1 | tee out/ci/integration-tests.log
+        run: cargo test --locked --no-fail-fast --tests 2>&1 | tee out/ci/tests.log
 
-      - name: Run documentation tests (--doc)
+      - name: Run documentation tests
+        shell: bash
+        run: cargo test --locked --no-fail-fast --doc 2>&1 | tee out/ci/doc-tests.log
+
+      # 与 refactor-check.sh 同口径：数 passed+failed，不得低于已提交的 .test-count。
+      # 基线是在 macOS 开发机上生成的，只在 macOS 上比，避免平台条件编译造成的差数。
+      - name: Test count must not drop
+        if: runner.os == 'macOS'
         shell: bash
         run: |
-          set -euo pipefail
-          box="$(mktemp -d)"
-          mkdir -p "$box"/{home,gqy,tmp,runtime,cache,config,data,state} out/ci
-          chmod 700 "$box/runtime"
-          env CARGO_HOME="$HOME/.cargo" RUSTUP_HOME="$HOME/.rustup" \
-              HOME="$box/home" GQY_HOME="$box/gqy" TMPDIR="$box/tmp" \
-              XDG_RUNTIME_DIR="$box/runtime" XDG_CACHE_HOME="$box/cache" XDG_CONFIG_HOME="$box/config" \
-              XDG_DATA_HOME="$box/data" XDG_STATE_HOME="$box/state" \
-            cargo test --locked --doc 2>&1 | tee out/ci/doc-tests.log
+          before=$(cat test_scripts/.test-count)
+          now=$(cat out/ci/tests.log out/ci/doc-tests.log | awk '/^test result:/ {sum += $4 + $6} END {print sum+0}')
+          echo "用例数 ${now}（基线 ${before}）"
+          if [ "$now" -lt "$before" ]; then
+            echo "::error::用例数从 ${before} 降到 ${now}。有意删测试时，同一提交里更新 test_scripts/.test-count"
+            exit 1
+          fi
+
+      # gqy-voice 默认不构建，这里只保证它能编过，不跑需要模型的 e2e
+      - name: Check the voice binary compiles
+        if: runner.os == 'Linux'
+        shell: bash
+        run: cargo check --locked --features voice --bin gqy-voice 2>&1 | tee out/ci/voice-check.log
+
+      - name: Run ignored tests (manual, non-blocking)
+        if: runner.os == 'Linux' && github.event_name == 'workflow_dispatch' && inputs.run_ignored
+        continue-on-error: true
+        shell: bash
+        run: cargo test --locked --no-fail-fast --tests -- --ignored 2>&1 | tee out/ci/ignored-tests.log
 
       - name: Preserve test evidence
         if: always()
@@ -123,6 +163,9 @@ jobs:
     name: MSRV check (${{ matrix.name }}, 1.89.0)
     runs-on: ${{ matrix.runner }}
     timeout-minutes: 30
+    # 不设的话 cargo 用 runner 预装的 stable，MSRV 形同虚设
+    env:
+      RUSTUP_TOOLCHAIN: '1.89.0'
     strategy:
       fail-fast: false
       matrix:
@@ -145,13 +188,14 @@ jobs:
           sudo apt-get install -y libasound2-dev libssl-dev pkg-config clang cmake
 
       - name: Install Rust toolchain
-        run: rustup toolchain install 1.89.0 --profile minimal
+        run: rustup toolchain install "$RUSTUP_TOOLCHAIN" --profile minimal
 
       - name: Check declared MSRV without hiding failures
         shell: bash
         run: |
           mkdir -p out/ci
-          cargo check --locked --all-targets 2>&1 | tee out/ci/msrv.log
+          cargo --version | tee out/ci/msrv.log
+          cargo check --locked --all-targets 2>&1 | tee -a out/ci/msrv.log
 
       - name: Preserve check evidence
         if: always()
