@@ -1,5 +1,7 @@
 ## Main
 
+- dev模式下，如果供应商是claude、agy、codex，默认使用其原生工具，不使用gqy的工具
+
 ## Feats
 
 - webui再safari上的移动端适配和界面固定，其次是移动端点击输入框整体界面不在上移动，或者考虑兼容方案，移动端浏览器：safari
