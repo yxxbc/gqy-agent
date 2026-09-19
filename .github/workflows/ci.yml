@@ -30,7 +30,6 @@ jobs:
         run: nix flake check --no-build --all-systems
 
   rust:
-    needs: format
     runs-on: ${{ vars.LINUX_X64_RUNNER || 'ubuntu-24.04' }}
     timeout-minutes: 75
     strategy:
@@ -40,7 +39,6 @@ jobs:
         toolchain: ['1.96.1', '1.89.0']
     env:
       RUSTUP_TOOLCHAIN: ${{ matrix.toolchain }}
-      CARGO_BUILD_JOBS: '2'
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -54,7 +52,7 @@ jobs:
           RUST_VERSION: ${{ matrix.toolchain }}
         run: rustup toolchain install "$RUST_VERSION" --profile minimal
       # 测试跑在一次性的 HOME/GQY_HOME/XDG 目录里，碰不到 runner 上的任何真实数据
-      - name: Run isolated source unit tests
+      - name: Run all isolated tests concurrently
         if: matrix.toolchain == '1.96.1'
         shell: bash
         run: |
@@ -66,7 +64,12 @@ jobs:
               HOME="$box/home" GQY_HOME="$box/gqy" TMPDIR="$box/tmp" \
               XDG_RUNTIME_DIR="$box/runtime" XDG_CACHE_HOME="$box/cache" XDG_CONFIG_HOME="$box/config" \
               XDG_DATA_HOME="$box/data" XDG_STATE_HOME="$box/state" \
-            cargo test --locked --lib 2>&1 | tee out/ci/source-unit.log
+            cargo test --locked --all-targets 2>&1 | tee out/ci/source-tests.log
+          env CARGO_HOME="$HOME/.cargo" RUSTUP_HOME="$HOME/.rustup" \
+              HOME="$box/home" GQY_HOME="$box/gqy" TMPDIR="$box/tmp" \
+              XDG_RUNTIME_DIR="$box/runtime" XDG_CACHE_HOME="$box/cache" XDG_CONFIG_HOME="$box/config" \
+              XDG_DATA_HOME="$box/data" XDG_STATE_HOME="$box/state" \
+            cargo test --locked --doc 2>&1 | tee -a out/ci/source-tests.log
       - name: Check the declared MSRV without hiding failures
         if: matrix.toolchain == '1.89.0'
         shell: bash
