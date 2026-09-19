@@ -10,6 +10,7 @@
 #   4. 模型面语言 模型可见文本恒英文
 #   5. 文件规模  不得出现新的越红线文件，超标文件不得变长
 #   6. 依赖方向  按层序表全对比较：不得新增跨层引用，已有的不得变多
+#   7. AGENTS.md 引用 规则书里写的路径与符号必须还存在
 #
 # 关于格式：仓库自 08-26（`939a2feb` 全量格式化）起 fmt-clean，早先那道
 # 「只禁止变差」的渐进门禁已无存在理由，直接全仓检查。
@@ -63,5 +64,8 @@ python3 test_scripts/refactor_size_report.py --check
 
 step "依赖方向"
 python3 test_scripts/arch_dep_check.py
+
+step "AGENTS.md 引用"
+python3 test_scripts/check-agents-refs.py
 
 printf '\n\033[32m安全网全绿\033[0m\n'

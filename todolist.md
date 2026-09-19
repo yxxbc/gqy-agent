@@ -49,6 +49,8 @@
 
 agy 桥接工具瘦身：gqy_tools_eager=true 时全部工具定义被全量注入 MCP 条目，每轮固定吃约 9k input token 且随会话累积。改法：默认改走按需加载，gqy_tools 支持白名单数组，另给 MCP 出站 schema 加空 enum 兜底净化
 
+拆分 `src/render/stream/timeline.rs`（2400 行，唯一越过 2000 行红线的文件，AGENTS §6.2）：目前体验没问题、近期改动也很少碰它，暂不排期；等下次要改它时顺手拆
+
 ## 搁置
 
 - REPL 复制不带左侧装饰

@@ -12,7 +12,7 @@
 
 先定位问题，找根因，并告知用户，同时提出方案，标记你推荐的选项，让用户决定是否要开工。
 
-功能完成后应当简洁易懂地给出可照做的验收流程，经过用户验证后确认才可以commit。验收成功准备发布的内容应当写进next release note中
+功能完成后应当简洁易懂地给出可照做的验收流程，经过用户验证后确认才可以commit。验收成功准备发布的内容写进 `docs/releases/next/release-notes.md`
 
 docs/中有所有的计划和文档，可以自行按需阅读。
 
@@ -66,7 +66,7 @@ docs/中有所有的计划和文档，可以自行按需阅读。
 
 ## 6. 性能与重构
 
-6.1 没有实测数字不合并；“实测后判不做”清单见 `docs/plan-is-true/low-footprint.md` 与 `docs/fixed/2026-08-18-性能优化.md`（mimalloc、AppConfig→Arc 快照、资源外置、panic=abort 等），别重提。
+6.1 没有实测数字不合并；“实测后判不做”清单见 `docs/plan/low-footprint.md` 与 `docs/fixed/2026-08-18-性能优化.md`（mimalloc、AppConfig→Arc 快照、资源外置、panic=abort 等），别重提。
 6.2 文件规模：目标 800 行 / 上限 1500 / 红线 2000。codegen-units=1 已定（release 编译 ~5.5 分钟属预期）。
 6.3 搬文件五坑（include_str 相对路径漂移/模块名遮蔽/super 语义改变/脚本必须拒绝覆盖已存在文件/回退前先看暂存区）：`docs/fixed/2026-08-18-代码拆分.md` §五。
 
@@ -78,9 +78,21 @@ docs/中有所有的计划和文档，可以自行按需阅读。
 7.4 Nix 下程序路径是 `/nix/store/<hash>-…`，每次升级都变：`gqy_executable()` 只用于起子进程或每次都会重建的配置，禁止写进 shell rc、launchd/systemd、用户配置等持久文件（写 `gqy` 靠 PATH）。
 7.5 预编译包和 Nix 包都不带 `gqy-voice`。开发机用 `cargo install --path . --locked --features voice`，不要同机再 `nix profile install`（`~/.cargo/bin` 会遮住它）；验收 Nix 版用 `GQY_HOME=$(mktemp -d) nix run github:yxxbc/gqy-agent/gqy`。
 7.6 shell 脚本里紧挨中文的变量必须加花括号（`${var}，`）：macOS 的 sh 在中文 locale 下会把全角标点的首字节吞进变量名，`set -u` 直接报错。
-7.7 只有 Nix 和 `install.sh` 两条安装路线。上游继承的 Arch/DEB/RPM 打包（`packaging/`、release.yml 等）已删除，别再恢复或往里加东西；`install.sh` 给没有 Nix 的用户，检测到 Nix 版会拒绝重复安装。CI（ci.yml）在任意分支 push 与 PR 上跑全套（fmt+flake、三道脚本门禁、Linux/macOS 测试与用例数门禁、voice 编译、1.89 MSRV）；`#[ignore]` 用例只在手动触发并勾选 run_ignored 时跑、不阻塞。
+7.7 只有 Nix 和 `install.sh` 两条安装路线。上游继承的 Arch/DEB/RPM 打包（`packaging/`、release.yml 等）已删除，别再恢复或往里加东西；`install.sh` 给没有 Nix 的用户，检测到 Nix 版会拒绝重复安装。CI（ci.yml）在任意分支 push 与 PR 上跑全套（fmt+flake、四道脚本门禁、Linux/macOS 测试与用例数门禁、voice 编译、1.89 MSRV）；`#[ignore]` 用例只在手动触发并勾选 run_ignored 时跑、不阻塞。
 
-## 8.添加/删除一个功能时必看
+## 8. 改动的连带更新
 
-8.1 **添加功能** 首先考虑添加的功能是在前端还是后端，或者是前后端是否都需添加，不确定的可以询问用户。核查改功能在其他相关文档、代码中的作用，对其更新后相关代码、文档都需要更新。
-8.2 **删除功能** 核查改功能的前后端，以及在其他相关文档、代码中的作用，对其更新后相关代码、文档都需要更新。
+8.1 **添加/删除功能**：先判断落在前端（WebUI/TUI）、后端还是两边都要改，拿不准就问用户。两端都有的功能要同步增删，不能只改一端。
+8.2 **对照表**：改了左列，同一提交里更新右列。表外的改动也要搜一遍引用它的代码和文档。
+
+| 改了什么 | 同一提交里更新 |
+|---|---|
+| 新增/删除工具 | `src/tools/descriptions/*.json`、`config/plugin_catalog.rs`、`tools/compose.rs` 的 `UNITS`、`docs/wiki/15-扩展指南.md` |
+| 新增顶层模块或跨层引用 | `test_scripts/arch_dep_check.py` 的层序表、`docs/architecture.md` |
+| Turn 字段/数据库迁移 | `rows.rs` 的 `TURN_COLUMNS` 与 `map_turn_row`（§3.1） |
+| 打包资源、外部命令、发布平台 | `publish-release.yml` 打包步骤、`nix/package.nix`、`nix/prebuilt.nix`（§7.3） |
+| 发版流程（`publish-release.yml`、`nix/update-release.py`） | 本文件 §7.2、`docs/wiki/18-Nix安装开发与发布.md` §4 |
+| CI 结构（`.github/workflows/ci.yml`） | 本文件 §7.7 |
+| 有意删除测试用例 | `test_scripts/.test-count` |
+| 搬动/改名/删除本文件提到的路径或符号 | 本文件（`test_scripts/check-agents-refs.py` 会在 CI 里拦） |
+| 用户可见的改动（验收通过后） | `docs/releases/next/release-notes.md` |
