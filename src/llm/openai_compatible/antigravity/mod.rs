@@ -18,6 +18,7 @@
 
 mod setup;
 mod stream;
+mod warm;
 
 use crate::llm::openai_compatible::cli_relay::{
     self, payload, RelayOutcome, ResumePlan, ToolScopes,
@@ -28,6 +29,7 @@ pub(in crate::llm::openai_compatible) use setup::remove_conversation_files;
 
 /// 供应商在表单里被关掉时的清理:代理目录与全局 mcp_config 里的桥条目。
 pub(crate) fn remove_relay_files_now() {
+    warm::discard();
     setup::remove_relay_files(&setup::default_config_dir());
 }
 
@@ -232,6 +234,19 @@ impl OpenAiCompatibleClient {
             if let Some(conversation_id) = &outcome.session_id {
                 setup::remove_conversation_files(conversation_id);
             }
+        } else if crate::daemon::is_resident() && gqy_session.is_some() {
+            // 会话回合才预热:辅助请求不续传,单次 CLI 一退进程就成孤儿。
+            if let Some(conversation_id) = &outcome.session_id {
+                self.prewarm_next_turn(
+                    &runtime,
+                    &model,
+                    &workdir,
+                    &env,
+                    &agent_name,
+                    conversation_id,
+                )
+                .await;
+            }
         }
         plan.record(&outcome);
         Ok(outcome.result)
@@ -254,6 +269,14 @@ impl OpenAiCompatibleClient {
     {
         let payload = render_stdin_line(plan.delta());
         let args = self.antigravity_args(runtime, model, workdir, agent_name, plan.resume_id());
+        // 上一轮给这一轮晾好的进程:命令行、环境、工作目录逐字节相同才认。
+        let key = warm::WarmKey {
+            binary: runtime.binary.clone(),
+            args: args.clone(),
+            env: env.to_vec(),
+            workdir: workdir.to_path_buf(),
+        };
+        let warm_process = warm::take(&key);
         crate::llm::request_log::record(
             &self.provider.id,
             model,
@@ -262,7 +285,8 @@ impl OpenAiCompatibleClient {
             &runtime.binary.display().to_string(),
             &json!({ "args": args, "stdin": payload, "conversation": plan.conversation() }),
         );
-        stream::run_agy_turn(
+        let used_warm = warm_process.is_some();
+        let outcome = stream::run_agy_turn(
             runtime,
             workdir,
             &args,
@@ -271,9 +295,58 @@ impl OpenAiCompatibleClient {
             agent_name,
             plan.resume_id(),
             request_id,
+            warm_process,
             on_chunk,
         )
-        .await
+        .await;
+        // 晾着的那个死了:一个字都没吐过,冷启动再来一次,用户看不出区别。
+        if used_warm && outcome.as_ref().is_err_and(stream::warm_process_dead) {
+            tracing::debug!(
+                request_id,
+                "antigravity warm process was dead; spawning a fresh one"
+            );
+            return stream::run_agy_turn(
+                runtime,
+                workdir,
+                &args,
+                env,
+                &payload,
+                agent_name,
+                plan.resume_id(),
+                request_id,
+                None,
+                on_chunk,
+            )
+            .await;
+        }
+        outcome
+    }
+
+    /// 给下一轮晾一个进程:参数与这一轮相同,只把续传目标换成刚拿到的会话 id。
+    /// 失败(agy 缺失、fork 不出来)只记一行 debug——预热本就是锦上添花。
+    async fn prewarm_next_turn(
+        &self,
+        runtime: &AntigravityRuntime,
+        model: &str,
+        workdir: &std::path::Path,
+        env: &[(String, Option<String>)],
+        agent_name: &str,
+        conversation_id: &str,
+    ) {
+        let args =
+            self.antigravity_args(runtime, model, workdir, agent_name, Some(conversation_id));
+        match stream::spawn_warm_agy(runtime, workdir, &args, env).await {
+            Ok(process) => warm::stash(
+                warm::WarmKey {
+                    binary: runtime.binary.clone(),
+                    args,
+                    env: env.to_vec(),
+                    workdir: workdir.to_path_buf(),
+                },
+                process,
+            ),
+            Err(error) => tracing::debug!(%error, "antigravity pre-warm failed"),
+        }
     }
 
     fn antigravity_args(

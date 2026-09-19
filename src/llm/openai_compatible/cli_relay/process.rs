@@ -23,7 +23,9 @@ pub(in crate::llm::openai_compatible) struct RelayProcess {
     /// 就退出(续传目标丢失、登录失败)时,大于管道缓冲的载荷会让同步 write_all
     /// 永远等不到人读,或者拿到一个没有 stderr 尾巴的 EPIPE——两种都盖住了
     /// 真正的报错措辞(评审 09-03)。
-    stdin_task: tokio::task::JoinHandle<()>,
+    stdin_task: Option<tokio::task::JoinHandle<()>>,
+    /// 预热进程先拉起、后喂载荷,写端在这里存着等 [`RelayProcess::send_payload`]。
+    stdin: Option<tokio::process::ChildStdin>,
     idle_timeout: Duration,
     /// 看门狗报错里的阶段名(`claude-code.stream` 这种)。
     stage: &'static str,
@@ -61,6 +63,34 @@ impl RelayProcess {
         label: &'static str,
         not_found: impl FnOnce() -> String,
     ) -> Result<Self> {
+        let mut process = Self::spawn_idle(
+            binary,
+            args,
+            workdir,
+            env,
+            idle_timeout,
+            stage,
+            label,
+            not_found,
+        )
+        .await?;
+        process.send_payload(stdin_payload);
+        Ok(process)
+    }
+
+    /// 只拉起进程,不喂 stdin。预热用:CLI 在收到输入之前就会把登录、MCP 握手
+    /// 这些固定开销跑完(agy 实测 4.5 秒),载荷晚点再给也不影响。
+    #[allow(clippy::too_many_arguments)]
+    pub(in crate::llm::openai_compatible) async fn spawn_idle(
+        binary: &std::path::Path,
+        args: &[String],
+        workdir: &std::path::Path,
+        env: &[(String, Option<String>)],
+        idle_timeout: Duration,
+        stage: &'static str,
+        label: &'static str,
+        not_found: impl FnOnce() -> String,
+    ) -> Result<Self> {
         let mut command = tokio::process::Command::new(binary);
         command
             .args(args)
@@ -91,7 +121,7 @@ impl RelayProcess {
             }
         })?;
         let pid = child.id().unwrap_or_default();
-        let mut stdin = child
+        let stdin = child
             .stdin
             .take()
             .with_context(|| format!("{label} stdin unavailable"))?;
@@ -126,27 +156,35 @@ impl RelayProcess {
                 }
             })
         };
-        let stdin_task = {
-            let payload = stdin_payload.as_bytes().to_vec();
-            tokio::spawn(async move {
-                if let Err(error) = stdin.write_all(&payload).await {
-                    // 子进程先退出(EPIPE)属正常:真正的原因在 stdout/stderr 里。
-                    tracing::debug!(%error, "{label} closed stdin before the payload was written");
-                }
-                drop(stdin);
-            })
-        };
         Ok(Self {
             child,
             pid,
             lines: BufReader::new(stdout).lines(),
             stderr_tail,
             stderr_task,
-            stdin_task,
+            stdin_task: None,
+            stdin: Some(stdin),
             idle_timeout,
             stage,
             label,
         })
+    }
+
+    /// 把本轮载荷写进 stdin 并关写端(本轮输入结束)。写在独立任务里:见
+    /// `stdin_task` 字段上的说明。
+    pub(in crate::llm::openai_compatible) fn send_payload(&mut self, stdin_payload: &str) {
+        let Some(mut stdin) = self.stdin.take() else {
+            return;
+        };
+        let payload = stdin_payload.as_bytes().to_vec();
+        let label = self.label;
+        self.stdin_task = Some(tokio::spawn(async move {
+            if let Err(error) = stdin.write_all(&payload).await {
+                // 子进程先退出(EPIPE)属正常:真正的原因在 stdout/stderr 里。
+                tracing::debug!(%error, "{label} closed stdin before the payload was written");
+            }
+            drop(stdin);
+        }));
     }
 
     /// 下一行 stdout;空闲超过看门狗就杀进程组并报 Timeout 类传输失败。
@@ -190,7 +228,9 @@ impl RelayProcess {
             }
         };
         self.stderr_task.abort();
-        self.stdin_task.abort();
+        if let Some(task) = &self.stdin_task {
+            task.abort();
+        }
         let code = exit
             .and_then(|status| status.code())
             .map(|code| code.to_string())
