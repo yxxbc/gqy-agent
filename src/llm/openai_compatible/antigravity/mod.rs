@@ -237,7 +237,7 @@ impl OpenAiCompatibleClient {
             if let Some(conversation_id) = &outcome.session_id {
                 setup::remove_conversation_files(conversation_id);
             }
-        } else if crate::daemon::is_resident()
+        } else if crate::paths::is_resident()
             && gqy_session.is_some()
             && !runtime.warm_idle.is_zero()
         {

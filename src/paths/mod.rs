@@ -51,6 +51,22 @@ pub fn prime_gqy_executable() {
     let _ = gqy_executable();
 }
 
+static RESIDENT: std::sync::atomic::AtomicBool = std::sync::atomic::AtomicBool::new(false);
+
+/// 本进程是常驻 daemon 吗。单次 CLI 阅后即焚:它不能留下任何等着被下一轮
+/// 领走的子进程——进程一退，留下的就是孤儿。预热那类「为下一轮准备」的优化
+/// 必须先问这一句。
+///
+/// 放在底层而不是 `daemon`:问这句话的是 llm 等下层模块，不能反向引用入口层。
+pub(crate) fn is_resident() -> bool {
+    RESIDENT.load(std::sync::atomic::Ordering::Relaxed)
+}
+
+/// 只由 daemon 启动时调用一次。
+pub(crate) fn mark_resident() {
+    RESIDENT.store(true, std::sync::atomic::Ordering::Relaxed);
+}
+
 /// `/proc/self/exe` 在文件被替换后会读出 `".../gqy (deleted)"`。
 /// 剥掉那个后缀，且只在剥完确实存在时才采信——不然宁可用原样报错，
 /// 也好过悄悄跑到一个不相干的路径上。
