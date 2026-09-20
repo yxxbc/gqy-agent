@@ -102,7 +102,7 @@ base64 = "0.22"
 fst = "0.4"
 
 [dev-dependencies]
-jieba-rs = "0.7"
+jieba-rs = "0.11"
 tiktoken-rs = "0.12"
 
 [profile.release]
