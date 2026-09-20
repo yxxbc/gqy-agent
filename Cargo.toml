@@ -90,7 +90,7 @@ ratex-render = { version = "0.1.12", features = ["embed-fonts"] }
 # 只有 gqy-voice 二进制会启用;主程序永远不带。
 sherpa-onnx = { version = "1.13.7", optional = true }
 cpal = { version = "0.15", optional = true }
-pinyin = { version = "0.10", optional = true }
+pinyin = { version = "0.11", optional = true }
 bzip2 = { version = "0.4", optional = true }
 
 [features]
