@@ -4,109 +4,74 @@
 
 # GQY (顾清影)
 
-**活在终端里的二次元 AI 伴侣 · 开箱即用 · 双模式设计 · 多端接入**
+**住在终端里的二次元 AI 伴侣：聊天陪伴、生活助手、写代码搭档，一个就够**
 
-*A lightweight, terminal-first anime AI assistant built with Rust.*
+*A terminal-first anime AI companion for Linux and macOS.*
 
 <p align="center">
-  <a href="https://github.com/yxxbc/gqy-agent"><img src="https://img.shields.io/badge/version-0.6.0-blue.svg?style=flat" alt="Version"></a>
-  <a href="https://www.rust-lang.org/"><img src="https://img.shields.io/badge/rust-1.89+-DEA584.svg?style=flat&logo=rust&logoColor=white" alt="Rust Version"></a>
+  <a href="https://github.com/yxxbc/gqy-agent/releases/latest"><img src="https://img.shields.io/badge/version-0.6.0-blue.svg?style=flat" alt="Version"></a>
   <a href="LICENSE"><img src="https://img.shields.io/badge/license-MIT-green.svg?style=flat" alt="License"></a>
-  <img src="https://img.shields.io/badge/platform-Linux%20%7C%20macOS%20%7C%20NotWindows-informational.svg?style=flat" alt="Platform">
+  <img src="https://img.shields.io/badge/platform-Linux%20%7C%20macOS-informational.svg?style=flat" alt="Platform">
 </p>
 
-<img src="pics/gqy-tui.png" alt="GQY TUI Screenshot" width="850" />
+<img src="pics/gqy-tui.png" alt="GQY 终端界面截图" width="850" />
 
 </div>
 
+## 顾清影是谁
 
-## 作者的话
-> 此项目只给开发者提供思路与架构，项目开源但不提供便携服务。不回答小白的提问，没有义务。
+顾清影是一个常驻在你电脑里的 AI 角色。平时陪你聊天、记得你说过的事、帮你查天气汇率、定闹钟、记账；要写代码或排查问题时，切到开发模式，她就变成一个安静高效的编程助手。
 
----
+> 「顾清影」最初是作者高中时期由 `Gemini-2.5-pro` 生成的虚构角色，现在她有了自己的家。
 
-## 项目简介
+> [!NOTE]
+> 这是一个业余维护的个人项目。遇到问题欢迎提 [issue](https://github.com/yxxbc/gqy-agent/issues)，我会尽力回复，但不保证时效。提问前先看看 [常见问题](docs/wiki/17-常见问题.md)，很多情况那里已经有答案。
 
-**GQY（顾清影）** 是一款以 Rust 编写的高性能、轻量级 AI 智能体应用。
+## 她能做什么
 
->  **角色背景**：「顾清影」最初源于作者高中时期接触 AI 时由 `Gemini-2.5-pro` 生成的虚构角色。现在，她化身为你系统中的常驻 AI 伴侣——既能在日常对话中提供贴心陪伴与生活辅助，也能在编码排障时切换为高效纯粹的开发者助手。
-
-本项目基础架构与命令系统基于 [shorin/miyu-agent 0.6.0](https://github.com/SHORiN-KiWATA/miyu-agent) 进行深度重构与二改开发。
-
----
-
-##  核心特性
-
--  **双模式架构设计**
-  - **Normal（普通模式）**：全功能与工具链开放，包含角色扮演、情感互动、游戏娱乐、天气汇率查询及日常生活辅助。
-  - **Dev（开发模式）**：彻底隔离非开发工具与冗余提示词，以极简设计最大化释放大语言模型自身的代码推理与工程排障能力。
--  **灵活的模型生态**
-  - 广泛兼容主流 OpenAI / Anthropic 协议中转。
-  - 支持调用本地模型环境（如 `Claude Code`、`agy`、`codex`）。
-  - 内置多档位模型池路由（Lite / Cheap / Standard / Flagship）。
--  **端侧离线语音支持**
-  - 搭载 **SenseVoice** 本地离线语音识别（零数据上传，彻底保护隐私）。
-  - 持续对话，后台模型处理。
-  - 支持常驻低功耗麦克风唤醒词监听、桌面通知提醒与 MiniMax / 小米 MiMo 语音合成（TTS）。
--  **长期记忆与知识沉淀**
-  - 具备好感度/情绪机制、会话联想注入与回合后经历/日记归档。
-  - 结合本地 ONNX Runtime 向量模型实现本地离线知识库检索（RAG）。
--  **完善的工具与插件生态**
-  - 内置 MCP 客户端、异步命令与后台任务管理、文件 Patch 工具、定时闹钟、Web 抓取与图像生成等。
-
----
-
-
+- **两种模式，一键切换**
+  - **普通模式**：有性格，有好感度和情绪。能闲聊、玩游戏、查天气汇率快递、看地图、生成图片、定时提醒。
+  - **开发模式**（`gqy dev`）：收起人格和生活工具，只留写代码需要的东西，把模型的注意力全部用在你的项目上。
+- **记得你**：长期记忆、日记、好感度与情绪。你纠正过她的事会带着理由记下来，下次不再犯；聊完一段时间后她还会自己复盘这次对话。
+- **你的知识库**：把文档丢给她，在本机建索引，离线检索，内容不上传。
+- **随处可聊**：终端界面、浏览器（手机平板也行）、直接在 shell 命令行里问、QQ、iMessage（macOS）。
+- **本地语音**：喊一声「清影」唤醒，说完就办。语音识别在本机完成，不上传录音。
+- **模型随便接**：
+  - 兼容 OpenAI / Anthropic 协议的服务都能用。
+  - 能借用你已有的 Claude Code、Codex、Antigravity 订阅。
+  - 没有 API key 也能先用免费额度试。
 
 ## 安装
 
-### 用 Nix 安装（推荐）
+支持 **Linux**（x86_64 / ARM64）和 **macOS**（Apple 芯片 / Intel）。不支持 Windows。
 
-装过 [Nix](https://nixos.org/download/)（需要开启 flakes）就只要一行：
+### 方式一：Nix（推荐）
+
+已经装了 [Nix](https://nixos.org/download/)（需要开启 flakes）的话，一行搞定：
 
 ```bash
 nix profile install github:yxxbc/gqy-agent/gqy
 ```
 
-- 支持 **Linux**（x86_64 / ARM64，含 NixOS）和 **macOS Apple 芯片**。Intel Mac 已不受 nixpkgs 支持，请用下面的一键安装脚本。
-- **不用本地编译**：直接下载 [Releases](https://github.com/yxxbc/gqy-agent/releases) 里云端编译好的包，按仓库里记录的 sha256 校验。
-- 字体、本地向量模型、默认知识库和 ONNX Runtime 都一起装好，不写 `~/.local`，**不需要 root**。
-- 升级：`nix profile upgrade gqy-agent`；卸载：`nix profile remove gqy-agent`；升级出问题退回：`nix profile rollback`。
-- 不想安装、只想试一下：`nix run github:yxxbc/gqy-agent/gqy`。
-- 想自己从源码编译：`nix profile install github:yxxbc/gqy-agent/gqy#gqy-src`（指定版本把 `gqy` 换成 tag，例如 `v0.6.0`）。
-- NixOS / home-manager 可以把 `github:yxxbc/gqy-agent/gqy` 加为 flake input，使用 `packages.<system>.gqy`。
-- 以前用 `install.sh` 装过：运行 `curl -fsSL https://raw.githubusercontent.com/yxxbc/gqy-agent/gqy/nix/migrate.sh | sh`，它会先用 Nix 装好，再把旧程序挪去备份（数据不动）。
-- 开发、发布流程和常见问题见 [docs/wiki/18-Nix安装开发与发布](docs/wiki/18-Nix安装开发与发布.md)。
+- 下载的是编译好的程序，不用等本地编译，不需要 root。
+- Intel Mac 不在 Nix 支持范围内，请用方式二。
+- 只想先试试、不安装：`nix run github:yxxbc/gqy-agent/gqy`
 
-### 一键安装脚本（没有 Nix 或 Intel Mac）
+### 方式二：一键安装脚本
 
-不用装 Rust，也不用自己编译。复制下面这行到终端运行：
+没有 Nix，或者是 Intel Mac，复制这一行到终端运行：
 
 ```bash
 curl -fsSL https://raw.githubusercontent.com/yxxbc/gqy-agent/gqy/install.sh | sh
 ```
 
-- 支持 **Linux**（x86_64 / ARM64）和 **macOS**（Apple 芯片 / Intel），自动识别。
-- 从 [Releases](https://github.com/yxxbc/gqy-agent/releases) 下载云端编译好的包，校验 sha256 后装到 `~/.local`，**不需要 root**。
-- 包里已经带好字体、本地向量模型、默认知识库和 ONNX Runtime，装完即可使用。
-- 再次运行同一行命令就是升级。
+- 装到 `~/.local`，不需要 root。字体、本地向量模型、默认知识库都一起装好。
+- 装完如果提示 `~/.local/bin` 不在 `PATH` 里，把 `export PATH="$HOME/.local/bin:$PATH"` 加到 `~/.zshrc` 或 `~/.bashrc`，然后重新打开终端。
 
-可选的环境变量：
+<details>
+<summary>手动下载安装包</summary>
 
-```bash
-# 安装指定版本
-curl -fsSL https://raw.githubusercontent.com/yxxbc/gqy-agent/gqy/install.sh | GQY_VERSION=v0.6.0 sh
-
-# 安装到别的目录（默认 ~/.local）
-curl -fsSL https://raw.githubusercontent.com/yxxbc/gqy-agent/gqy/install.sh | GQY_PREFIX=/opt/gqy sh
-```
-
-> [!NOTE]
-> 如果安装完提示 `~/.local/bin` 不在 `PATH` 里，把 `export PATH="$HOME/.local/bin:$PATH"` 加到 `~/.zshrc` 或 `~/.bashrc` 后重新打开终端。
-
-### 手动下载
-
-在 [Releases](https://github.com/yxxbc/gqy-agent/releases/latest) 下载对应平台的 `gqy-<平台>.tar.gz`，解压后把里面的 `bin`、`lib`、`share` 三个目录一起放到同一个前缀下（例如 `~/.local`）。程序会在「`gqy` 所在目录的上一级 `/share/gqy`」里找资源，所以三个目录要放在一起。
+在 [Releases](https://github.com/yxxbc/gqy-agent/releases/latest) 下载对应平台的压缩包，解压后把里面的 `bin`、`lib`、`share` 三个目录一起放到同一个位置（例如 `~/.local`）。三个目录要放在一起，程序会在旁边找资源文件。
 
 | 平台 | 文件 |
 | :-- | :-- |
@@ -115,158 +80,148 @@ curl -fsSL https://raw.githubusercontent.com/yxxbc/gqy-agent/gqy/install.sh | GQ
 | macOS Apple 芯片 | `gqy-aarch64-apple-darwin.tar.gz` |
 | macOS Intel | `gqy-x86_64-apple-darwin.tar.gz` |
 
-> [!NOTE]
-> 预编译包暂不包含语音前端 `gqy-voice`（依赖 sherpa-onnx 静态库）。需要本地语音功能的话，请按下面的步骤从源码编译。
+</details>
 
-### 从源码构建
+## 第一次使用
 
-适合想修改人格提示词、或需要语音功能的开发者。
-
-- **Rust 工具链**：1.89 及以上版本（附带 `cargo`）
-- **操作系统**：Linux / macOS
-- *(推荐)* **终端模拟器**：[Kitty](https://sw.kovidgoyal.net/kitty/)（可获得最佳的终端图文渲染体验）
+在终端输入：
 
 ```bash
-# 1. 克隆代码仓库
-git clone https://github.com/yxxbc/gqy-agent.git
-cd gqy-agent
-
-# 2. 修改默认人格提示词
-cd src/prompts/
-vim gqy.md
-
-# 3. 编译主程序 (只生成 gqy)
-cargo build --release
-
-# (可选) 编译带语音特性的版本 (额外生成 gqy-voice，链接 sherpa-onnx)
-cargo build --release --features voice
+gqy
 ```
 
-用 Nix 的话，`nix build .#gqy-src` 会在 `./result` 下得到和安装版一样的完整布局；`nix develop` 进入带 Rust 工具链和 ONNX Runtime 的开发环境。
+第一次打开会进入新手引导，五步走完就能聊：
+
+1. **选人格**：用内置的顾清影，或者自己捏一个。
+2. **选功能**：勾选想要的插件（图库、地图、快递、记账……）。
+3. **认识你**：告诉她怎么称呼你、你是做什么的。
+4. **终端集成**：可选，让你在 shell 里也能直接问她。
+5. **接模型**：
+   - 可以借用已有的 Claude Code / Codex / Antigravity 订阅。
+   - 可以用公共免费额度。
+   - 也可以填你自己的 API key。
+
+之后随时可以用 `gqy config` 修改这些设置。
 
 > [!TIP]
-> 编译完成后，建议将 `target/release/gqy`（以及可选的 `gqy-voice`）放置在相同的系统 `PATH` 路径下（如 `~/.local/bin` 或 `/usr/local/bin`）。GQY 守护进程启动时会自动在同级目录寻找 `gqy-voice`。
+> 推荐使用 [Kitty](https://sw.kovidgoyal.net/kitty/) 终端，图片能直接显示在对话里，体验最好。
 
-### 发布新版本（维护者）
+## 日常使用
 
-预编译包由 [`.github/workflows/publish-release.yml`](.github/workflows/publish-release.yml) 在 GitHub 云端编译并发布：推送 `v` 开头的 tag（例如 `v0.6.1`），或在 Actions 页面手动运行「发布 Release（云端构建）」。发布完成后，工作流会把新版本的校验和写进 `gqy` 分支的 `nix/release.json`，Nix 用户 `nix profile upgrade gqy-agent` 就能拿到新版。完整步骤见 [docs/wiki/18-Nix安装开发与发布](docs/wiki/18-Nix安装开发与发布.md)。
-
-### 初始化与启动
+### 终端
 
 ```bash
-# 初始化配置与状态数据文件
-gqy init
-
-# 启动后台守护进程 (首次运行也会自动执行初始化)
-gqy daemon start
-
-# 查看 CLI 完整帮助
-gqy -h
+gqy        # 普通模式
+gqy dev    # 开发模式
 ```
 
----
+- 空会话时按 `Tab` 在两种模式之间切换。
+- 输入 `/` 可以看到所有命令，例如 `/new` 新会话、`/models` 换模型、`/config` 打开设置、`/help` 查看全部。
+- 其他快捷键：`Shift+Enter` 换行，连按两次 `Esc` 打断她的回复，`Ctrl+D` 退出。
 
-##  交互模式
-
-GQY 提供了多样化的交互方式，无缝融入日常工作流：
-
-### 1. 终端 TUI / REPL
-
-```bash
-gqy        # 进入 Normal 普通模式 REPL
-gqy dev    # 进入 Dev 极简开发模式 REPL
-```
-
-### 2. 局域网 WebUI
-
-轻量响应式 Web 操作界面，便于手机、平板或其他局域网设备接入：
+### 浏览器（WebUI）
 
 ```bash
 gqy web
 ```
 
+- 会打印一个局域网地址，同一 Wi-Fi 下的手机、平板也能打开。
+- 第一次登录用内置账号（用户名 `gqy`，密码 `gqy`）。登录后会让你创建自己的管理员账号，建好后内置账号自动失效。
+- 可以用邀请码请朋友注册，每个人的会话和记忆互相隔离。
+
+### 直接在 shell 里问
+
+```bash
+gqy zsh-init     # 或 gqy bash-init / gqy fish-init
+```
+
+装好后不用进入对话界面，在命令行里就能直接和她说话。zsh 支持最完整。
+
+### 语音
+
+在 `gqy config` 里打开「语音功能」后：
+
+- 喊唤醒词（默认「清影」「顾清影」），听到提示音后说出你的要求。
+- 在终端里输入 `/stt`，或在网页上点麦克风，可以语音输入。
+- `gqy listen` 可以绑定到桌面快捷键，按一下就开始听，不用喊唤醒词。
+
 > [!NOTE]
-> 首次访问会提示登录内置初始账号，创建属于你的管理员账号后，初始账号将自动删除。
+> 预编译包暂时不带语音组件，需要语音的话目前要从源码编译，见 [参与开发](docs/wiki/14-参与开发.md)。详细说明见 [语音功能](docs/voice.md)。
 
-### 3. Shell 终端集成
+### QQ 与 iMessage
 
-无需离开终端即可直接与 GQY 对话：
+顾清影可以接入 QQ（通过 NapCat）和 iMessage（仅 macOS），在手机上和她聊，也能拉进群里。设置方法见 [QQ 与通讯平台](docs/wiki/13-QQ与通讯平台.md)。
+
+## 设置
+
+以下三处改的是同一份配置，用哪个都行：
+
+- 在终端运行 `gqy config`。
+- 在对话界面里输入 `/config`。
+- 在网页的设置页修改。
+
+常用的几项：
+- **供应商与模型**：推荐配置你自己的 API key，比公共免费额度更稳定。
+- **自定义提示词**：创建你自己的人格，或者写一段「用户身份」让她更了解你。
+- **插件**：随时开关各项功能。
+
+## 升级与卸载
+
+| 安装方式 | 升级 | 卸载 |
+| :-- | :-- | :-- |
+| Nix | `nix profile upgrade gqy-agent` | `nix profile remove gqy-agent` |
+| 一键脚本 | 再运行一次安装命令 | 删除 `~/.local` 下的 `bin/gqy`、`lib/gqy`、`share/gqy`、`share/licenses/gqy` |
+
+- 卸载前先运行 `gqy daemon stop` 停掉后台服务。
+- 卸载只删程序，你的配置、会话和记忆都在 `~/.gqy`，要彻底清除就把它也删掉（建议先 `gqy export` 备份）。
+- Nix 升级后有问题，可以用 `nix profile rollback` 退回上一版。
+- 每个版本更新了什么，见 [更新日志](CHANGELOG.md)。
+
+## 备份与换电脑
 
 ```bash
-# 生成并配置 zsh 集成脚本
-gqy zsh-init
+gqy export                      # 打包配置、会话、记忆和知识库
+gqy export --no-secrets         # 不含 API key，适合分享给别人
 ```
 
-- **zsh**：提供无缝嵌入式对话支持。
-- **fish / bash**：支持单行快速问答。
-
-### 4. 本地离线语音 (Voice)
-
-在配置中开启「语音功能」后，Daemon 会自动拉起独立的 `gqy-voice` 常驻进程：
-
-- **语音唤醒**：呼叫唤醒词（默认 *清影* / *顾清影* / *清影清影*） $\rightarrow$ 提示音 + 桌面通知 $\rightarrow$ 说出指令 $\rightarrow$ 执行并播报回复摘要。
-- **本地听写**：REPL 中执行 `/stt`、命令行输入 `gqy stt` 或点击 WebUI 麦克风均可快速听写。
-- **快捷收听**：支持通过 `gqy listen` 绑定全局快捷键一键唤起。
-- 更多详细配置请参阅 [`docs/voice.md`](docs/voice.md)。
-
----
-
-##  配置与个性化
-
-运行以下命令调出可视化的交互式配置终端（TUI）：
+在新电脑上：
 
 ```bash
-gqy config
-```
-
-- **供应商与模型设置**：默认提供 opencode 公共 API，推荐配置个人 API 密钥以获得更稳定的服务体验。
-- **自定义提示词与人设**：支持在「自定义提示词」中创建专属 AI 人格，并可设置「用户身份」使对话体验更加贴合个人喜好。
-
----
-
-##  数据迁移与备份
-
-GQY 提供便捷的打包与迁移指令，支持一键备份至 `.tar.gz` 文件（文件权限默认设为 `0600`）：
-
-```bash
-# 导出当前数据
-gqy export                      # 导出基础配置、会话历史、记忆与知识库原文
-gqy export --index --platforms  # 额外导出向量索引与外部平台聊天历史
-gqy export --no-secrets         # 过滤 API Key 与令牌（推荐用于公开分享配置）
-gqy export --dry-run            # 演练预览：仅检查打包清单与文件体积，不实际写入
-
-# 在新设备上导入数据
-gqy daemon stop                 # 导入前必须先停止正在占用数据库的 daemon
-gqy import gqy-export-*.tar.gz  # 执行导入还原
+gqy daemon stop                 # 先停掉后台服务
+gqy import gqy-export-*.tar.gz  # 导入备份文件
 ```
 
 > [!WARNING]
-> 默认导出的归档文件中包含明文 API 密钥与令牌，请妥善保管归档文件，避免泄露至公开环境。
+> 默认的备份文件里有你的 API key 等明文密钥，请妥善保管，不要上传到公开的地方。
 
----
+## 更多文档
 
-##  致谢与鸣谢
+- [快速开始](docs/wiki/01-快速开始.md) · [功能总览](docs/wiki/02-功能总览.md) · [使用方式](docs/wiki/03-使用方式.md) · [命令参考](docs/wiki/04-命令参考.md) · [配置指南](docs/wiki/05-配置指南.md)
+- [记忆系统](docs/wiki/08-记忆系统.md) · [安全与隐私](docs/wiki/16-安全与隐私.md) · [常见问题](docs/wiki/17-常见问题.md)
 
-### 功能与架构参考
-- [shorin/miyu-agent](https://github.com/SHORiN-KiWATA/miyu-agent)
-- [Opencode](https://github.com/anomalyco/opencode)
-- [Claude Code](https://github.com/anthropics/claude-code)
-- [Pi](https://github.com/earendil-works/pi)
-- [Deepseek-Reasonix](https://github.com/esengine/deepseek-reasonix)
-- [Deepseek-Harness](https://github.com/deepseek-ai/deepseek-harness)
-- [AstrBot](https://github.com/AstrBotDevs/AstrBot)
-- [NapCatQQ](https://github.com/NapNeko/NapCatQQ)
+想自己编译、改默认人格或者参与开发，见 [参与开发](docs/wiki/14-参与开发.md) 和 [Nix 安装、开发与发布](docs/wiki/18-Nix安装开发与发布.md)。
 
-### 插件与设计参考
-- [Yue-bin/astrbot_plugin_maskoff](https://github.com/Yue-bin/astrbot_plugin_maskoff)
-- [nuomicici/astrbot_plugin_GroupMemberQuery](https://github.com/nuomicici/astrbot_plugin_GroupMemberQuery)
-- [advent259141/Astrbot_plugin_Heartflow](https://github.com/advent259141/Astrbot_plugin_Heartflow)
-- [Railgun19457/astrbot_plugin_image_generation](https://github.com/Railgun19457/astrbot_plugin_image_generation)
-- [xiewoc/astrbot_plugin_weather_wttr_in](https://github.com/xiewoc/astrbot_plugin_weather_wttr_in)
-- [muyouzhi6/astrbot_plugin_recall_cancel](https://github.com/muyouzhi6/astrbot_plugin_recall_cancel)
+## 致谢
 
----
+本项目基于 [shorin/miyu-agent 0.6.0](https://github.com/SHORiN-KiWATA/miyu-agent) 深度重构与二次开发。
 
-##  开源协议
+功能与架构参考：
+[Opencode](https://github.com/anomalyco/opencode) ·
+[Claude Code](https://github.com/anthropics/claude-code) ·
+[Pi](https://github.com/earendil-works/pi) ·
+[Deepseek-Reasonix](https://github.com/esengine/deepseek-reasonix) ·
+[Deepseek-Harness](https://github.com/deepseek-ai/deepseek-harness) ·
+[AstrBot](https://github.com/AstrBotDevs/AstrBot) ·
+[NapCatQQ](https://github.com/NapNeko/NapCatQQ)
 
-本项目采用 [MIT License](LICENSE) 协议开源。
+插件与设计参考：
+[astrbot_plugin_maskoff](https://github.com/Yue-bin/astrbot_plugin_maskoff) ·
+[astrbot_plugin_GroupMemberQuery](https://github.com/nuomicici/astrbot_plugin_GroupMemberQuery) ·
+[Astrbot_plugin_Heartflow](https://github.com/advent259141/Astrbot_plugin_Heartflow) ·
+[astrbot_plugin_image_generation](https://github.com/Railgun19457/astrbot_plugin_image_generation) ·
+[astrbot_plugin_weather_wttr_in](https://github.com/xiewoc/astrbot_plugin_weather_wttr_in) ·
+[astrbot_plugin_recall_cancel](https://github.com/muyouzhi6/astrbot_plugin_recall_cancel)
+
+## 开源协议
+
+[MIT License](LICENSE)
