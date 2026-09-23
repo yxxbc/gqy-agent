@@ -1,8 +1,17 @@
 ## Main
 
+TUI 这一批（09-23 定，方案都在 `docs/plan/`）：
+
+- 待验收：TUI 配色（`6f7f4c03` 等，需要一次 macOS 全绿）；CHANGELOG 与一键发版（`41591af3`，下次发版首次实跑）
+- 打开方式：`gqy` 默认新会话、空会话复用，`gqy -c` 回到上次，`--session` 直达（`2026-09-23-tui-launch-and-lobby.md` §二）
+- 圆角输入框：淡灰框线 + 主色 `❯`，消息回显 `❯` + 淡底色（`2026-09-23-tui-input-box.md`）
+- 开屏欢迎框：Claude Code 式小框 + 最近会话，吉祥物可选立绘 / 黑猫 / 自定义 / 关（`display.mascot`，素材在 `assets/mascot/`）（`2026-09-23-tui-launch-and-lobby.md` §三）
+- 方向键选斜杠命令（开工前定：Enter 执行还是只填入）（`2026-09-23-tui-commands-settings.md` §一）
+- `/config` 补齐约 31 项设置 + `/config <分组>` 直达（同上 §二）
+
 - 聊后复盘开机补跑：复盘定时只在 daemon 内存里，15 分钟内关机或重启 daemon 就丢了，开机后不补，除非回到同一会话再说话。改法：daemon 启动时扫最近几天「最后一轮已过等待时长且没复盘过」的属主会话补排复盘（见 `docs/design/2026-09-19-daily-chat-reflection.md`）
 - 纠正记忆写入时处理冲突：现在纠正是直接插入，旧的错误说法原样保留、可能和纠正一起被召回，只能等整理器碰巧改写。改法：存纠正时用记忆去重的语义相似度找高度相似的旧记录，把真值标成「已否定」（召回和整理器都会跳过），门槛设高避免误伤
-- dev模式下，如果是claude、agy、codex，默认使用其原生工具，只使用gqy的anysearch工具，同时webui下显示其工作区项目，会话记录。webui输入框能显示选择客户端。供应商中的claude、codex、agy只能在人格模式下调用。
+- dev模式下，如果是claude、agy、codex，默认使用其原生工具，只使用gqy的anysearch工具，同时webui下显示其工作区项目，会话记录。webui输入框能显示选择客户端。供应商中的claude、codex、agy只能在人格模式下调用。参考：`https://github.com/makecindy/cindy/tree/main/packages/maker-core/src/agents`
 
 ## Feats
 
@@ -15,15 +24,12 @@
 - 修复webui 右侧工件清单 无法弹出问题，给顾清影添加一个控制这个的工具，让他生成文档或者预览文件的时候可以打开这个（目前推送交付区可以唤醒，可以二选一，推荐后者，不过后者需要优化，不然ai容易忘记）
 - 寻找正确识别或者读取agy、claude、codex中token详细消耗的方法，去网上寻找答案
 - 修复上下文圆环点击后的浮窗对应的数据要准确,增加agy、claude、codex的订阅时效额度，参考codexbar、(https://github.com/tungcorn/antigravity-usage-checker)、(https://github.com/skainguyen1412/antigravity-usage)、(https://github.com/phuryn/claude-usage)
-- tui 美化意见
 - webui 美化意见
-- 多发行版打包工作流，MacOS适配
 - Live2D
 - 支持QQ官方机器人
 - 支持telegram
 - 安全性、权限
 - macOS 沙盒后端：`/sandbox` 目前只有 Linux 的 Landlock 后端（`src/tools/sandbox/linux.rs`），非 Linux 走 `unsupported.rs`——**失败关闭**：绑了沙盒的会话在 macOS 上命令一条都跑不了（不是直通裸奔）。补 `src/tools/sandbox/macos.rs`，把 `SandboxPolicy` 译成 Seatbelt profile 交给 `sandbox-exec`：放行工作区、临时目录与 npm/cargo/pip 编译缓存，挡掉 `~/.ssh`、`~/.gnupg`、`~/.aws` 等凭证目录；需要越权的命令走确认或降级直通。（miyu-agent#47）
-- 首次使用TUI OOBE
 
 ## 优化
 
@@ -36,8 +42,6 @@
 优化数据统计页面，提升可读性和美观度
 
 减少token消耗
-
-重写完整TUI
 
 多平台字体处理
 
@@ -61,7 +65,3 @@ agy 桥接工具瘦身：gqy_tools_eager=true 时全部工具定义被全量注�
 - 机制三，聊后复盘：一段对话结束后发独立辅助请求（§1.7 独立缓存），检查读错情绪、附和、无据断言、对未核实的工作打包票；结论写成「这次注意什么」，下一轮从 system 侧注入（§1.4 不化石），不漏进她的台词。
 - 风险：过度道歉、反思变表演（OOC）、人格变拘谨。人格文本是实测敏感区（§1.5），改动要小步实测。
 - 验收（原样重放起因案例）：① 给同样的聊天记录和截图让她写报告——次数写 13、40 美元不出现或标成假设、不替人补论点；② 告诉她报告有错——她会记下来；③ 几轮后再提这份报告——她承认算错而不是邀功，撒娇可以照旧
-
-## 搁置
-
-- REPL 复制不带左侧装饰
