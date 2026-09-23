@@ -2208,6 +2208,7 @@ impl StreamRenderer {
         }
         let stats = self.tool_stats_entry(name);
         stats.started_at = Instant::now().checked_sub(elapsed);
+        stats.replayed = Some(elapsed);
     }
 
     /// 同 [`Self::replay_tool_elapsed`]，这一段思考想了多久。

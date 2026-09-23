@@ -52,6 +52,7 @@ impl StreamRenderer {
             let stats = self.tool_stats_entry(name);
             stats.started_at = Some(std::time::Instant::now());
             stats.elapsed = None;
+            stats.replayed = None;
             // 面板的第一步：交给它的差事。派出去这一刻是唯一还看得见它的地方。
             self.subagent_prompt(name, arguments);
         }
@@ -158,7 +159,7 @@ impl StreamRenderer {
                 } else {
                     stats.error += 1;
                 }
-                stats.elapsed = stats.started_at.map(|at| at.elapsed());
+                stats.elapsed = stats.measure();
                 stats.detail = detail;
                 stats.tail = tail;
                 return self.settle_tool_batch();
@@ -203,7 +204,7 @@ impl StreamRenderer {
                     stats.ok += 1;
                     stats.progress = None;
                     if stats.elapsed.is_none() {
-                        stats.elapsed = stats.started_at.map(|at| at.elapsed());
+                        stats.elapsed = stats.measure();
                     }
                     // 和别的工具一样结算：不结算的话这一步要等下一个事件才收
                     // 进时间线，live 区里它会一直挂着转轮。
@@ -253,7 +254,7 @@ impl StreamRenderer {
             }
             // 跑完就把表停下：时间线上那一步报的是它自己花的时间，不是到收缩为止。
             if stats.elapsed.is_none() {
-                stats.elapsed = stats.started_at.map(|at| at.elapsed());
+                stats.elapsed = stats.measure();
             }
             // 已经有更好的详情（补丁 diff）就别用原始输出盖掉它。
             if let Some(detail) = detail {

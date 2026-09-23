@@ -459,6 +459,9 @@ fn a_replayed_segment_still_says_how_long_it_took() {
             .write_tool_call("run_command", r#"{"command":"ls"}"#)
             .unwrap();
         renderer.replay_tool_elapsed("run_command", Duration::from_millis(1_200));
+        // 慢机器：回放喂进耗时到结果落定之间真的过了一段时间。回放的数只能
+        // 是记录里那个，不能把这段也算进去（09-23 云端 macOS 报成 3.7s）。
+        std::thread::sleep(Duration::from_millis(60));
         renderer
             .write_tool_result("run_command", true, "out")
             .unwrap();

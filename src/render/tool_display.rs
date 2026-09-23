@@ -19,6 +19,10 @@ pub(crate) struct ToolStats {
     pub(crate) final_progress: Option<String>,
     pub(crate) started_at: Option<std::time::Instant>,
     pub(crate) elapsed: Option<std::time::Duration>,
+    /// 回放喂进来的耗时（记录里的原值）。有它就不再拿 `started_at` 推算：
+    /// 回放时「喂进耗时」到「结果落定」之间真实流逝的那一截不属于这一步，
+    /// 慢机器上会把 3.6s 算成 3.7s（09-23 云端 macOS）。
+    pub(crate) replayed: Option<std::time::Duration>,
     /// The subagent handed itself off to the background. Its call returned at
     /// once, so the elapsed timer would only ever read `0s` — and worse, imply
     /// the work finished instantly. The job strip tracks it from here on.
@@ -36,6 +40,12 @@ pub(crate) struct ToolStats {
 }
 
 impl ToolStats {
+    /// 结果落定这一刻，这一步花了多久：回放用记录值，实时用墙上时间。
+    pub(crate) fn measure(&self) -> Option<std::time::Duration> {
+        self.replayed
+            .or_else(|| self.started_at.map(|started| started.elapsed()))
+    }
+
     pub(crate) fn elapsed(&self) -> Option<std::time::Duration> {
         self.elapsed
             .or_else(|| self.started_at.map(|started| started.elapsed()))

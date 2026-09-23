@@ -556,7 +556,7 @@ impl StreamRenderer {
             .map(|(name, _)| name.clone());
         if let Some(name) = name {
             let stats = self.tool_stats_entry(&name);
-            stats.elapsed = stats.started_at.map(|at| at.elapsed());
+            stats.elapsed = stats.measure();
             stats.detail = detail;
             stats.tail = tail;
         }
