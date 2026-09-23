@@ -232,14 +232,27 @@ pub fn current_turn_model() -> Option<TurnModel> {
 pub struct ImageGenLimit {
     per_request: usize,
     remaining: std::sync::atomic::AtomicUsize,
+    /// 这一轮里生图请求失败了几次。成功的张数有配额，失败会退还配额——不另外
+    /// 数失败的话，供应商一直出错时模型会无限重试（原先靠人格提示词里一句
+    /// 「失败上限 5 次」求自觉，AGENTS §2.5：限额由代码承担）。
+    failures: std::sync::atomic::AtomicUsize,
 }
+
+/// 一轮里生图最多失败几次，之后拒绝重试，让模型把错误如实告诉用户。
+pub const MAX_IMAGE_GEN_FAILURES: usize = 5;
 
 impl ImageGenLimit {
     pub fn new(per_request: usize) -> std::sync::Arc<Self> {
         std::sync::Arc::new(Self {
             per_request,
             remaining: std::sync::atomic::AtomicUsize::new(per_request),
+            failures: std::sync::atomic::AtomicUsize::new(0),
         })
+    }
+
+    /// 张数不限，只数失败（本地会话、豁免的平台会话）。
+    pub fn unlimited() -> std::sync::Arc<Self> {
+        Self::new(usize::MAX)
     }
 
     fn try_acquire(&self) -> bool {
@@ -277,6 +290,7 @@ impl ImageGenLimit {
     fn reset(&self) {
         self.remaining
             .store(self.per_request, std::sync::atomic::Ordering::Release);
+        self.failures.store(0, std::sync::atomic::Ordering::Release);
     }
 }
 
@@ -313,7 +327,29 @@ pub fn refund_image_gen_allowance() {
     });
 }
 
-/// 排队 follow-up 被消费 = 用户更新了请求,配额重置。非平台回合是 no-op。
+/// 这一轮生图的失败次数是否已经用完。未挂计数器（直连 REPL、测试）时不限。
+pub fn image_gen_failures_exhausted() -> bool {
+    IMAGE_GEN_LIMIT
+        .try_with(|limit| {
+            limit.as_ref().is_some_and(|limit| {
+                limit.failures.load(std::sync::atomic::Ordering::Acquire) >= MAX_IMAGE_GEN_FAILURES
+            })
+        })
+        .unwrap_or(false)
+}
+
+/// 记一次生图失败。
+pub fn record_image_gen_failure() {
+    let _ = IMAGE_GEN_LIMIT.try_with(|limit| {
+        if let Some(limit) = limit {
+            limit
+                .failures
+                .fetch_add(1, std::sync::atomic::Ordering::AcqRel);
+        }
+    });
+}
+
+/// 排队 follow-up 被消费 = 用户更新了请求,张数配额与失败次数一起重置。
 pub fn reset_image_gen_limit() {
     let _ = IMAGE_GEN_LIMIT.try_with(|limit| {
         if let Some(limit) = limit {
@@ -331,6 +367,22 @@ mod image_limit_tests {
         with_image_gen_limit(Some(ImageGenLimit::new(1)), async {
             assert!(try_allow_image());
             assert!(!try_allow_image());
+        })
+        .await;
+    }
+
+    #[tokio::test]
+    async fn failures_are_capped_even_without_a_quota() {
+        with_image_gen_limit(Some(ImageGenLimit::unlimited()), async {
+            for _ in 0..MAX_IMAGE_GEN_FAILURES {
+                assert!(!image_gen_failures_exhausted());
+                assert!(try_allow_image());
+                refund_image_gen_allowance();
+                record_image_gen_failure();
+            }
+            assert!(image_gen_failures_exhausted());
+            reset_image_gen_limit();
+            assert!(!image_gen_failures_exhausted(), "新消息后重新计数");
         })
         .await;
     }

@@ -108,6 +108,12 @@ async fn generate_image(
         .unwrap_or(&plugin.default_resolution)
         .trim();
     // 平台回合的配额由代码承担,不写进 prompt 求模型自觉;本地会话无 task-local,天然放行。
+    if crate::tools::workspace::image_gen_failures_exhausted() {
+        bail!(
+            "image generation failed {} times in this request. Stop retrying and tell the user what went wrong.",
+            crate::tools::workspace::MAX_IMAGE_GEN_FAILURES
+        )
+    }
     if !crate::tools::workspace::try_allow_image() {
         bail!("image generation limit reached: only one image per user request in messaging-platform conversations. Wait for the next user message before generating another.")
     }
@@ -122,7 +128,9 @@ async fn generate_image(
         Ok(bytes) => bytes,
         Err(error) => {
             // 失败退还配额:同一请求内允许重试,只有成功的生成才占额度。
+            // 失败另外计数,满 MAX_IMAGE_GEN_FAILURES 次后不再放行。
             crate::tools::workspace::refund_image_gen_allowance();
+            crate::tools::workspace::record_image_gen_failure();
             return Err(error);
         }
     };

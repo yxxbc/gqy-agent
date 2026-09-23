@@ -60,13 +60,18 @@ pub(in crate::web) async fn run_turn_task(
     turn_engine: TurnEngineState,
     memory_organizer: Option<MemoryOrganizerHandle>,
 ) {
-    // 平台回合挂生图配额(管理员/私聊白名单豁免);本地回合不挂,保持无限。
+    // 平台回合限一张生图(管理员/私聊白名单豁免);其余回合张数不限。两种都挂
+    // 计数器,失败次数一律封顶(MAX_IMAGE_GEN_FAILURES)。
     // 包在整个 turn future 外面,turn 内所有工具执行路径都能看到同一计数器。
-    let image_limit = profile
+    let limited = profile
         .as_ref()
         .and_then(|profile| profile.platform.as_ref())
-        .filter(|context| !context.image_generation_unlimited())
-        .map(|_| crate::tools::workspace::ImageGenLimit::new(1));
+        .is_some_and(|context| !context.image_generation_unlimited());
+    let image_limit = Some(if limited {
+        crate::tools::workspace::ImageGenLimit::new(1)
+    } else {
+        crate::tools::workspace::ImageGenLimit::unlimited()
+    });
     // 巨型 future 装箱落堆:外层还有五层 with_* 泛型包装再 spawn_local,
     // debug 构建下逐层栈拷贝会撞穿 actor 线程 16MB 栈(实测 SIGABRT)。
     crate::tools::workspace::with_image_gen_limit(

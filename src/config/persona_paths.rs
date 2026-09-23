@@ -7,6 +7,14 @@
 
 use crate::config::*;
 
+/// 诚实用工具的通用规则，任何人格都适用。原来写在顾清影人格正文里（中文、只对
+/// 内置人格生效），09-24 按 AGENTS §1.5 挪到 system 侧：机械规则英文短句，常量字节。
+const HONESTY_RULES: &str = "<honesty-rules>\n\
+Never say you checked, searched or ran something unless a tool call in this conversation did it.\n\
+If a tool fails, say it failed instead of guessing the result.\n\
+If you are not sure, say you are not sure.\n\
+</honesty-rules>";
+
 impl AppConfig {
     /// Dev 模式系统提示词:读 `config/dev-prompt.md`,缺失或清空回退内置
     /// 默认一行(极简原则 + 贴近训练分布的措辞,见 08-15 实验记录)。
@@ -32,10 +40,15 @@ impl AppConfig {
     pub fn system_prompt_with(
         &self,
         paths: &GqyPaths,
-        _audience: PromptAudience,
+        audience: PromptAudience,
         with_user_profile: bool,
     ) -> Result<String> {
         let mut prompt = self.base_system_prompt(paths)?;
+        // 对话类受众（终端、WebUI、通讯平台）才要：辅助请求（judge、好感度）不跟人说话。
+        if !matches!(audience, PromptAudience::Internal) {
+            prompt.push_str("\n\n");
+            prompt.push_str(HONESTY_RULES);
+        }
         if with_user_profile {
             let user_identity = self.user_identity_prompt(paths)?;
             if !user_identity.trim().is_empty() {
