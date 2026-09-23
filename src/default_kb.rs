@@ -9,21 +9,35 @@ use sha2::{Digest, Sha256};
 use std::path::{Path, PathBuf};
 use std::process::{Command, Stdio};
 
-const SHORIN_WIKI_REMOTE: &str = "https://github.com/SHORiN-KiWATA/Shorin-ArchLinux-Guide.git";
+/// 默认知识库的来源：本项目仓库的 `kb/` 目录（09-24 起；此前是上游作者的
+/// Arch Linux 指南仓库）。安装包里带的快照就是发版那一刻的 `kb/`，更新从同一处拉。
+const KB_REMOTE: &str = "https://github.com/yxxbc/gqy-agent.git";
+const KB_BRANCH: &str = "gqy";
+const KB_DIR: &str = "kb";
+/// 远端 `kb/` 目录的 tree 哈希。代码仓库的 HEAD 每次提交都变，拿它判断「知识库
+/// 有更新」会让用户被反复提示；`kb/` 这棵树只在知识库内容变了时才变。
+const KB_TREE_API: &str = "https://api.github.com/repos/yxxbc/gqy-agent/git/trees/gqy";
 const UPDATE_CHECK_INTERVAL_SECS: i64 = 24 * 60 * 60;
-/// `git ls-remote` 的预算。正常连 GitHub 约 0.4 秒，5 秒是 12 倍余量。
+/// 远端检查的预算。正常连 GitHub 约 0.4 秒，5 秒是 12 倍余量。
 ///
 /// 有上限这件事本身比数值重要：这条检查在 REPL 启动路径上同步跑，网络黑洞
-/// （公司防火墙 DROP、VPN 掉包、强制门户）时 git 自己要 **135 秒**才放弃，
+/// （公司防火墙 DROP、VPN 掉包、强制门户）时一次 TCP 连接要 **135 秒**才放弃，
 /// 用户看到的就是 `gqy` 启动卡死两分钟。超时了就跳过这轮检查——它只是
 /// 「知识库有更新」的提示，不值得挡在提示符前面。
-const REMOTE_HEAD_TIMEOUT: std::time::Duration = std::time::Duration::from_secs(5);
-const SPARSE_CHECKOUT_PATTERN: &str = "*.md";
+const REMOTE_CHECK_TIMEOUT: std::time::Duration = std::time::Duration::from_secs(5);
+/// 只检出 `kb/` 下的 Markdown：代码仓库的其余部分与知识库无关。
+const SPARSE_CHECKOUT_PATTERN: &str = "/kb/**/*.md";
+/// 安装包里记录快照对应的 `kb/` tree 哈希的文件（发布工作流写入）。
+const BUNDLED_TREE_FILE: &str = "manifest/kb.tree";
 
 #[derive(Debug, Clone, Default, Serialize, Deserialize)]
 pub struct DefaultKbState {
     pub release_hash: String,
-    pub shorin_wiki_commit: String,
+    /// 本地已导入的 `kb/` tree 哈希。旧版本存的是上游 wiki 的提交号，字段名
+    /// 叫 `shorin_wiki_commit`；读旧文件时照样认，和新 tree 对不上会提示更新一次。
+    #[serde(alias = "shorin_wiki_commit")]
+    pub source_tree: String,
+    /// 远端 `kb/` tree 哈希（字段名沿用旧的 `remote_commit`，WebUI 读它）。
     pub remote_commit: String,
     pub update_available: bool,
     pub last_checked_at: String,
@@ -137,10 +151,9 @@ pub async fn check_update_if_due(paths: &GqyPaths) -> Result<()> {
         return Ok(());
     }
     state.last_checked_at = Utc::now().to_rfc3339();
-    if let Ok(remote) = remote_head().await {
+    if let Ok(remote) = remote_kb_tree().await {
         state.remote_commit = remote.clone();
-        state.update_available =
-            !state.shorin_wiki_commit.is_empty() && state.shorin_wiki_commit != remote;
+        state.update_available = !state.source_tree.is_empty() && state.source_tree != remote;
     }
     save_state(paths, &state)
 }
@@ -165,7 +178,7 @@ where
                 "--depth=1",
                 "--filter=blob:none",
                 "origin",
-                "HEAD",
+                KB_BRANCH,
             ],
         )?;
         on_progress(UpdateStage::CheckingOutRepository);
@@ -187,7 +200,7 @@ where
     }
     on_progress(UpdateStage::ValidatingRepository);
     validate_update_repo(&repo)?;
-    let commit = git_output(&git, &repo, &["rev-parse", "HEAD"])?;
+    let tree = git_output(&git, &repo, &["rev-parse", &format!("HEAD:{KB_DIR}")])?;
     on_progress(UpdateStage::BuildingSnapshot);
     let source = build_update_source(paths, &repo)?;
     on_progress(UpdateStage::HashingSnapshot);
@@ -198,8 +211,8 @@ where
     on_progress(UpdateStage::SavingState);
     let mut state = load_state(paths)?;
     state.release_hash = release_hash;
-    state.shorin_wiki_commit = commit.clone();
-    state.remote_commit = commit;
+    state.source_tree = tree.clone();
+    state.remote_commit = tree;
     state.update_available = false;
     state.last_checked_at = Utc::now().to_rfc3339();
     state.last_imported_at = Utc::now().to_rfc3339();
@@ -218,7 +231,7 @@ fn import_snapshot(
     kb.replace_default_files(source)?;
     let mut state = load_state(paths)?;
     state.release_hash = release_hash.to_string();
-    state.shorin_wiki_commit = read_to_string(source.join("manifest/shorinwiki.commit"));
+    state.source_tree = read_to_string(source.join(BUNDLED_TREE_FILE));
     state.last_imported_at = Utc::now().to_rfc3339();
     save_state(paths, &state)
 }
@@ -232,13 +245,17 @@ fn state_file(paths: &GqyPaths) -> PathBuf {
 }
 
 fn update_repo_dir(paths: &GqyPaths) -> PathBuf {
-    paths
-        .cache_dir
-        .join("default-kb/shorin-archlinux-guide.git")
+    paths.cache_dir.join("default-kb/gqy-agent-kb.git")
 }
 
-fn legacy_update_repo_dir(paths: &GqyPaths) -> PathBuf {
-    paths.cache_dir.join("default-kb/shorinwiki.git")
+/// 换过来源之前用过的缓存目录（上游 wiki 的两代克隆），更新时顺手删掉。
+fn legacy_update_repo_dirs(paths: &GqyPaths) -> [PathBuf; 2] {
+    [
+        paths.cache_dir.join("default-kb/shorinwiki.git"),
+        paths
+            .cache_dir
+            .join("default-kb/shorin-archlinux-guide.git"),
+    ]
 }
 
 fn update_source_dir(paths: &GqyPaths) -> PathBuf {
@@ -246,12 +263,10 @@ fn update_source_dir(paths: &GqyPaths) -> PathBuf {
 }
 
 fn cleanup_legacy_update_repo(paths: &GqyPaths, repo: &Path) -> Result<()> {
-    let legacy = legacy_update_repo_dir(paths);
-    if legacy == repo || !legacy.exists() {
-        return Ok(());
-    }
-    if legacy.join(".git").is_dir() || legacy.is_dir() {
-        std::fs::remove_dir_all(legacy)?;
+    for legacy in legacy_update_repo_dirs(paths) {
+        if legacy != repo && legacy.is_dir() {
+            std::fs::remove_dir_all(legacy)?;
+        }
     }
     Ok(())
 }
@@ -281,7 +296,7 @@ fn rebuild_update_repo(
     let parent = repo.parent().context("update repository has no parent")?;
     std::fs::create_dir_all(parent)?;
     let staging = tempfile::Builder::new()
-        .prefix("shorin-archlinux-guide-")
+        .prefix("gqy-agent-kb-")
         .tempdir_in(parent)?;
     let staging_arg = staging.path().display().to_string();
     run_git(
@@ -293,7 +308,9 @@ fn rebuild_update_repo(
             "--depth=1",
             "--filter=blob:none",
             "--no-checkout",
-            SHORIN_WIKI_REMOTE,
+            "--branch",
+            KB_BRANCH,
+            KB_REMOTE,
             &staging_arg,
         ],
     )?;
@@ -348,11 +365,13 @@ fn replace_update_repo(staging: &Path, repo: &Path) -> Result<()> {
 }
 
 fn validate_update_repo(repo: &Path) -> Result<()> {
-    let wiki = repo.join("wiki");
-    let source = if wiki.is_dir() { wiki.as_path() } else { repo };
-    if collect_markdown(source)?
+    let source = repo.join(KB_DIR);
+    if !source.is_dir() {
+        bail!("default knowledge base update has no {KB_DIR}/ directory");
+    }
+    if collect_markdown(&source)?
         .iter()
-        .all(|file| excluded(file.strip_prefix(source).unwrap_or(file)))
+        .all(|file| excluded(file.strip_prefix(&source).unwrap_or(file)))
     {
         bail!("default knowledge base update contains no importable Markdown files");
     }
@@ -383,34 +402,45 @@ fn should_check(state: &DefaultKbState) -> bool {
     Utc::now().timestamp() - last.timestamp() >= UPDATE_CHECK_INTERVAL_SECS
 }
 
-async fn remote_head() -> Result<String> {
-    remote_head_bounded(SHORIN_WIKI_REMOTE, REMOTE_HEAD_TIMEOUT).await
+async fn remote_kb_tree() -> Result<String> {
+    remote_kb_tree_bounded(KB_TREE_API, REMOTE_CHECK_TIMEOUT).await
 }
 
-async fn remote_head_bounded(remote: &str, budget: std::time::Duration) -> Result<String> {
-    let git = git_command()?;
-    // 走 tokio 的 Command 是为了拿 `kill_on_drop`：超时后 future 被丢弃，子进程
-    // 跟着被杀，而不是留一个还在等 TCP 的 git 挂在后台。仓库里其它带超时的外部
-    // 命令（archlinux 的 AUR 审查、rg）都是这个写法。
-    let output = tokio::time::timeout(
-        budget,
-        tokio::process::Command::new(git)
-            .args(["ls-remote", remote, "HEAD"])
-            .stderr(Stdio::null())
-            .kill_on_drop(true)
-            .output(),
-    )
+/// 远端 `kb/` 的 tree 哈希：GitHub 的 trees 接口一次请求就给出顶层每一项的
+/// 哈希，不用克隆。整个请求（连接 + 读完）受 `budget` 约束。
+async fn remote_kb_tree_bounded(api: &str, budget: std::time::Duration) -> Result<String> {
+    let client = reqwest::Client::builder()
+        .connect_timeout(budget)
+        .timeout(budget)
+        .user_agent(concat!("gqy/", env!("CARGO_PKG_VERSION")))
+        .build()?;
+    let body: serde_json::Value = tokio::time::timeout(budget, async {
+        client
+            .get(api)
+            .header("accept", "application/vnd.github+json")
+            .send()
+            .await?
+            .error_for_status()?
+            .json::<serde_json::Value>()
+            .await
+    })
     .await
-    .map_err(|_| anyhow::anyhow!("git ls-remote timed out"))??;
-    if !output.status.success() {
-        bail!("git ls-remote failed");
-    }
-    let text = String::from_utf8(output.stdout)?;
-    Ok(text
-        .split_whitespace()
-        .next()
-        .unwrap_or_default()
-        .to_string())
+    .map_err(|_| anyhow::anyhow!("remote knowledge-base check timed out"))??;
+    kb_tree_from_listing(&body).context("remote repository has no kb/ directory")
+}
+
+/// 从 trees 接口的返回里挑出 `kb` 那一项的哈希。
+fn kb_tree_from_listing(body: &serde_json::Value) -> Option<String> {
+    body.get("tree")?
+        .as_array()?
+        .iter()
+        .find(|entry| {
+            entry.get("path").and_then(|v| v.as_str()) == Some(KB_DIR)
+                && entry.get("type").and_then(|v| v.as_str()) == Some("tree")
+        })?
+        .get("sha")?
+        .as_str()
+        .map(str::to_string)
 }
 
 fn git_command() -> Result<String> {
@@ -457,25 +487,9 @@ fn build_update_source(paths: &GqyPaths, repo: &Path) -> Result<PathBuf> {
     if dest.exists() {
         std::fs::remove_dir_all(&dest)?;
     }
-    let bundled = default_kb_source_dir();
-    let bundled_kb = bundled.join("kb");
-    if bundled_kb.is_dir() {
-        copy_markdown_tree(&bundled_kb, &dest.join("kb"))?;
-    }
-    let wiki = repo.join("wiki");
-    let wiki_source = if wiki.is_dir() { wiki.as_path() } else { repo };
-    std::fs::create_dir_all(dest.join("shorinwiki"))?;
-    for file in collect_markdown(wiki_source)? {
-        let rel = file.strip_prefix(wiki_source)?;
-        if excluded(rel) {
-            continue;
-        }
-        let target = dest.join("shorinwiki").join(rel);
-        if let Some(parent) = target.parent() {
-            std::fs::create_dir_all(parent)?;
-        }
-        std::fs::copy(file, target)?;
-    }
+    // 远端就是安装包快照的同一个目录，拉下来的整份替换快照，不再与它合并。
+    // 目标前缀仍是 `kb/`，和安装包导入的路径一致，换来源前后同一篇文档是同一个名字。
+    copy_markdown_tree(&repo.join(KB_DIR), &dest.join(KB_DIR))?;
     Ok(dest)
 }
 
@@ -606,16 +620,39 @@ mod tests {
     #[test]
     fn update_repo_requires_importable_markdown() {
         let temp = tempfile::tempdir().unwrap();
-        let wiki = temp.path().join("wiki");
-        std::fs::create_dir_all(wiki.join("legacy")).unwrap();
-        std::fs::write(wiki.join("legacy/old.md"), "old").unwrap();
+        assert!(validate_update_repo(temp.path()).is_err(), "没有 kb/ 目录");
 
+        let kb = temp.path().join(KB_DIR);
+        std::fs::create_dir_all(kb.join("legacy")).unwrap();
+        std::fs::write(kb.join("legacy/old.md"), "old").unwrap();
         assert!(validate_update_repo(temp.path()).is_err());
 
-        std::fs::create_dir_all(wiki.join("archlinux")).unwrap();
-        std::fs::write(wiki.join("archlinux/current.md"), "current").unwrap();
-
+        std::fs::create_dir_all(kb.join("macos")).unwrap();
+        std::fs::write(kb.join("macos/current.md"), "current").unwrap();
         assert!(validate_update_repo(temp.path()).is_ok());
+    }
+
+    #[test]
+    fn remote_tree_is_the_kb_entry_not_the_commit() {
+        let listing = serde_json::json!({
+            "sha": "commit-tree",
+            "tree": [
+                { "path": "README.md", "type": "blob", "sha": "readme" },
+                { "path": "kb", "type": "tree", "sha": "kb-tree" },
+                { "path": "src", "type": "tree", "sha": "src-tree" },
+            ]
+        });
+        assert_eq!(kb_tree_from_listing(&listing).as_deref(), Some("kb-tree"));
+        let without = serde_json::json!({ "tree": [{ "path": "kb", "type": "blob", "sha": "x" }] });
+        assert_eq!(kb_tree_from_listing(&without), None);
+    }
+
+    #[test]
+    fn old_state_files_still_load() {
+        let old = r#"{"release_hash":"h","shorin_wiki_commit":"abc","remote_commit":"abc",
+            "update_available":false,"last_checked_at":"","last_imported_at":"","last_notice_commit":""}"#;
+        let state: DefaultKbState = serde_json::from_str(old).unwrap();
+        assert_eq!(state.source_tree, "abc");
     }
 
     #[test]
@@ -637,21 +674,20 @@ mod tests {
 }
 
 #[cfg(test)]
-mod remote_head_tests {
+mod remote_check_tests {
     use super::*;
 
-    /// 10.255.255.1 是 RFC1918 里一个不会有人应答的地址，`git ls-remote` 打过去
-    /// 会一直等 TCP——实测 git 自己要 **135 秒**才放弃。这条检查在 REPL 启动路径
-    /// 上，所以必须有上限。
+    /// 10.255.255.1 是 RFC1918 里一个不会有人应答的地址，连过去会一直等 TCP——
+    /// 实测不设上限要 **135 秒**才放弃。这条检查在 REPL 启动路径上，所以必须有上限。
     ///
     /// 用 200 ms 预算测，跑得比一次 `cargo test` 的启动还快。断言只看「有没有
     /// 被上限兜住」，不看具体返回什么：没网的环境里 connect 会立刻
     /// EHOSTUNREACH，照样是「很快返回」，测试不会假红。
     #[tokio::test]
-    async fn remote_head_gives_up_instead_of_hanging() {
+    async fn remote_check_gives_up_instead_of_hanging() {
         let budget = std::time::Duration::from_millis(200);
         let started = std::time::Instant::now();
-        let result = remote_head_bounded("https://10.255.255.1/nope.git", budget).await;
+        let result = remote_kb_tree_bounded("https://10.255.255.1/nope", budget).await;
         let waited = started.elapsed();
         assert!(result.is_err(), "黑洞地址不该返回成功");
         assert!(

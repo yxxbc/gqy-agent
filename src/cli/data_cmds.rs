@@ -213,7 +213,7 @@ pub(in crate::cli) async fn run_update_default_kb(paths: &GqyPaths) -> Result<()
     println!(
         "{}: {}",
         t("updated default knowledge base", "已更新默认知识库"),
-        state.shorin_wiki_commit
+        state.source_tree
     );
     Ok(())
 }

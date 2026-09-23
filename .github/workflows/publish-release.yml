@@ -162,6 +162,9 @@ jobs:
           cp -R assets/models/bge-small-zh-v1.5-int8 "$stage/share/gqy/models/"
           cp -R src/scripts "$stage/share/gqy/scripts"
           cp -R kb "$stage/share/gqy/default-kb/kb"
+          # 快照对应的 kb/ tree 哈希：程序拿它和远端比，kb/ 变了才提示「知识库有更新」
+          mkdir -p "$stage/share/gqy/default-kb/manifest"
+          git rev-parse HEAD:kb > "$stage/share/gqy/default-kb/manifest/kb.tree"
 
           install -m 0644 LICENSE "$stage/share/licenses/gqy/LICENSE"
           install -m 0644 assets/fonts/NotoSansCJK.LICENSE "$stage/share/licenses/gqy/"

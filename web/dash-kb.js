@@ -224,18 +224,19 @@
       : task.error ? `上次失败:${task.error}`
         : s.update_available ? "有可用更新" : "已是最新";
     const button = D.el("button.dash-button.is-slim", { type: "button", text: task.running ? "更新中…" : "更新", onclick: startUpdate });
-    button.disabled = task.running || !d.bundled && !s.shorin_wiki_commit;
+    // 来源是项目仓库的 kb/，没有安装包快照（cargo install）也能直接从远端拉。
+    button.disabled = task.running;
     // 版本号一致时只写一个:同一串哈希写两遍撑满一行,再把按钮挤到第二行,整条
     // 就长得像一根进度条了(09-09 用户反馈)。完整信息挂在 title 上。
-    const local = short(s.shorin_wiki_commit);
+    const local = short(s.source_tree);
     const remote = short(s.remote_commit);
     const version = local === remote ? local : `${local} → ${remote}`;
     const imported = s.last_imported_at ? D.formatTime(s.last_imported_at) : "—";
     const detail = D.el("span.dash-cell-muted", { text: `${version} · ${imported}` });
-    detail.title = `本地 ${short(s.shorin_wiki_commit)} · 远端 ${short(s.remote_commit)} · 上次导入 ${imported}`;
+    detail.title = `本地 ${short(s.source_tree)} · 远端 ${short(s.remote_commit)} · 上次导入 ${imported}`;
     ui.defaultCard.replaceChildren(D.el("div.dash-inline-card.is-tight", null,
       D.el("span.dash-chip.is-builtin", { text: "内置库" }),
-      D.el("span.dash-inline-main", { text: "Shorin ArchLinux Guide" }),
+      D.el("span.dash-inline-main", { text: "顾清影内置知识库" }),
       detail,
       D.el(`span.dash-chip${s.update_available && !task.running ? ".is-warn" : ""}`, { text: status }),
       button));
