@@ -1,4 +1,4 @@
-# 对话中输入框改为圆角框（2026-09-23，待开工）
+# 对话中输入框改为圆角框（2026-09-23，方案已定，排在两批验收之后）
 
 来由：用户问「TUI 是否摆脱了 opencode 的形式」。结论是没有，09-21 那轮只改了颜色，左竖条 `┃`、平铺正文、底栏这套结构仍是 opencode 一路。用户提出对话中的输入框换成 Claude Code 那种，09-23 在三种形态里选了**完整圆角框**（另两种是上下横线式、只换输入框保留竖条回显）。
 
@@ -14,10 +14,13 @@
 | 开屏大厅（空会话） | **不变**：艺术字 + 星空 + 窄框，窄框仍用 `┃` |
 | 推翻的定稿 | `docs/plan/2026-09-10-tui-rewrite.md` §3「用户消息与输入区：蓝色粗体 `┃`」与「无边框盒子（通知是全局唯一允许的边框）」。施工时在那两条后注明被本文取代 |
 
-## 二、开工前再确认的两个细节
+## 二、细节（09-23 已拍板）
 
-1. **边框颜色**。推荐框线用 `FAINT`（淡灰，和 Claude Code 一样不抢眼），`❯` 用模式主色（普通蓝 / dev 酒红），模式区分靠 `❯` 和底栏标签。另一种是整个框用模式主色，更醒目，但框线在长会话里一直是一块高饱和色。
-2. **你发出的消息在对话记录里怎么显示**。推荐 `❯ 消息` 加淡底色整行（Claude Code 的做法），不再画竖条，与输入框的 `❯` 呼应。另一种是保留现在的 `┃` 竖条回显，风格会混用。
+| 事项 | 决定 |
+|---|---|
+| 框线颜色 | 框线 `FAINT` 淡灰，`❯` 用模式主色（普通蓝 / dev 酒红）。模式区分靠 `❯` 和底栏标签 |
+| 你发出的消息在对话记录里 | `❯ 消息` + 整行淡底色，不再画竖条。淡底色是内容色，按深浅底各备一套（加进 `render/style.rs` 的 swatches） |
+| 开工时间 | 先放着。等 09-21 TUI 配色与 09-23 发版改造两批验收完再开，避免三批改动叠在一起难以定位问题 |
 
 ## 三、现状与改动点
 
@@ -27,11 +30,11 @@
 
 | 位置 | 改什么 |
 |---|---|
-| `cli/repl/layout.rs` | `input_prompt_bar` / `submitted_echo_bar` / `submitted_echo_lines` 拆成两套：大厅沿用竖条，对话中用框。新增 `input_box_top(cols)`、`input_box_bottom(cols)`、行前缀 `│ ❯ `（续行 `│   `）、行尾 ` │` |
+| `cli/repl/layout.rs` | `input_prompt_bar` / `submitted_echo_bar` / `submitted_echo_lines` 拆成两套：大厅沿用竖条，对话中用框（框线 `FAINT`，`❯` 用 `mode_accent`）。新增 `input_box_top(cols)`、`input_box_bottom(cols)`、行前缀 `│ ❯ `（续行 `│   `）、行尾 ` │` |
 | `cli/repl/input.rs::render_repl_input_with_footer` | `layout.is_none()` 时画框：首尾两行换成框线，每行输入按可见宽度补空格后接右框线。输入折行宽度用 `cols - 2` 调用现有的 `repl_wrapped_input_rows_for_cols`（右边框留两列），前缀宽度按新前缀算 |
 | 光标 | 同一函数末尾与 `tail/frame.rs:359` 的全屏光标计算都按新前缀（4 列）算，行偏移不变 |
 | 选区 | `tail/screen/select.rs::decoration_width` 认 `│` 开头为 4 列装饰。`drawn` 里记的是**不带右框线**的那份，复制出来不带 `│` |
-| 回显 | `submitted_echo_lines` 按第二节第 2 条改。`replace_repl_input_with_user_echo` 跟着换 |
+| 回显 | `submitted_echo_lines` 改成 `❯ 消息` + 整行淡底色（第二节）。`replace_repl_input_with_user_echo` 跟着换 |
 | 其他调用方 | `footer.rs`、`inline_picker.rs`、`cli/mod.rs`（3 处）用 `input_prompt_bar` 算宽度或画前缀，逐个核对是跟框走还是跟大厅走 |
 | 空输入提示 | `composer_hint::styled` 的可用宽度改按框内宽度算 |
 | 命令候选 | inline 模式下候选行占的是底栏那一行（在框外），不受影响。全屏浮层在框上方，不受影响 |
