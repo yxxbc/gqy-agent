@@ -46,7 +46,7 @@ flate2 = "1.0"
 fuzzy-matcher = "0.3"
 fancy-regex = "0.19"
 fst = "0.4"
-fontdb = { version = "0.23", default-features = false, features = ["std", "fs", "memmap"] }
+fontdb = { version = "0.24", default-features = false, features = ["std", "fs", "memmap"] }
 if-addrs = "0.15"
 libc = "0.2"
 pulldown-cmark = { version = "0.13.4", default-features = false }
