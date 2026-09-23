@@ -25,6 +25,7 @@ TUI 这一批（09-23 定，方案都在 `docs/plan/`）：
 - 寻找正确识别或者读取agy、claude、codex中token详细消耗的方法，去网上寻找答案
 - 修复上下文圆环点击后的浮窗对应的数据要准确,增加agy、claude、codex的订阅时效额度，参考codexbar、(https://github.com/tungcorn/antigravity-usage-checker)、(https://github.com/skainguyen1412/antigravity-usage)、(https://github.com/phuryn/claude-usage)
 - webui 美化意见
+- WebUI 供应商显示彩色品牌图标（现在全是字母），认不出的仍用字母。方案：`docs/plan/2026-09-24-webui-provider-icons.md`
 - Live2D
 - 支持QQ官方机器人
 - 支持telegram
