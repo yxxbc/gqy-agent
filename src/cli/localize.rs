@@ -10,6 +10,9 @@ pub(in crate::cli) fn localized_command() -> clap::Command {
     let mut command = Cli::command();
     command = command
         .about(t("Selene, the GQY AI assistant", "顾清影 AI 助手"))
+        // flatten 进来的 TurnOptions 的文档注释会被 clap 当成 long_about，`--help`
+        // 顶部就印出一段写给开发者的说明（09-07 起）。只留上面那句简介。
+        .long_about(None::<&str>)
         .override_usage(t(
             "gqy [OPTIONS] [MESSAGE]... [COMMAND]",
             "gqy [选项] [消息]... [命令]",
