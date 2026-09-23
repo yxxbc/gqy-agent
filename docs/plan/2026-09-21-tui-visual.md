@@ -61,7 +61,7 @@
 3. **工具块状态色**：✓ 用 `SUCCESS`，✗ 用 `DANGER`（`timeline.rs:1034` 附近已是 `DANGER`），运行中 ◌ 用 `ACCENT`，块体保持 dim。先读 `render/stream/timeline.rs` 的 glyph 逻辑。
 4. **空输入占位提示**（“和顾清影说点什么…”，`MUTED`，一有输入就消失）：WebUI 已有人格可配的占位文案（提交 `a4210a6d`，`persona_identity`），TUI 应复用同一来源。全屏输入框在 `cli/repl/tail/`，inline 在 `cli/repl/layout.rs`。
 5. **测试**：`src/cli/tests/` 与 `src/render/tests/` 里约 26 处断言写死了色号。界面色字节没变，大部分应该仍然通过；需要改的主要是思考绿（`38;5;10`）、diff 的 `38;5;245/102/250`、展开区 `Indexed(236)`。改成引用 `style::X`，不要再写字面量。`testkit/tui/run.py:900` 断言 `\x1b[38;5;10m●` 不出现、`:979` 匹配 `\x1b[2m\x1b[36m` 转轮，也要核对。
-6. **验收**：`cargo test`、`test_scripts/refactor-check.sh`（涉及 render，属硬要求）、截图对照（见下节），然后写验收流程给用户，通过后提交并更新 `docs/releases/next/release-notes.md`。
+6. **验收**：`cargo test`、`test_scripts/refactor-check.sh`（涉及 render，属硬要求）、截图对照（见下节），然后写验收流程给用户，通过后提交。09-23 发版链改造时已把本项写进 `CHANGELOG.md` 的 `[Unreleased]`（空输入提示、占用条、`display.theme`、配色、思考样式五条），验收不过要同步删改。
 
 ## 五、截图对照工具
 

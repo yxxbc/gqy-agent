@@ -133,35 +133,30 @@ Nix 版的程序在 `/nix/store/<hash>-gqy-<版本>/` 下，**每次升级路径
 
 ## 4. 维护者：发布新版本
 
-1. 确认要发布的内容都已经合进 `gqy` 分支，并通过验收。
-2. 把草稿目录改名为版本号，并把标题从「下一个版本（草稿）」改成正式标题：
-   ```bash
-   git mv docs/releases/next docs/releases/X.Y.Z
-   ```
-   `docs/releases/X.Y.Z/release-notes.md` 会原样成为 GitHub Release 的正文，后面自动附上安装说明。找不到这个文件时发布工作流会在编译前直接失败。
-3. 修改 `Cargo.toml` 的 `version`（README 顶部的版本徽章也一起改），然后提交：
-   ```bash
-   git add -A docs/releases
-   git commit -am "release: vX.Y.Z"
-   git push gqy gqy
-   ```
-4. 打 tag 并推送，会触发云端构建：
-   ```bash
-   git tag vX.Y.Z
-   git push gqy vX.Y.Z
-   ```
-5. 在 GitHub Actions 里看「发布 Release（云端构建）」跑完。它会：
-   - 先检查 `docs/releases/X.Y.Z/release-notes.md` 存在，再编译 4 个平台并发布到 Releases，正文取自这份说明；
-   - 自动往 `gqy` 分支提交一个 `chore(nix): 预编译包更新到 vX.Y.Z`，更新 `nix/release.json`。
-6. 把 CI 的提交拉回本地，免得下次推送冲突：
+平时：每个验收通过的用户可见改动，都在同一个提交里写进 `CHANGELOG.md` 的 `## [Unreleased]`。格式是 Keep a Changelog，写法约定在文件开头。CI 会跑 `python3 .github/scripts/release.py check` 检查格式。
+
+发版：
+
+1. 确认要发布的内容都已经合进 `gqy` 分支并通过验收，`[Unreleased]` 里的条目齐全、措辞是给用户看的。
+2. 打开 GitHub Actions →「发布 Release（云端构建）」→ Run workflow，分支选 `gqy`，填版本号（例如 `0.7.0`，不带 `v`）。
+3. 工作流会依次：
+   - 用 `release.py prepare` 把 `[Unreleased]` 定稿为 `[0.7.0] - 今天`，上面留一个空的 `[Unreleased]`，并同步 `Cargo.toml`、`Cargo.lock`、README 的版本徽章；`[Unreleased]` 是空的就直接失败；
+   - 以 `github-actions[bot]` 提交 `release: v0.7.0` 到 `gqy` 分支，并打 tag `v0.7.0`；
+   - 编译 4 个平台并发布到 Releases，正文取自 CHANGELOG 里 `[0.7.0]` 那一段，后面自动附上安装说明；
+   - 再往 `gqy` 分支提交一个 `chore(nix): 预编译包更新到 v0.7.0`，更新 `nix/release.json`。
+
+   bot 推的 tag 不会再触发工作流（GitHub 对 `GITHUB_TOKEN` 的限制），所以定稿和编译发布在同一个工作流里串着跑，不会重复发布。
+4. 把 CI 的两个提交拉回本地，免得下次推送冲突：
    ```bash
    git pull gqy gqy
    ```
-7. 验收：
+5. 验收：
    ```bash
    GQY_HOME=$(mktemp -d) nix run github:yxxbc/gqy-agent/gqy --refresh -- --version   # 应该输出新版本号
    ```
    用户那边运行 `nix profile upgrade gqy-agent` 就能升到新版。
+
+同一个版本号再运行一次工作流（tag 已存在）就是重新编译发布这个 tag，不会再改 CHANGELOG。
 
 ### 出了问题怎么办
 
@@ -169,20 +164,24 @@ Nix 版的程序在 `/nix/store/<hash>-gqy-<版本>/` 下，**每次升级路径
 |---|---|
 | CI 最后一步推送被拒（分支保护） | 要么在分支保护规则里放行 `github-actions`，要么手动更新：`gh release download vX.Y.Z -p SHA256SUMS` → `python3 nix/update-release.py vX.Y.Z SHA256SUMS` → 提交 `nix/release.json` |
 | 用户安装时报 `hash mismatch` | Release 里的包被重新上传过，`release.json` 还是旧 hash。重新跑一次发布工作流，或者按上一行手动更新 |
-| 某个平台编译失败 | 那个平台的包不在 Release 里，`update-release.py` 会报「SHA256SUMS 里没有 …」并退出，`release.json` 保持旧版本，不会写出坏数据。修好后重新跑工作流（可以手动运行并填同一个 tag） |
+| 某个平台编译失败 | 那个平台的包不在 Release 里，`update-release.py` 会报「SHA256SUMS 里没有 …」并退出，`release.json` 保持旧版本，不会写出坏数据。修好后重新跑工作流（手动运行并填同一个版本号，tag 已存在就只重新发布） |
 | 重新发布旧 tag | 工作流会跳过回写，`release.json` 不会被降级到旧版本 |
-| 发布工作流开头就失败：找不到发布说明 | 打 tag 前没把 `docs/releases/next` 改名为版本号。补上改名并提交后，手动运行工作流、填同一个 tag |
+| 发布工作流开头就失败：`[Unreleased] 里没有任何条目` | 没有写 CHANGELOG。补上条目提交后重新运行 |
+| 发布工作流开头就失败：`CHANGELOG.md 里没有 [X.Y.Z]` | 手动推的 tag 所在提交里没有这个版本段。本地 `python3 .github/scripts/release.py prepare X.Y.Z` 后提交，把 tag 挪到这个提交上再推 |
+| 定稿那步推送被拒（分支保护） | 同「CI 最后一步推送被拒」：在分支保护规则里放行 `github-actions` |
 
 ### 版本发出去后发现 bug
 
-**首选：发补丁版**（vX.Y.Z 有问题就发 vX.Y.Z+1）。修好、验收、新建 `docs/releases/<补丁版本>/release-notes.md`，照常发版。用户照常升级就能拿到修复，旧版本原样留档。
+**首选：发补丁版**（vX.Y.Z 有问题就发 vX.Y.Z+1）。修好、验收、在 `[Unreleased]` 的 `### Fixed` 里写上，照常发版。用户照常升级就能拿到修复，旧版本原样留档。
 
 如果 `gqy` 分支已经合进了不打算发布的新功能，就从旧 tag 拉 hotfix 分支，只修这个 bug（tag 打在哪个提交上都能触发发布）：
 
 ```bash
 git switch -c hotfix/X.Y.Z+1 vX.Y.Z
-# 修 bug、写发布说明、改版本号，然后提交
-git tag vX.Y.Z+1 && git push gqy vX.Y.Z+1
+# 修 bug，在 CHANGELOG 的 [Unreleased] 写上，然后提交
+python3 .github/scripts/release.py prepare X.Y.Z+1   # 定稿并同步版本号
+git commit -am "release: vX.Y.Z+1"
+git tag vX.Y.Z+1 && git push gqy vX.Y.Z+1           # 推 tag 触发发布
 git switch gqy && git merge hotfix/X.Y.Z+1   # 修复合回主线
 ```
 

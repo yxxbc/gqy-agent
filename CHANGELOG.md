@@ -1,105 +1,65 @@
-## [unreleased]
+# 更新日志
 
-### 🚀 Features
+格式遵循 [Keep a Changelog](https://keepachangelog.com/zh-CN/1.1.0/)，版本号遵循 [语义化版本](https://semver.org/lang/zh-CN/)。
 
-- *(identity)* 对外身份改成顾清影(二进制与 ~/.miyu 路径不动)
-- *(album)* 图库内置化 + WebUI 面板(按人格分库)
-- *(map)* 地图插件与地图卡片(开源优先,高德可选)
-- *(express)* 内置快递查询与时间线卡片(查不到就说查不到)
-- *(dev)* /init 生成 GQY.md,dev 会话与 dev 子代理都读它
-- *(webui)* 地图卡片改挂进工具签收起区(隐私默认)
-- *(agent)* 上下文占用分项拆解与度量审计
-- *(web)* 后台任务与会话多用户安全隔离访问收口
-- *(web)* 上下文分项面板、划词助手、围栏图表预览与成果交付增强
-- *(gqy)* 顾清影成为内置默认人格，logo 改 GQY，修脚本面板越界
-- *(tools)* 新增 github 工具与 顾清影 独立 bot 身份
-- *(imessage)* 新增 iMessage 本地守护桥接与端到端通道
-- *(voice)* 优化 Web 语音全双工流式传输与音频桥接
-- *(antigravity)* 预热进程保留时长可配置
+写法约定（`python3 .github/scripts/release.py check` 会检查，CI 也跑）：
 
-### 🐛 Bug Fixes
+- 新改动写进 `## [Unreleased]`，验收通过后再写。发版时工作流把它改成 `## [X.Y.Z] - 日期`，这一段原样成为 GitHub Release 的正文。
+- 版本标题下可以先写一段概述，然后只用这几个小节，按此顺序：`### Added`（新增）、`### Changed`（变更）、`### Deprecated`（即将移除）、`### Removed`（移除）、`### Fixed`（修复）、`### Security`（安全）。
+- 每条以 `- ` 开头，写给用户看：说清改了什么、对用户有什么影响。纯内部重构、文档、CI 不写。破坏性变更在条目开头标 **破坏性**。
 
-- *(sandbox)* Landlock 只在 Linux 编译,别的平台失败关闭
-- *(voice)* MacOS 麦克风三处修复(48k 抗混叠 / 16k 优先 / ALSA 过滤加平台门)
-- *(tui)* Enable fullscreen by default and prepare clean 0.6.0 rebuild
-- *(tools)* Clean CJK in tool descriptions and refresh registry shapes fixture
-- *(scripts+web)* 适配 macOS/Safari 体验及修复 4 个内置脚本不稳定问题
-- *(gqy)* 移除 GQY.md 项目上下文注入，修正改名遗漏的输入框提示测试
-- *(macos)* 修复 artifact 身份与旧布局迁移，测试套件在 macOS 全绿
-- *(macos)* RLIMIT_AS 只在 Linux 上设,嵌入与渲染 worker 不再起不来
-- *(persona)* 补全纯中文人格名 md→哈希 scope 的迁移
-- *(shell)* Fish hook 落到 fish 真正读取的配置目录
-- *(pics)* Change pics images
-- *(pics)* Delect images
-- *(docs)* Delete images and readme link
-- *(docs)* Update todolist
-- *(prompt)* 默认人格提醒去掉一百字上限，篇幅随场合
-- *(tui)* 点击链接按平台调用打开命令，失败时如实提示
-- *(github)* 规范 GitHub 提交签名与测试用例
+## [Unreleased]
 
-### 📚 Documentation
+本版本起项目对外改名为 GQY / 顾清影，顾清影成为内置默认人格。安装以 Nix 为主，没有 Nix 的机器用一键安装脚本。
 
-- 09-13 计划补齐今日四项 + wiki 收录图库/地图/快递 + todolist 划掉两条
-- *(plan)* 09-14 地图坐标锚点专项(实测:两源之差里 575m 是坐标系差)
-- *(plan)* 排查 GQY.md 会不会被人格会话读到(不会),记下两个相邻的坑
-- *(plan)* 裁定 /init 暂不使用,项目约定该按需读而不是进前缀
-- *(plan)* 删掉 09-14 那份计划
-- *(plan)* 归档已完成的历史计划文档至 plan-is-true
-- *(voice)* 更新语音功能文档以反映最新双进程与TTS机制
-- *(analyse)* 建立 Gemini 专属分析与优化规范目录
-- *(spec)* 规范文档归档契约与 09-14 主任务设计规划
-- Update the validated 0.6.0-2 release workflow [skip ci]
-- Trim release announcement [skip ci]
-- *(plan)* GQY 全面改名与顾清影默认人格交接文档
-- *(plan)* 记录迁移脚本细节、旧 ~/.gqy 处理与 P7 安装进度
-- *(plan)* 记录 17:11–17:25 意外与处置
-- *(plan)* P6/P7 完成，P8 服务侧验收与 venv 路径修复记录
-- 美化并规范化 README 文档及相关资源
-- *(tools)* 补 github 工具与 gqy github 子命令文档
-- *(design)* TUI 视觉美化方案稿
-- 同步语音、iMessage 与通讯平台文档
+### Added
 
-### ⚡ Performance
+- 内置图库（`album`）、地图（`map`，开源数据优先，高德可选）、快递 100 查询（`express`）三个插件，WebUI 配套图库面板、地图卡片和快递时间线卡片
+- WebUI：上下文占用分项拆解面板、划词助手、围栏图表（Mermaid）预览，成果交付增强
+- 新增 `github` 工具：commit、提 PR / issue、评论与 gh 直通。你固定是 author，顾清影自动挂 `Co-Authored-By`；名字与邮箱在 `tools.github` 配置，`gqy reload` 生效
+- 顾清影可以有自己的 GitHub 账号：`gqy github login / status / logout`，凭据隔离在 `~/.gqy/github/`，不碰你的 gh / git 登录与钥匙串。默认用你的身份，明确要求时才用她的账号，推不进的仓库自动 fork 后提 PR
+- iMessage 本地守护桥接（macOS）
+- 纠正型记忆：你纠正过的事情会带着理由记下来，优先级最高
+- 日常聊天复盘：会话空闲一段时间后顾清影回顾这段对话，最多记 3 条改进要点，下次聊天时参考。时长由 `plugins.memory.review_idle_seconds` 控制（默认 900 秒，0 关闭）。WebUI 记忆页新增「复盘」页签，只读
+- Antigravity 预热进程的保留时长可配置：设置里「Antigravity 中转 → 预热进程保留时长」（`plugins.antigravity.warm_idle_seconds`），设成 0 完全关闭预热
+- TUI：输入框为空时显示淡色提示，文案与 WebUI 人格看板的输入框提示同源（默认「给 <人格名> 发消息」），开发模式不显示
+- TUI 底栏的上下文占用改成占用条 `47k/168k ▰▱▱▱▱ 28%`，占用低于 60% 绿色、低于 85% 黄色、更高红色。终端窄时先退成纯百分比
+- 新配置项 `display.theme`（`auto` / `dark` / `light`，默认 `auto`）：终端底色深浅。自动模式下交互 REPL 启动时向终端查询一次底色。环境变量 `GQY_THEME` 可临时覆盖。WebUI 设置页和 `/config` 都能改
 
-- *(antigravity)* 预热下一轮 agy 进程，每轮省约 6 秒
+### Changed
 
-### 🚜 Refactor
+- **破坏性**：项目全面改名 Miyu → GQY / 顾清影，顾清影成为内置默认人格，logo 改为 GQY
+- 安装以 Nix 为主（`nix profile install github:yxxbc/gqy-agent/gqy`），没有 Nix 或 Intel Mac 用 `install.sh` 一键安装，预编译包由云端构建
+- Antigravity 每轮少等约 6 秒：一轮结束后立刻把下一轮要用的 agy 进程拉起来备着，第二轮起基本只剩模型生成时间。只有常驻 daemon 会预热，只备一个，默认 5 分钟没人用自动关闭。换会话、换发起来源、换续传目标时不复用，预热进程意外退出会自动退回冷启动
+- 全屏 TUI 默认开启
+- TUI 配色：界面色（输入框竖条、模式标签、选中标记、成功 / 警告 / 错误色）跟随终端的 16 色配色方案；代码高亮、diff、展开区底色按深浅底各备一套，浅色终端下也看得清
+- TUI 思考过程改为暗色斜体（原为亮绿），等待动画改用主色
+- 顾清影说话不再过短：默认人格提醒去掉「整条不超过一百字」的硬上限，篇幅跟着场合走
+- WebUI 地图卡片默认收进工具签的折叠区，不直接展示位置
 
-- *(tools)* Extract shape_tests into dedicated submodule to comply with size limit
-- [**breaking**] 项目全面改名 Miyu → GQY / 顾清影
-- 扩展点改表驱动并补齐静默失败守护
+### Removed
 
-### 🎨 Styling
+- 上游继承的 Arch / DEB / RPM 打包。安装只保留 Nix 与 `install.sh` 两条路线
 
-- Cargo fmt 修正两处遗留格式
+### Fixed
 
-### 🧪 Testing
+- macOS 麦克风：48kHz 重采样加抗混叠、优先使用 16kHz、ALSA 过滤只在 Linux 生效，修复 KWS 唤醒词不命中
+- macOS 上嵌入与渲染 worker 因内存上限（RLIMIT_AS）起不来
+- macOS 上 TUI 点击链接只提示「正在打开链接」却没有打开；打不开时改为提示「无法打开链接」
+- macOS / Safari 的 WebUI 体验问题与 4 个内置脚本不稳定
+- 引导「自选功能」里图库、地图、快递三个插件没有名字
+- 终端配置器的全局设置、插件设置、QQ 菜单改为按字段绑定写回，插入新设置项不会再把值写进错误的设置
+- 纯中文人格名的数据目录迁移不完整
+- fish 的 shell hook 写到了 fish 不读取的配置目录
 
-- *(gqy)* 改名后测试全绿、统一格式化、修正脚本面板层级标签
+### Security
 
-### ⚙️ Miscellaneous Tasks
+- bot 身份下 gh 找不到自己的 token 时，不再回退使用宿主钥匙串里的 token：没有 bot token 一律拒绝执行
+- 后台任务与会话的多用户访问隔离收口
+- Landlock 沙盒只在 Linux 上启用，其他平台明确拒绝而不是假装已隔离
 
-- *(tools)* 注册表形状夹具补上 send_subagent_message
-- Add standalone native macOS (aarch64) build workflow
-- 添加 Dependabot 依赖机器人配置及相关更新
-- *(deps)* Bump the github-actions group with 4 updates
-- 完善 macOS 工作流构建与打包脚本
-- 云端编译并发布 Release，新增一键安装脚本
-- 以 Nix 为主要安装方式，新增 flake 与迁移脚本
-- 删除上游继承的 Arch/DEB/RPM 打包体系，CI 改跑 gqy 分支
+<!-- legacy: 以下为 git-cliff 生成的历史记录，保留原格式，release.py check 不检查 -->
 
-### 💼 Other
-
-- Fix draft lookup and sync verified 0.6.0 release channels
-- Finalize 0.6.0-2 channels and repair headless CI
-- Integrate main 0.6.0 with gqy customizations
-- *(docs)* Add main txt
-- *(deps)* Bump directories from 5.0.1 to 6.0.0
-- *(deps)* Bump yaml-rust2 from 0.11.0 to 0.13.0
-- *(deps)* Bump fancy-regex from 0.17.0 to 0.19.1
-- *(deps)* Bump if-addrs from 0.13.4 to 0.15.0
-- *(deps)* Bump the minor-and-patch group with 13 updates
-- *(deps)* Bump ratatui from 0.29.0 to 0.30.2
 ## [0.6.0] - 2026-09-13
 
 ### 🚀 Features

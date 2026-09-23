@@ -4,11 +4,18 @@ name: 发布 Release（云端构建）
 # install.sh 从这里下载最新版本，别人不用自己编译。
 #
 # 触发方式：
-#   - 推送 v 开头的 tag（例如 v0.6.1）
-#   - 在 Actions 页面手动运行，可以填 tag；留空就用 Cargo.toml 里的版本
+#   - 【日常发版】在 Actions 页面手动运行，填版本号（例如 0.7.0）。tag 还不存在时，
+#     工作流自己完成整条发版链：CHANGELOG 的 [Unreleased] 定稿为 [0.7.0] - 今天，
+#     同步 Cargo.toml / Cargo.lock / README 徽章，以 github-actions[bot] 提交到当前
+#     分支并打 tag v0.7.0，然后编译发布。tag 已存在时只重新编译发布这个 tag。
+#   - 【hotfix】手动推送 v 开头的 tag。tag 所在提交的 CHANGELOG 里必须已有这个版本段
+#     （本地先跑 .github/scripts/release.py prepare X.Y.Z 再提交打 tag）。
 #
-# Release 正文取自 docs/releases/<版本号去掉 v>/release-notes.md，后面附上安装说明。
-# 找不到这份说明就在编译前失败——发版提交里要先把 docs/releases/next 改名为版本号。
+# bot 推的 tag 不会再触发工作流（GITHUB_TOKEN 的限制），所以定稿和编译发布放在同一个
+# 工作流里串着跑，不会重复发布。
+#
+# Release 正文取自 CHANGELOG.md 里这个版本的那一段（release.py notes），后面附上安装说明。
+# 找不到这一段就在编译前失败。
 #
 # 包里的布局和系统安装一致：bin/gqy + share/gqy/{fonts,models,scripts,default-kb}
 # + lib/gqy/libonnxruntime。程序会在「二进制所在目录/../share/gqy」下找资源，
@@ -21,10 +28,10 @@ on:
     tags: ['v*']
   workflow_dispatch:
     inputs:
-      tag:
-        description: 发布到哪个 tag（例如 v0.6.0）。留空就用 Cargo.toml 里的版本。
+      version:
+        description: 版本号（例如 0.7.0）。tag 不存在就定稿 CHANGELOG 并新发，已存在就重新发布。
         type: string
-        default: ''
+        required: true
 
 permissions:
   contents: read
@@ -38,39 +45,65 @@ env:
   ORT_VERSION: '1.23.2'
 
 jobs:
-  # 编译前先定版本号、确认发布说明存在：缺说明几秒内失败，不白编 4 个平台
+  # 编译前先定版本号、（新版本时）定稿并打 tag、取出发布说明：缺说明几秒内失败，不白编 4 个平台
   preflight:
-    name: 确定版本号并检查发布说明
+    name: 确定版本号并准备发布说明
     runs-on: ubuntu-24.04
+    permissions:
+      contents: write
     outputs:
-      tag: ${{ steps.tag.outputs.tag }}
-      notes: ${{ steps.tag.outputs.notes }}
+      tag: ${{ steps.release.outputs.tag }}
+      sha: ${{ steps.release.outputs.sha }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-        with:
-          persist-credentials: false
 
-      - name: 确定版本号
-        id: tag
+      - name: 定版本号，新版本则定稿 CHANGELOG 并打 tag
+        id: release
         env:
-          INPUT_TAG: ${{ inputs.tag }}
+          INPUT_VERSION: ${{ inputs.version }}
         run: |
           set -euo pipefail
           if [ "$GITHUB_REF_TYPE" = "tag" ]; then
             tag="$GITHUB_REF_NAME"
-          elif [ -n "$INPUT_TAG" ]; then
-            tag="$INPUT_TAG"
+            new=false
           else
-            tag="v$(grep -m1 '^version' Cargo.toml | cut -d'"' -f2)"
+            version="${INPUT_VERSION#v}"
+            if ! printf '%s' "$version" | grep -Eq '^[0-9]+\.[0-9]+\.[0-9]+$'; then
+              echo "::error::版本号应为 X.Y.Z，实为 ${INPUT_VERSION}"
+              exit 1
+            fi
+            tag="v${version}"
+            if git ls-remote --exit-code --tags origin "refs/tags/${tag}" >/dev/null; then
+              echo "${tag} 已存在，重新发布"
+              new=false
+            else
+              new=true
+            fi
           fi
-          notes="docs/releases/${tag#v}/release-notes.md"
-          echo "发布版本：${tag}，发布说明：${notes}"
-          if [ ! -s "$notes" ]; then
-            echo "::error file=${notes}::找不到发布说明 ${notes}。发版提交里先把 docs/releases/next 改名为 ${tag#v}"
-            exit 1
+
+          if [ "$new" = true ]; then
+            python3 .github/scripts/release.py prepare "${tag#v}"
+            git -c user.name='github-actions[bot]' \
+                -c user.email='41898282+github-actions[bot]@users.noreply.github.com' \
+                commit -am "release: ${tag}"
+            git tag "$tag"
+            git push --atomic origin "HEAD:${GITHUB_REF_NAME}" "refs/tags/${tag}"
+          else
+            git fetch --depth 1 origin "refs/tags/${tag}:refs/tags/${tag}"
           fi
+
+          # 正文从当前分支的 CHANGELOG 取（新版本就是刚定稿的那份）。重新发布旧 tag 时，
+          # 那个 tag 里可能还没有 CHANGELOG 新格式，而当前分支的历史段是全的。
+          python3 .github/scripts/release.py notes "$tag" > release-notes.md
+          echo "发布版本：${tag}"
           echo "tag=$tag" >> "$GITHUB_OUTPUT"
-          echo "notes=$notes" >> "$GITHUB_OUTPUT"
+          echo "sha=$(git rev-parse "${tag}^{commit}")" >> "$GITHUB_OUTPUT"
+
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: release-notes
+          path: release-notes.md
+          if-no-files-found: error
 
   build:
     name: 编译 ${{ matrix.target }}
@@ -96,6 +129,7 @@ jobs:
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
+          ref: ${{ needs.preflight.outputs.sha }}
           persist-credentials: false
 
       - name: 安装 Linux 编译依赖
@@ -169,6 +203,7 @@ jobs:
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
+          ref: ${{ needs.preflight.outputs.sha }}
           persist-credentials: false
 
       - uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
@@ -176,6 +211,11 @@ jobs:
           pattern: dist-*
           merge-multiple: true
           path: dist
+
+      - uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+        with:
+          name: release-notes
+          path: notes
 
       - name: 汇总校验和，附上安装脚本
         run: |
@@ -188,10 +228,10 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
           TAG: ${{ needs.preflight.outputs.tag }}
-          NOTES: ${{ needs.preflight.outputs.notes }}
+          SHA: ${{ needs.preflight.outputs.sha }}
         run: |
-          # 正文 = docs/releases/<版本>/release-notes.md 原文 + 安装说明
-          cp "$NOTES" notes.md
+          # 正文 = CHANGELOG.md 里这个版本的那一段 + 安装说明
+          cp notes/release-notes.md notes.md
           printf '\n\n---\n\n' >> notes.md
           cat >> notes.md <<EOF
           ## 用 Nix 安装（推荐）
@@ -216,14 +256,14 @@ jobs:
 
           语音前端 \`gqy-voice\` 暂不在预编译包里，需要的话请从源码编译：\`cargo build --release --features voice\`。
 
-          由 GitHub Actions 在云端从提交 ${GITHUB_SHA} 编译。
+          由 GitHub Actions 在云端从提交 ${SHA} 编译。
           EOF
 
           if gh release view "$TAG" >/dev/null 2>&1; then
             gh release upload "$TAG" dist/* --clobber
             gh release edit "$TAG" --notes-file notes.md
           else
-            gh release create "$TAG" dist/* --target "$GITHUB_SHA" --title "顾清影 $TAG" --notes-file notes.md --latest
+            gh release create "$TAG" dist/* --target "$SHA" --title "顾清影 $TAG" --notes-file notes.md --latest
           fi
 
       # `nix profile install github:<仓库>` 按默认分支上的 nix/release.json 下载上面的包，

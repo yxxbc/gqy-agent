@@ -36,7 +36,7 @@ jobs:
       - name: Check the Nix flake
         run: nix flake check --no-build --all-systems
 
-  # test_scripts/refactor-check.sh 里不需要编译的四道门禁，拆开跑，红了能直接看出是哪道
+  # test_scripts/refactor-check.sh 里不需要编译的四道门禁 + CHANGELOG 格式，拆开跑，红了能直接看出是哪道
   gates:
     name: Gate scripts
     runs-on: ${{ vars.LINUX_X64_RUNNER || 'ubuntu-24.04' }}
@@ -53,6 +53,8 @@ jobs:
         run: python3 test_scripts/arch_dep_check.py
       - name: AGENTS.md references still exist
         run: python3 test_scripts/check-agents-refs.py
+      - name: CHANGELOG follows Keep a Changelog
+        run: python3 .github/scripts/release.py check
 
   # 平台 × 测试类型，一类一张卡片，红了一眼看出是哪类。
   # 代价是每张卡片都各自从头编译一遍。
