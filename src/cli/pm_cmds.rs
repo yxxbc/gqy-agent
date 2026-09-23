@@ -210,8 +210,13 @@ pub(in crate::cli) async fn run_pm(paths: &GqyPaths, args: PmArgs) -> Result<()>
         }
         PmCommand::Search { query } => {
             let query = query.trim().to_lowercase();
+            let taps = pm::load_taps(paths)?;
+            if taps.is_empty() {
+                println!("{}", no_taps_hint());
+                return Ok(());
+            }
             let mut found = 0usize;
-            for tap in pm::load_taps(paths)? {
+            for tap in taps {
                 let index = match pm::fetch_tap_index(&tap).await {
                     Ok(index) => index,
                     Err(error) => {
@@ -298,18 +303,23 @@ pub(in crate::cli) async fn run_pm(paths: &GqyPaths, args: PmArgs) -> Result<()>
                 Ok(())
             }
             TapCommand::List => {
-                for tap in pm::load_taps(paths)? {
-                    println!(
-                        "{tap}{}",
-                        if tap == pm::OFFICIAL_TAP {
-                            t("  (official)", "  (官方)")
-                        } else {
-                            ""
-                        }
-                    );
+                let taps = pm::load_taps(paths)?;
+                if taps.is_empty() {
+                    println!("{}", no_taps_hint());
+                }
+                for tap in taps {
+                    println!("{tap}");
                 }
                 Ok(())
             }
         },
     }
+}
+
+/// 还没有任何包索引时的提示。
+fn no_taps_hint() -> &'static str {
+    t(
+        "No package index (tap) yet. Add one with `gqy pm tap add owner/repo`, or install directly by owner/repo, a GitHub URL or a local directory.",
+        "还没有添加包索引（tap）。用 `gqy pm tap add owner/repo` 添加，或者直接按 owner/repo、GitHub 地址、本地目录安装。",
+    )
 }

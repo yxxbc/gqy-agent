@@ -298,16 +298,21 @@ fn tarballs_that_escape_the_package_are_rejected() {
     assert!(error.to_string().contains("escapes"), "{error:#}");
 }
 
+/// 没有内置索引；以前存进 taps.json 的那个不存在的「官方」索引读出来时被滤掉。
 #[test]
-fn taps_always_include_the_official_one() {
+fn taps_start_empty_and_drop_the_dead_default() {
     let temp = tempfile::tempdir().unwrap();
     let root = temp.path().join(".gqy");
     let paths = test_paths(&root);
     fs::create_dir_all(&root).unwrap();
-    assert_eq!(load_taps(&paths).unwrap(), vec![OFFICIAL_TAP.to_string()]);
-    save_taps(&paths, &["me/tap".to_string()]).unwrap();
-    assert_eq!(
-        load_taps(&paths).unwrap(),
-        vec![OFFICIAL_TAP.to_string(), "me/tap".to_string()]
-    );
+    assert!(load_taps(&paths).unwrap().is_empty());
+    save_taps(
+        &paths,
+        &[
+            "SHORiN-KiWATA/gqy-packages".to_string(),
+            "me/tap".to_string(),
+        ],
+    )
+    .unwrap();
+    assert_eq!(load_taps(&paths).unwrap(), vec!["me/tap".to_string()]);
 }

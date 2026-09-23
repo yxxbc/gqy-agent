@@ -23,7 +23,9 @@ use std::os::unix::fs::PermissionsExt;
 use std::path::{Component, Path, PathBuf};
 
 pub const MANIFEST_FILE: &str = "gqy-package.toml";
-pub const OFFICIAL_TAP: &str = "SHORiN-KiWATA/gqy-packages";
+/// 曾经内置、实际并不存在的索引仓库（改名时从 `miyu-packages` 顺手替换出来的，
+/// 09-24 查实 GitHub 上没有）。读取时滤掉，已经存进 `taps.json` 的也一并清理。
+const DEAD_TAPS: &[&str] = &["SHORiN-KiWATA/gqy-packages"];
 const LOCK_FILE: &str = "lock.json";
 const TAPS_FILE: &str = "taps.json";
 const INDEX_FILE: &str = "index.json";
@@ -243,9 +245,8 @@ pub fn load_taps(paths: &GqyPaths) -> Result<Vec<String>> {
         Err(error) if error.kind() == std::io::ErrorKind::NotFound => Vec::new(),
         Err(error) => return Err(error).with_context(|| format!("reading {}", path.display())),
     };
-    if !taps.iter().any(|tap| tap == OFFICIAL_TAP) {
-        taps.insert(0, OFFICIAL_TAP.to_string());
-    }
+    // 不再内置默认索引：用户自己 `gqy pm tap add` 才有。
+    taps.retain(|tap| !DEAD_TAPS.contains(&tap.as_str()));
     Ok(taps)
 }
 
@@ -406,10 +407,16 @@ pub async fn fetch_tap_index(tap: &str) -> Result<TapIndex> {
     serde_json::from_str(&raw).with_context(|| format!("parsing {INDEX_FILE} of tap {tap}"))
 }
 
-/// 在所有 tap 里找一个包名;先命中的 tap 赢(官方 tap 排最前)。
+/// 在所有 tap 里找一个包名;先命中的 tap 赢(按添加顺序)。
 pub async fn resolve_from_taps(paths: &GqyPaths, name: &str) -> Result<PackageSource> {
     validate_package_name(name)?;
     let taps = load_taps(paths)?;
+    if taps.is_empty() {
+        bail!(
+            "no package index (tap) is configured, so {name:?} cannot be looked up by name. \
+             Install by owner/repo, a GitHub URL or a local directory, or add an index with `gqy pm tap add owner/repo`"
+        );
+    }
     let mut errors = Vec::new();
     for tap in &taps {
         match fetch_tap_index(tap).await {
