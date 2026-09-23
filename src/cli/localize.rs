@@ -9,7 +9,7 @@ use crate::cli::*;
 pub(in crate::cli) fn localized_command() -> clap::Command {
     let mut command = Cli::command();
     command = command
-        .about(t("GQY AI assistant", "顾清影 AI 助手"))
+        .about(t("Selene, the GQY AI assistant", "顾清影 AI 助手"))
         .override_usage(t(
             "gqy [OPTIONS] [MESSAGE]... [COMMAND]",
             "gqy [选项] [消息]... [命令]",

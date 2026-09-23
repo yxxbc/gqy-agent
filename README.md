@@ -2,11 +2,11 @@
 
 <img src="pics/gqy-logo.png" alt="GQY Logo" width="160" />
 
-# GQY (顾清影)
+# GQY · 顾清影 Selene
 
 **住在终端里的二次元 AI 伴侣：聊天陪伴、生活助手、写代码搭档，一个就够**
 
-*A terminal-first anime AI companion for Linux and macOS.*
+*Selene, a terminal-first anime AI companion for Linux and macOS.*
 
 <p align="center">
   <a href="https://github.com/yxxbc/gqy-agent/releases/latest"><img src="https://img.shields.io/badge/version-0.6.0-blue.svg?style=flat" alt="Version"></a>
@@ -24,7 +24,7 @@
 
 顾清影是一个常驻在你电脑里的 AI 角色。平时陪你聊天、记得你说过的事、帮你查天气汇率、定闹钟、记账；要写代码或排查问题时，切到开发模式，她就变成一个安静高效的编程助手。
 
-> 「顾清影」最初是作者高中时期由 `Gemini-2.5-pro` 生成的虚构角色，现在她有了自己的家。
+> 「顾清影」最初是作者高中时期由 `Gemini-2.5-pro` 生成的虚构角色，现在她有了自己的家。英文名 Selene，取「起舞弄清影」月下清影的意象。
 
 > [!NOTE]
 > 这是一个业余维护的个人项目。遇到问题欢迎提 [issue](https://github.com/yxxbc/gqy-agent/issues)，我会尽力回复，但不保证时效。提问前先看看 [常见问题](docs/wiki/17-常见问题.md)，很多情况那里已经有答案。
@@ -101,7 +101,7 @@ gqy
 
 1. **选人格**：用内置的顾清影，或者自己捏一个。
 2. **选功能**：勾选想要的插件（图库、地图、快递、记账……）。
-3. **认识你**：告诉她怎么称呼你、你是做什么的。
+3. **认识你**：告诉她怎么称呼你、你是做什么的、你们是什么关系。她对你的称呼和相处方式都按这里写的来，之后在设置的「用户身份」里随时能改。
 4. **终端集成**：可选，让你在 shell 里也能直接问她。
 5. **接模型**：
    - 可以借用已有的 Claude Code / Codex / Antigravity 订阅。

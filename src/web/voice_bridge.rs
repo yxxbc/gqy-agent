@@ -312,7 +312,7 @@ fn handle_worker_event(state: &DaemonState, kind: &str, data: Value) {
                 // 「收到」会替换掉这条(notify-send -r),不会连弹两条。
                 notify(
                     state,
-                    t("GQY is listening", "顾清影 在听"),
+                    t("Selene is listening", "顾清影 在听"),
                     t("speak now", "请讲"),
                 );
             } else {
@@ -324,7 +324,7 @@ fn handle_worker_event(state: &DaemonState, kind: &str, data: Value) {
                     if WAKE_NOTICE_GEN.load(Ordering::Relaxed) == generation {
                         notify(
                             &state,
-                            t("GQY is listening", "顾清影 在听"),
+                            t("Selene is listening", "顾清影 在听"),
                             t("speak now", "请讲"),
                         );
                     }
@@ -345,7 +345,7 @@ fn handle_worker_event(state: &DaemonState, kind: &str, data: Value) {
             }
             WAKE_NOTICE_GEN.fetch_add(1, Ordering::Relaxed);
             cancel_active_run(state);
-            notify(state, t("GQY heard", "顾清影 收到"), &clip(&text, 80));
+            notify(state, t("Selene heard", "顾清影 收到"), &clip(&text, 80));
             let state = state.clone();
             tokio::spawn(async move {
                 if let Err(error) = run_voice_turn(&state, text).await {

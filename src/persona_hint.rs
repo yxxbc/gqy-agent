@@ -462,7 +462,7 @@ mod tests {
     }
 
     /// 内置对话示范可完整解析:条数不写死(内容会被编辑),只保证全部成对
-    /// 非空。顾清影作为默认人格时没有预设对话(09-14),内置文件为空也要成立。
+    /// 非空。09-14 起内置文件曾为空,09-24 公开版人格补了示例对;为空也要成立。
     #[test]
     fn embedded_gqy_dialogs_parse_into_pairs() {
         let raw = crate::prompts::default_gqy_dialogs();

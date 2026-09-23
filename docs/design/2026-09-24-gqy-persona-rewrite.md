@@ -1,6 +1,15 @@
-# 顾清影人格提示词改写草稿（2026-09-24，待用户审阅）
+# 顾清影人格提示词改写（2026-09-24，已实施）
 
-施工前的方案稿，**真文件一个字没动**。用户审过本稿再改 `src/prompts/gqy.md` 等，并用 `testkit/persona-ab/` 做改前改后对比（AGENTS §1.5：人格文本是实测敏感区）。
+09-24 用户看过草稿后说「动手吧」，按本稿实施，偏差如下：
+
+- 第五节「回复前自检、不编造」落为 `config/persona_paths.rs` 的 `HONESTY_RULES`，只注入对话类受众（Owner / External），辅助请求（Internal）不带。
+- 第五节「删除走回收站」落为 `run_command` 描述末尾一句英文引导（`trash_path` 工具早已存在，命令黑名单也已覆盖高危命令），没有新增硬拦截。
+- 第五节生图上限：`ImageGenLimit` 加失败计数，所有 daemon 回合都挂计数器（原来只有平台回合），一轮失败满 5 次拒绝重试。直连 REPL（`GQY_DIRECT`）不经 daemon，不挂计数器。
+- 第七节英文显示名只改了 5 处字符串（在听 ×2、收到、在等你回答、回复完成）与 `--help` 的介绍语；`GQY voice` 是语音功能的通知标题，指功能不指她，保留。按当前人格名动态显示的 `persona_display_name` 没做，留作后续。
+- 作者私有版已写入本机 `~/.gqy/data/prompts/system-prompt.md`（原文 + Selene 一句）与 `hints/default.md`（原 hint 逐字），写入前两处均不存在。作用域只由 `active_persona` 决定（`persona_scope_name`），仍是 `default`。
+- 按用户要求不在本地跑测试，由云端 CI 验证；`testkit/persona-ab/` 的前后对比未做，留给用户实际使用时感受。
+
+以下是原草稿。
 
 ---
 
