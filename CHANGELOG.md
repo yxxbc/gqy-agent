@@ -24,6 +24,7 @@
 - Antigravity 预热进程的保留时长可配置：设置里「Antigravity 中转 → 预热进程保留时长」（`plugins.antigravity.warm_idle_seconds`），设成 0 完全关闭预热
 - TUI：输入框为空时显示淡色提示，文案与 WebUI 人格看板的输入框提示同源（默认「给 <人格名> 发消息」），开发模式不显示
 - TUI 底栏的上下文占用改成占用条 `47k/168k ▰▱▱▱▱ 28%`，占用低于 60% 绿色、低于 85% 黄色、更高红色。终端窄时先退成纯百分比
+- 内置知识库新增《顾清影使用手册》10 篇：安装升级卸载、第一次使用、换模型、语音、QQ 与 iMessage 接入、记忆、会话、浏览器与 shell、备份换电脑、常见问题。问她关于她自己的事时，她会先查这里再回答
 - 新配置项 `display.theme`（`auto` / `dark` / `light`，默认 `auto`）：终端底色深浅。自动模式下交互 REPL 启动时向终端查询一次底色。环境变量 `GQY_THEME` 可临时覆盖。WebUI 设置页和 `/config` 都能改
 - 顾清影有了英文名 Selene（取「起舞弄清影」月下清影的意象）。英文界面里指她本人的提示改用 Selene，例如 `Selene is listening`、`Selene finished replying`
 - 内置人格补了 4 段示例对话（日常、排障、被纠正、问模型），语气更稳定
