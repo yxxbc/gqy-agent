@@ -68,6 +68,7 @@ curl -fsSL https://raw.githubusercontent.com/yxxbc/gqy-agent/gqy/install.sh | sh
 ```
 
 - 装到 `~/.local`，不需要 root。字体、本地向量模型、默认知识库都一起装好。
+- 安装时顶部是 GQY 字符 logo，底部是进度条（百分比、大小、速度）。想先看看安装界面、不真的安装：`curl -fsSL https://raw.githubusercontent.com/yxxbc/gqy-agent/gqy/install.sh | sh -s -- --preview`
 - 装完如果提示 `~/.local/bin` 不在 `PATH` 里，把 `export PATH="$HOME/.local/bin:$PATH"` 加到 `~/.zshrc` 或 `~/.bashrc`，然后重新打开终端。
 
 <details>
