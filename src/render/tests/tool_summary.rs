@@ -795,7 +795,7 @@ fn summary_styles_distinguish_reasoning_from_tools() {
     );
     assert_eq!(
         style_summary_text("思考", SummaryStyle::Reasoning),
-        "\x1b[38;5;10m思考\x1b[0m"
+        format!("{}思考\x1b[0m", crate::render::style::THINKING_STYLE)
     );
 }
 

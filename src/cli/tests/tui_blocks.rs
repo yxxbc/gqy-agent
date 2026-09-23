@@ -541,7 +541,8 @@ fn job_panel_starts_with_the_prompt_it_was_given() {
     });
 }
 
-/// 想的那一步：**行**是暗的，**展开的正文**才是绿的。
+/// 想的那一步：**行**是普通暗色，**展开的正文**才是思考样式（dim + 斜体，
+/// 原先是亮绿）。
 ///
 /// 反过来（抬头绿、正文白）是用户实测到的那一版：「浮层里思考行和思考展开
 /// 内容的颜色反了」。主线那边一直是正文绿，两处得一个规矩。
@@ -564,13 +565,14 @@ fn job_panel_paints_thinking_body_green_not_its_handle() {
             .position(|row| row.contains("先看一眼再说"))
             .expect("没有思考那一步");
         let head = &screen.overlay_rows_ansi()[row];
-        assert!(!head.contains("38;5;10"), "思考那一行还是绿的: {head:?}");
+        let thinking = crate::render::style::THINKING_STYLE;
+        assert!(!head.contains(thinking), "思考那一行用了正文样式: {head:?}");
         assert!(screen.overlay_toggle(row), "思考那一步点不开");
         let opened = screen.overlay_rows_ansi();
         assert!(
-            opened.iter().any(|line| line.contains("38;5;10")
+            opened.iter().any(|line| line.contains(thinking)
                 && crate::render::strip_ansi_text(line).contains("先看一眼再说")),
-            "展开的思考正文不是绿的: {opened:?}"
+            "展开的思考正文不是思考样式: {opened:?}"
         );
         let _ = std::fs::remove_dir_all(&dir);
     });

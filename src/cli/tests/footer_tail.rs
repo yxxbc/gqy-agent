@@ -203,7 +203,7 @@ fn an_idle_tick_only_redraws_when_the_cumulative_actually_moved() {
     }));
 }
 
-/// footer 宽度不够时最先丢输出速度,再丢 Σ、再丢百分比。
+/// footer 宽度不够时先把占用条退成纯百分比,再丢输出速度、Σ、百分比。
 #[test]
 fn the_footer_drops_the_output_speed_before_the_cumulative_total() {
     let config = AppConfig::default();
@@ -229,8 +229,14 @@ fn the_footer_drops_the_output_speed_before_the_cumulative_total() {
 
     let wide = strip_terminal_control_sequences(&repl_footer_line(AgentMode::Normal, &footer, 100));
     assert!(
-        wide.contains("361 tok/s · 21.7k/1M(2.2%) · Σ180.1k(C24%)"),
+        wide.contains("361 tok/s · 21.7k/1M ▱▱▱▱▱ 2% · Σ180.1k(C24%)"),
         "{wide}"
+    );
+    let gauge_dropped =
+        strip_terminal_control_sequences(&repl_footer_line(AgentMode::Normal, &footer, 68));
+    assert!(
+        gauge_dropped.contains("361 tok/s · 21.7k/1M 2% · Σ180.1k(C24%)"),
+        "{gauge_dropped}"
     );
     let narrow =
         strip_terminal_control_sequences(&repl_footer_line(AgentMode::Normal, &footer, 64));
@@ -261,7 +267,7 @@ fn the_footer_leaves_the_per_turn_figure_to_the_token_line() {
     let line = strip_terminal_control_sequences(&repl_footer_line(AgentMode::Normal, &footer, 80));
     // Two standing gauges only. Carrying the turn figure as well cost 14
     // columns and pushed the whole footer past 80.
-    assert!(line.contains("21.7k/1M(2.2%)"), "{line}");
+    assert!(line.contains("21.7k/1M ▱▱▱▱▱ 2%"), "{line}");
     assert!(line.contains("Σ180.1k(C24%)"), "{line}");
     assert!(!line.contains("21.2k"), "{line}");
     assert!(!line.contains("C40%"), "{line}");
