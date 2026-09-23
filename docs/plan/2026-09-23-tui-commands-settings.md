@@ -13,6 +13,7 @@
 - inline：`cli/repl/input.rs::render_repl_input_with_footer` 在 footer 位置挤一行命令名（`repl_command_suggestions_line`）。
 - 按键：`cli/repl/editor.rs`（live 编辑器，全屏与 inline 共用）的 `KeyCode::Up/Down` 固定翻输入历史；`KeyCode::Tab` 只在候选唯一时补全（`complete_repl_command`）。直连模式另有一套旧循环 `input.rs::read_repl_input`，按键处理是复制的一份。
 - **根因**：候选只是渲染产物，编辑器里没有「选中第几条」的状态，方向键无处可去。
+- 这条交互 09-10 就已定稿（`docs/plan/2026-09-10-tui-rewrite.md` §4：「输入 `/`：命令列表锚在输入框上方，↑↓ 选、Tab 补全、Enter 执行、Esc 清空」），是施工时漏掉的，不是新需求。注意定稿写的是 Enter **执行**，与下面方案第 2 条的「只填入不执行」不同，开工前与用户确认。
 
 ### 方案
 
