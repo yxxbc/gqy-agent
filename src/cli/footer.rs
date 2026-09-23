@@ -222,21 +222,22 @@ pub(in crate::cli) fn repl_footer_line(
         turn_tokens: 0,
         ..footer.token_usage
     };
-    // Narrow terminals: drop the output speed first, then the cumulative
-    // total, then the percent, so the core context meter survives as long
-    // as possible.
+    // Narrow terminals: the gauge shrinks to a bare percent first, then drop
+    // the output speed, then the cumulative total, then the percent, so the
+    // core context meter survives as long as possible.
     let mut right_plain = String::new();
-    for (with_speed, with_cumulative, with_percent) in [
-        (true, true, true),
-        (false, true, true),
-        (false, false, true),
-        (false, false, false),
+    for (with_speed, with_cumulative, percent) in [
+        (true, true, Some(context_gauge as fn(f64) -> String)),
+        (true, true, Some(context_percent as fn(f64) -> String)),
+        (false, true, Some(context_percent as fn(f64) -> String)),
+        (false, false, Some(context_percent as fn(f64) -> String)),
+        (false, false, None),
     ] {
         let meter = render::TokenMeter {
             cumulative_tokens: usage.cumulative_tokens.filter(|_| with_cumulative),
             ..usage
         };
-        right_plain = render::format_token_usage_inline_opts(&meter, with_percent, with_speed);
+        right_plain = render::format_token_usage_inline_with(&meter, percent, with_speed);
         let left_room = cols
             .saturating_sub(bar_width)
             .saturating_sub(visible_width(&right_plain));
@@ -256,6 +257,34 @@ pub(in crate::cli) fn repl_footer_line(
         )
         .max(1);
     format!("{bar}{left}{}{right}", " ".repeat(gap))
+}
+
+/// 上下文占用条的格数。
+const GAUGE_CELLS: usize = 5;
+
+/// ` ▰▰▱▱▱ 28%`：占用条按阈值上色，整段其余部分保持底栏的 dim。
+fn context_gauge(ratio: f64) -> String {
+    use crate::render::style::{DANGER, SUCCESS, WARNING};
+    let filled = ((ratio * GAUGE_CELLS as f64).round() as usize).min(GAUGE_CELLS);
+    let color = if ratio < 0.60 {
+        SUCCESS
+    } else if ratio < 0.85 {
+        WARNING
+    } else {
+        DANGER
+    };
+    // 条本身不 dim，否则阈值色在暗底上分不出来。画完回到 dim 接后面的文字。
+    format!(
+        " \x1b[22m{color}{}{}\x1b[0m\x1b[2m{}",
+        "▰".repeat(filled),
+        "▱".repeat(GAUGE_CELLS - filled),
+        context_percent(ratio),
+    )
+}
+
+/// 占用条放不下时退成的纯百分比：` 28%`。
+fn context_percent(ratio: f64) -> String {
+    format!(" {:.0}%", ratio * 100.0)
 }
 
 pub(in crate::cli) fn repl_footer_left(
@@ -341,6 +370,7 @@ pub(in crate::cli) fn repl_footer_left_parts(
 /// 是写死的 `#a39ec4`,不随壁纸换色(09-05 用户实录:波峰颜色对不上)。
 /// 普通模式:峰=primary(34 加粗)、中=secondary(96)、谷=secondary_fixed_dim
 /// (36 加 dim);dev 模式整条走 tertiary(35)的加粗/正常/dim 三档。
+/// 这三档是对着用户壁纸配色调出来的,故意直接写色号、不走 `render::style`。
 /// 每帧相位步进 0.24 rad,配合 80ms 的 footer tick 约每秒 3 rad,与演示稿
 /// 的流速一致。
 pub(in crate::cli) fn sound_wave_frame(frame: usize, dev: bool) -> String {
@@ -374,12 +404,12 @@ pub(in crate::cli) fn colored_footer_mode_label(mode: AgentMode) -> String {
         AgentMode::Normal => primary_footer_text(label),
         // tertiary(35 酒红,与 render/webui 的 tertiary 一致),区别于普通
         // 模式的 primary 蓝。
-        AgentMode::Dev => format!("\x1b[1m\x1b[35m{label}\x1b[0m"),
+        AgentMode::Dev => format!("\x1b[1m{}{label}\x1b[0m", crate::render::style::ACCENT_DEV),
     }
 }
 
 pub(in crate::cli) fn primary_footer_text(text: &str) -> String {
-    format!("\x1b[1m\x1b[34m{text}\x1b[0m")
+    format!("\x1b[1m{}{text}\x1b[0m", crate::render::style::ACCENT)
 }
 
 pub(in crate::cli) fn turn_meter(

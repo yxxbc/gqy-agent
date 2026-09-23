@@ -121,11 +121,9 @@ pub(in crate::cli) fn submitted_echo_lines(
 }
 
 pub(in crate::cli) fn submitted_echo_bar(mode: AgentMode) -> String {
-    match mode {
-        AgentMode::Normal => "\x1b[1m\x1b[34m┃\x1b[0m".to_string(),
-        // 与 footer 模式标签同为 tertiary(35 酒红),整条 dev 视觉一致。
-        AgentMode::Dev => "\x1b[1m\x1b[35m┃\x1b[0m".to_string(),
-    }
+    // 与 footer 模式标签同色:普通主色 / dev 酒红,整条视觉一致。
+    let accent = crate::render::style::mode_accent(mode == AgentMode::Dev);
+    format!("\x1b[1m{accent}┃\x1b[0m")
 }
 
 pub(in crate::cli) fn input_prompt_bar(mode: AgentMode) -> String {

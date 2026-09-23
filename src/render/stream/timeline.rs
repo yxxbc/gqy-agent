@@ -30,6 +30,7 @@
 
 use super::StreamRenderer;
 use crate::render::blocks;
+use crate::render::style::{DANGER, FAINT, THINKING_STYLE};
 use crate::render::t;
 use std::time::{Duration, Instant};
 
@@ -332,7 +333,7 @@ fn flush_subagent_thought(log: &mut SubagentLog) {
     }
     let body = wrap_detail(&text)
         .into_iter()
-        .map(|line| format!("\x1b[2m\x1b[38;5;10m{line}\x1b[0m"))
+        .map(|line| format!("{THINKING_STYLE}{line}\x1b[0m"))
         .collect::<Vec<_>>();
     log.segment.thoughts += 1;
     log.segment.note_start_since(elapsed);
@@ -633,16 +634,17 @@ fn subagent_lines(log: &mut SubagentLog) -> Vec<String> {
                 peek_tail(&log.reasoning, panel_step_width())
             ),
         );
-        let detail =
-            {
-                let indent = indent();
-                let mut lines = vec![line.clone(), String::new()];
-                lines.extend(wrap_detail(&log.reasoning).into_iter().map(|piece| {
-                    format!("\x1b[2m\x1b[38;5;10m{indent}{DETAIL_INDENT}{piece}\x1b[0m")
-                }));
-                lines.push(String::new());
-                lines
-            };
+        let detail = {
+            let indent = indent();
+            let mut lines = vec![line.clone(), String::new()];
+            lines.extend(
+                wrap_detail(&log.reasoning)
+                    .into_iter()
+                    .map(|piece| format!("{THINKING_STYLE}{indent}{DETAIL_INDENT}{piece}\x1b[0m")),
+            );
+            lines.push(String::new());
+            lines
+        };
         let id = match log.live_block {
             Some(id) => {
                 blocks::update(id, String::new(), detail);
@@ -1031,7 +1033,7 @@ fn step_line_failed(glyph: &str, text: &str) -> String {
 
 fn step_line_failed_in(glyph: &str, text: &str, width: usize) -> String {
     let text = crate::render::clip_to_display_width(text, width);
-    format!("\x1b[31m{}{glyph} {text}\x1b[0m", indent())
+    format!("{DANGER}{}{glyph} {text}\x1b[0m", indent())
 }
 
 /// 一步：`  <glyph> <text>`。glyph 占的就是竖线那一列。
@@ -1352,7 +1354,7 @@ impl StreamRenderer {
         } else {
             wrap_detail(&self.reasoning_text)
                 .into_iter()
-                .map(|line| format!("\x1b[2m\x1b[38;5;10m{line}\x1b[0m"))
+                .map(|line| format!("{THINKING_STYLE}{line}\x1b[0m"))
                 .collect::<Vec<_>>()
         };
         self.timeline.thoughts += 1;
@@ -1525,9 +1527,9 @@ impl StreamRenderer {
             // `step_detail` 统一加，而这儿是直接当块内容用的，得自己加。
             // 不加的话点开之后正文贴着第 0 列，比它的抬头还靠左。
             lines.extend(
-                wrap_detail(&self.reasoning_text).into_iter().map(|line| {
-                    format!("\x1b[2m\x1b[38;5;10m{indent}{DETAIL_INDENT}{line}\x1b[0m")
-                }),
+                wrap_detail(&self.reasoning_text)
+                    .into_iter()
+                    .map(|line| format!("{THINKING_STYLE}{indent}{DETAIL_INDENT}{line}\x1b[0m")),
             );
             lines.push(String::new());
             return lines;
@@ -1873,14 +1875,14 @@ impl StreamRenderer {
         };
         self.stop_waiting()?;
         let indent = indent();
-        let bar = "\x1b[2m\x1b[90m┃\x1b[0m";
+        let bar = format!("\x1b[2m{FAINT}┃\x1b[0m");
         let width = crate::render::command_terminal_width()
             .saturating_sub(indent.len() + 3)
             .max(20);
         let stdout = &mut self.output;
         writeln!(
             stdout,
-            "{indent}{bar} \x1b[2m\x1b[90m{} {} {}\x1b[0m",
+            "{indent}{bar} \x1b[2m{FAINT}{} {} {}\x1b[0m",
             t("Answered", "已回答"),
             request.questions.len(),
             t("questions", "个问题")
@@ -1893,7 +1895,7 @@ impl StreamRenderer {
             );
             writeln!(
                 stdout,
-                "{indent}{bar} \x1b[2m\x1b[90m{}\x1b[0m",
+                "{indent}{bar} \x1b[2m{FAINT}{}\x1b[0m",
                 crate::render::clip_to_display_width(&line, width)
             )?;
         }

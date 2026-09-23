@@ -9,6 +9,7 @@ use crate::cli::repl::input::*;
 use crate::cli::repl::remote::*;
 use crate::cli::repl::tail::*;
 use crate::cli::*;
+use crate::render::style::DANGER;
 
 pub(in crate::cli) async fn run_chat_with_images(
     paths: &GqyPaths,
@@ -534,7 +535,7 @@ pub(in crate::cli) async fn run_direct_repl(
                     println!("{}", t("configuration reloaded", "配置已重新加载"));
                 }
                 Ok(false) => {}
-                Err(error) => println!("\x1b[31m{error:#}\x1b[0m"),
+                Err(error) => println!("{DANGER}{error:#}\x1b[0m"),
             }
             println!();
             continue;
@@ -622,7 +623,7 @@ pub(in crate::cli) async fn run_direct_repl(
                 }
                 VariantOutcome::Cancelled => {}
                 VariantOutcome::Rejected(message) => {
-                    eprintln!("\x1b[31m{message}\x1b[0m");
+                    eprintln!("{DANGER}{message}\x1b[0m");
                 }
             }
             continue;
@@ -650,7 +651,7 @@ pub(in crate::cli) async fn run_direct_repl(
             let count = match parse_repl_pop_count(command_args) {
                 Ok(count) => count,
                 Err(err) => {
-                    eprintln!("\x1b[31m{}: {err}\x1b[0m", t("error", "错误"));
+                    eprintln!("{DANGER}{}: {err}\x1b[0m", t("error", "错误"));
                     continue;
                 }
             };
@@ -662,7 +663,7 @@ pub(in crate::cli) async fn run_direct_repl(
                 }
                 Ok(None) => {}
                 Err(err) => {
-                    eprintln!("\x1b[31m{}: {err}\x1b[0m", t("error", "错误"));
+                    eprintln!("{DANGER}{}: {err}\x1b[0m", t("error", "错误"));
                 }
             }
             continue;
@@ -714,7 +715,7 @@ pub(in crate::cli) async fn run_direct_repl(
                 }
                 Err(err) => {
                     renderer.finish()?;
-                    eprintln!("\x1b[31m{}: {err}\x1b[0m", t("error", "错误"));
+                    eprintln!("{DANGER}{}: {err}\x1b[0m", t("error", "错误"));
                 }
             }
             continue;
@@ -891,7 +892,7 @@ pub(in crate::cli) async fn run_direct_repl(
                         footer.update_session_tokens(agent.effective_context_tokens()?);
                     }
                     Err(err) => {
-                        let frame = format!("\x1b[31m{}: {err}\x1b[0m\n", t("error", "错误"));
+                        let frame = format!("{DANGER}{}: {err}\x1b[0m\n", t("error", "错误"));
                         live.apply_output_frame(frame.as_bytes())?;
                         continue;
                     }
@@ -932,7 +933,7 @@ pub(in crate::cli) async fn run_direct_repl(
             }
             Err(err) => {
                 if let Some(live) = live_repl.as_mut() {
-                    let frame = format!("\x1b[31m{}: {err}\x1b[0m\n", t("error", "错误"));
+                    let frame = format!("{DANGER}{}: {err}\x1b[0m\n", t("error", "错误"));
                     live.apply_output_frame(frame.as_bytes())?;
                     synchronized_terminal_update(CursorAfterUpdate::Shown, || {
                         live.reload_queue(&state)

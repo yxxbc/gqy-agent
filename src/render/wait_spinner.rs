@@ -1,4 +1,5 @@
 use super::clip_to_display_width;
+use crate::render::style::{ACCENT, INFO};
 use anyhow::Result;
 use crossterm::cursor::{MoveDown, MoveToColumn, MoveUp};
 use crossterm::execute;
@@ -209,16 +210,16 @@ fn render_cell(char_index: usize, state: ScannerState) -> String {
 fn paint_active_dot(index: usize) -> String {
     let dot = ACTIVE_DOTS[index.min(ACTIVE_DOTS.len() - 1)];
     match index {
-        0 => format!("\x1b[38;5;10m{dot}\x1b[0m"),
-        1 => format!("\x1b[38;5;10m{dot}\x1b[0m"),
-        2 => format!("\x1b[2m\x1b[38;5;10m{dot}\x1b[0m"),
-        3 => format!("\x1b[2m\x1b[38;5;10m{dot}\x1b[0m"),
-        _ => format!("\x1b[2m\x1b[38;5;10m{dot}\x1b[0m"),
+        0 => format!("{ACCENT}{dot}\x1b[0m"),
+        1 => format!("{ACCENT}{dot}\x1b[0m"),
+        2 => format!("\x1b[2m{ACCENT}{dot}\x1b[0m"),
+        3 => format!("\x1b[2m{ACCENT}{dot}\x1b[0m"),
+        _ => format!("\x1b[2m{ACCENT}{dot}\x1b[0m"),
     }
 }
 
 fn paint_inactive_dot() -> String {
-    format!("\x1b[2m\x1b[38;5;10m{INACTIVE_DOT}\x1b[0m")
+    format!("\x1b[2m{ACCENT}{INACTIVE_DOT}\x1b[0m")
 }
 
 fn total_frames_scanner() -> usize {
@@ -315,12 +316,12 @@ fn fade_factor(state: ScannerState) -> f64 {
 }
 
 fn paint_secondary(text: &str) -> String {
-    format!("\x1b[2m\x1b[36m{text}\x1b[0m")
+    format!("\x1b[2m{INFO}{text}\x1b[0m")
 }
 
 fn paint_for_style(text: &str, style: SpinnerStyle) -> String {
     match style {
-        SpinnerStyle::Scanner => format!("\x1b[38;5;10m{text}\x1b[0m"),
+        SpinnerStyle::Scanner => format!("{ACCENT}{text}\x1b[0m"),
         SpinnerStyle::Braille => paint_secondary(text),
     }
 }
@@ -406,7 +407,7 @@ mod tests {
         let (frame, lines) = render_frame(0, &spinner);
 
         assert!(frame.contains("思考"));
-        assert!(frame.contains("\x1b[38;5;10m"));
+        assert!(frame.contains(&*crate::render::style::ACCENT));
         assert!(!frame.contains("\x1b[36m思考"));
         assert!(!frame.contains('('));
         assert_eq!(lines, 1);

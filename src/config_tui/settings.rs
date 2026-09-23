@@ -194,6 +194,17 @@ pub(in crate::config_tui) fn edit_settings(
                     value.trim().parse::<usize>()?.min(MAX_REPL_REPLAY_TURNS);
                 Ok(())
             },
+        )
+        .with(
+            Field::new(
+                t("Terminal background", "终端底色"),
+                config.display.theme.clone(),
+            )
+            .choices(&["auto", "dark", "light"]),
+            |config, value| {
+                config.display.theme = value.trim().to_string();
+                Ok(())
+            },
         );
     run_form_without_buttons(
         stdout,

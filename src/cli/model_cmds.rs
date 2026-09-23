@@ -7,6 +7,7 @@
 
 use crate::cli::repl::width::*;
 use crate::cli::*;
+use crate::render::style::{SUCCESS, TERTIARY_STYLE};
 
 pub(in crate::cli) fn short_model_name(model: &str, provider: &str) -> String {
     model
@@ -987,7 +988,7 @@ pub(in crate::cli) fn variant_menu_column_widths(
 pub(in crate::cli) fn variant_menu_header(label: &str, active: bool, width: usize) -> String {
     let label = pad_visible_width(&truncate_visible_width(label, width), width);
     if active {
-        format!("\x1b[1m\x1b[35m{label}\x1b[0m")
+        format!("\x1b[1m{TERTIARY_STYLE}{label}\x1b[0m")
     } else {
         format!("\x1b[1m{label}\x1b[0m")
     }
@@ -1011,9 +1012,9 @@ pub(in crate::cli) fn variant_menu_cell(
         width,
     );
     if focused {
-        format!("\x1b[1m\x1b[35m{line}\x1b[0m")
+        format!("\x1b[1m{TERTIARY_STYLE}{line}\x1b[0m")
     } else if checked == Some(true) {
-        format!("\x1b[1m\x1b[32m{line}\x1b[0m")
+        format!("\x1b[1m{SUCCESS}{line}\x1b[0m")
     } else if highlighted {
         format!("\x1b[1m{line}\x1b[0m")
     } else {

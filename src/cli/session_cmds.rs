@@ -15,6 +15,7 @@ use crate::cli::turn_request::{
 use crate::i18n::text as t;
 use crate::ipc::{Command as IpcCommand, SessionRef, SessionState};
 use crate::paths::GqyPaths;
+use crate::render::style::FAINT;
 use crate::state::StateStore;
 use anyhow::Result;
 use serde_json::{json, Value};
@@ -379,7 +380,7 @@ pub(in crate::cli) async fn compact_session(
                 }
                 let mut out = io::stdout().lock();
                 if dim {
-                    write!(out, "\x1b[90m{delta}\x1b[0m")?;
+                    write!(out, "{FAINT}{delta}\x1b[0m")?;
                 } else {
                     write!(out, "{delta}")?;
                 }

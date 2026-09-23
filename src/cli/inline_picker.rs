@@ -5,6 +5,7 @@
 //! 退出时也能把终端还回去。
 
 use crate::cli::*;
+use crate::render::style::{DANGER, SUCCESS, TERTIARY_STYLE};
 
 pub(in crate::cli) fn fuzzy_matches(
     matcher: &SkimMatcherV2,
@@ -128,11 +129,11 @@ pub(in crate::cli) fn inline_fuzzy_item_line(
     let line = truncate_visible_width(&line, width);
     if selected {
         format!(
-            "\x1b[1m\x1b[35m›\x1b[0m\x1b[1m{}\x1b[0m",
+            "\x1b[1m{TERTIARY_STYLE}›\x1b[0m\x1b[1m{}\x1b[0m",
             line.strip_prefix('›').unwrap_or(&line)
         )
     } else if active {
-        format!("\x1b[1m\x1b[32m{}\x1b[0m", line)
+        format!("\x1b[1m{SUCCESS}{}\x1b[0m", line)
     } else {
         format!("\x1b[2m{}\x1b[0m", line)
     }
@@ -255,7 +256,7 @@ pub(in crate::cli) fn inline_single_item_line(item: &str, selected: bool, width:
     let line = truncate_visible_width(&line, width);
     if selected {
         format!(
-            "\x1b[1m\x1b[35m›\x1b[0m\x1b[1m{}\x1b[0m",
+            "\x1b[1m{TERTIARY_STYLE}›\x1b[0m\x1b[1m{}\x1b[0m",
             line.strip_prefix('›').unwrap_or(&line)
         )
     } else {
@@ -270,7 +271,7 @@ pub(in crate::cli) fn inline_single_confirm_header(label: &str, width: usize) ->
         format!("delete \"{label}\"? y/N")
     };
     format!(
-        "\x1b[1m\x1b[31m{}\x1b[0m",
+        "\x1b[1m{DANGER}{}\x1b[0m",
         truncate_visible_width(&line, width)
     )
 }

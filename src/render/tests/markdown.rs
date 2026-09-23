@@ -243,7 +243,7 @@ fn bare_url_keeps_balanced_parens() {
 #[test]
 fn does_not_link_glued_scheme() {
     let output = render_inline("xhttps://example.com");
-    assert!(!output.contains(URL_STYLE), "{output}");
+    assert!(!output.contains(&*URL_STYLE), "{output}");
 }
 
 #[test]
@@ -273,7 +273,7 @@ fn title_url_line_works_inside_list_items() {
 #[test]
 fn title_url_line_ignores_prose_parentheses() {
     let output = render_markdown_line("这句话 (只是个注解)");
-    assert!(!output.contains(LINK_LABEL_STYLE), "{output}");
+    assert!(!output.contains(&*LINK_LABEL_STYLE), "{output}");
 }
 
 #[test]

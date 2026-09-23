@@ -10,6 +10,7 @@ use crate::cli::repl::editor::*;
 use crate::cli::repl::input::*;
 use crate::cli::repl::tail::*;
 use crate::cli::*;
+use crate::render::style::DANGER;
 
 pub(in crate::cli) async fn run_remote_repl(paths: &GqyPaths, mut mode: AgentMode) -> Result<()> {
     let _cursor_restore = ReplCursorRestore;
@@ -225,7 +226,7 @@ pub(in crate::cli) async fn run_remote_repl(paths: &GqyPaths, mut mode: AgentMod
                         repl_note(
                             &mut live_repl,
                             &format!(
-                                "\x1b[31m{}: {error:#}\x1b[0m\n",
+                                "{DANGER}{}: {error:#}\x1b[0m\n",
                                 t("could not switch mode", "切换模式失败")
                             ),
                         )?;
@@ -340,7 +341,7 @@ pub(in crate::cli) async fn run_remote_repl(paths: &GqyPaths, mut mode: AgentMod
                         repl_note(
                             &mut live_repl,
                             &format!(
-                                "\x1b[31m{}\x1b[0m\n",
+                                "{DANGER}{}\x1b[0m\n",
                                 t("created session has no id", "新会话缺少 ID")
                             ),
                         )?;
@@ -574,7 +575,7 @@ pub(in crate::cli) async fn run_remote_repl(paths: &GqyPaths, mut mode: AgentMod
                             repl_note(
                                 &mut live_repl,
                                 &format!(
-                                    "\x1b[31m{}: {arg} ({error})\x1b[0m\n",
+                                    "{DANGER}{}: {arg} ({error})\x1b[0m\n",
                                     t("invalid sandbox path", "无效的沙盒路径")
                                 ),
                             )?;
@@ -662,6 +663,7 @@ pub(in crate::cli) async fn run_remote_repl(paths: &GqyPaths, mut mode: AgentMod
                         let _ =
                             repl_ipc_admin(paths, &mut live_repl, IpcCommand::ReloadConfig).await;
                         config = AppConfig::load(paths)?;
+                        crate::cli::repl::composer_hint::refresh(&config, paths);
                         // 人格是会话的命名空间维度:切人格后 daemon 的当前会话
                         // 指针已经指向新人格的会话,前端必须重取并把
                         // active_session_id / history / footer 一起换过去。
@@ -694,7 +696,7 @@ pub(in crate::cli) async fn run_remote_repl(paths: &GqyPaths, mut mode: AgentMod
                     }
                     Ok(false) => {}
                     Err(error) => {
-                        repl_note(&mut live_repl, &format!("\x1b[31m{error:#}\x1b[0m\n"))?
+                        repl_note(&mut live_repl, &format!("{DANGER}{error:#}\x1b[0m\n"))?
                     }
                 },
                 ReplSlashCommand::Models => {
@@ -716,7 +718,7 @@ pub(in crate::cli) async fn run_remote_repl(paths: &GqyPaths, mut mode: AgentMod
                     let changed = match result {
                         Ok(changed) => changed,
                         Err(error) => {
-                            repl_note(&mut live_repl, &format!("\x1b[31m{error:#}\x1b[0m\n"))?;
+                            repl_note(&mut live_repl, &format!("{DANGER}{error:#}\x1b[0m\n"))?;
                             continue;
                         }
                     };
@@ -770,6 +772,7 @@ pub(in crate::cli) async fn run_remote_repl(paths: &GqyPaths, mut mode: AgentMod
                     };
                     let refreshed = AppConfig::load(paths)?;
                     config = refreshed;
+                    crate::cli::repl::composer_hint::refresh(&config, paths);
                     let (state, changed) =
                         repl_active_or_default_state(paths, &active_session_id).await?;
                     if changed {
@@ -872,7 +875,7 @@ pub(in crate::cli) async fn run_remote_repl(paths: &GqyPaths, mut mode: AgentMod
                         }
                         VariantOutcome::Cancelled => {}
                         VariantOutcome::Rejected(message) => {
-                            repl_note(&mut live_repl, &format!("\x1b[31m{message}\x1b[0m"))?;
+                            repl_note(&mut live_repl, &format!("{DANGER}{message}\x1b[0m"))?;
                         }
                     }
                 }
@@ -915,7 +918,7 @@ pub(in crate::cli) async fn run_remote_repl(paths: &GqyPaths, mut mode: AgentMod
                         Err(err) => {
                             repl_note(
                                 &mut live_repl,
-                                &format!("\x1b[31m{}: {err}\x1b[0m", t("error", "错误")),
+                                &format!("{DANGER}{}: {err}\x1b[0m", t("error", "错误")),
                             )?;
                             continue;
                         }
@@ -1015,7 +1018,7 @@ pub(in crate::cli) async fn run_remote_repl(paths: &GqyPaths, mut mode: AgentMod
                         Err(err) => {
                             repl_note(
                                 &mut live_repl,
-                                &format!("\x1b[31m{}: {err}\x1b[0m\n", t("error", "错误")),
+                                &format!("{DANGER}{}: {err}\x1b[0m\n", t("error", "错误")),
                             )?;
                             continue;
                         }
@@ -1290,7 +1293,7 @@ pub(in crate::cli) async fn run_remote_repl(paths: &GqyPaths, mut mode: AgentMod
                 }
             }
             Err(err) => {
-                let frame = format!("\x1b[31m{}: {err}\x1b[0m\n\n", t("error", "错误"));
+                let frame = format!("{DANGER}{}: {err}\x1b[0m\n\n", t("error", "错误"));
                 live_repl.apply_output_frame(frame.as_bytes())?;
                 if let Ok((state, true)) =
                     repl_active_or_default_state(paths, &active_session_id).await

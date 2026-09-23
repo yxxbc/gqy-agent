@@ -7,6 +7,7 @@
 //! 行内解析（`render_inline`）是手写的扫描而不是通用 Markdown 库：这里只需要
 //! 支持实际会出现的一小撮语法，而且要能在**任意位置被截断**后继续。
 
+use crate::render::style::{INFO, SUCCESS, TERTIARY_STYLE};
 use crate::render::*;
 
 pub fn print_assistant_response(response: &ChatResult, show_reasoning: bool) -> Result<()> {
@@ -213,9 +214,9 @@ impl MarkdownLineRenderer {
             } else {
                 "\\["
             };
-            let mut output = format!("\x1b[36m{opener}\x1b[0m\n");
+            let mut output = format!("{INFO}{opener}\x1b[0m\n");
             for line in std::mem::take(&mut self.math_buffer) {
-                output.push_str(&format!("\x1b[36m{line}\x1b[0m\n"));
+                output.push_str(&format!("{INFO}{line}\x1b[0m\n"));
             }
             return output;
         }
@@ -297,11 +298,11 @@ pub(crate) fn render_display_math(tex: &str, closer: &str) -> String {
     }
     let opener = if closer == "$$" { "$$" } else { "\\[" };
     let closing = if closer == "$$" { "$$" } else { "\\]" };
-    let mut output = format!("\x1b[36m{opener}\x1b[0m\n");
+    let mut output = format!("{INFO}{opener}\x1b[0m\n");
     for line in tex.lines() {
-        output.push_str(&format!("\x1b[36m{line}\x1b[0m\n"));
+        output.push_str(&format!("{INFO}{line}\x1b[0m\n"));
     }
-    output.push_str(&format!("\x1b[36m{closing}\x1b[0m\n"));
+    output.push_str(&format!("{INFO}{closing}\x1b[0m\n"));
     output
 }
 
@@ -312,8 +313,8 @@ pub(crate) fn render_markdown_line(line: &str) -> String {
         return header;
     }
     if let Some((depth, rest)) = parse_blockquote(trimmed) {
-        let bars = "\x1b[32m| \x1b[0m".repeat(depth);
-        return format!("{indent}{bars}\x1b[32m{}\x1b[0m", render_inline(rest));
+        let bars = format!("{SUCCESS}| \x1b[0m").repeat(depth);
+        return format!("{indent}{bars}{SUCCESS}{}\x1b[0m", render_inline(rest));
     }
     if let Some(rest) = trimmed
         .strip_prefix("- ")
@@ -394,7 +395,7 @@ pub(crate) fn render_inline(text: &str) -> String {
                             && !tex.ends_with(' ')
                             && !chars.get(end + 1).is_some_and(|next| next.is_ascii_digit())));
                 if accept {
-                    output.push_str(PRIMARY_STYLE);
+                    output.push_str(&PRIMARY_STYLE);
                     output.push_str(&math::unicode_math(&tex));
                     output.push_str(RESET);
                     index = end + if double { 2 } else { 1 };
@@ -414,7 +415,7 @@ pub(crate) fn render_inline(text: &str) -> String {
             }
             if let Some(end) = closing {
                 let tex: String = chars[index + 2..end].iter().collect();
-                output.push_str(PRIMARY_STYLE);
+                output.push_str(&PRIMARY_STYLE);
                 output.push_str(&math::unicode_math(&tex));
                 output.push_str(RESET);
                 index = end + 2;
@@ -426,7 +427,7 @@ pub(crate) fn render_inline(text: &str) -> String {
                 if chars.get(label_end + 1) == Some(&'(') {
                     if let Some(url_end) = find_marker(&chars, label_end + 2, ')') {
                         let alt = chars[index + 2..label_end].iter().collect::<String>();
-                        output.push_str(IMAGE_STYLE);
+                        output.push_str(&IMAGE_STYLE);
                         output.push_str("[image");
                         if !alt.is_empty() {
                             output.push_str(": ");
@@ -447,7 +448,7 @@ pub(crate) fn render_inline(text: &str) -> String {
         }
         if chars[index] == '`' {
             if let Some(end) = find_marker(&chars, index + 1, '`') {
-                output.push_str(INLINE_CODE_STYLE);
+                output.push_str(&INLINE_CODE_STYLE);
                 output.extend(chars[index + 1..end].iter());
                 output.push_str(RESET);
                 index = end + 1;
@@ -465,7 +466,7 @@ pub(crate) fn render_inline(text: &str) -> String {
         }
         if index + 1 < chars.len() && chars[index] == '*' && chars[index + 1] == '*' {
             if let Some(end) = find_double_marker(&chars, index + 2, '*') {
-                output.push_str(BOLD_STYLE);
+                output.push_str(&BOLD_STYLE);
                 output.extend(chars[index + 2..end].iter());
                 output.push_str(RESET);
                 index = end + 2;
@@ -474,7 +475,7 @@ pub(crate) fn render_inline(text: &str) -> String {
         }
         if chars[index] == '*' {
             if let Some(end) = find_marker(&chars, index + 1, '*') {
-                output.push_str(ITALIC_STYLE);
+                output.push_str(&ITALIC_STYLE);
                 output.extend(chars[index + 1..end].iter());
                 output.push_str(RESET);
                 index = end + 1;
@@ -484,7 +485,7 @@ pub(crate) fn render_inline(text: &str) -> String {
         if chars[index] == '_' {
             if is_emphasis_start(&chars, index) {
                 if let Some(end) = find_emphasis_end(&chars, index + 1, '_') {
-                    output.push_str(ITALIC_STYLE);
+                    output.push_str(&ITALIC_STYLE);
                     output.extend(chars[index + 1..end].iter());
                     output.push_str(RESET);
                     index = end + 1;

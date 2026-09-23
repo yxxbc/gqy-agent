@@ -6,6 +6,7 @@
 //! `redact_sensitive_inline` / `redact_bearer_token` 是必需的：工具参数里可能带
 //! token 或密钥，而终端内容会被截图、会进日志。
 
+use crate::render::style::THINKING_STYLE;
 use crate::render::*;
 
 #[derive(Default)]
@@ -63,7 +64,7 @@ pub(crate) fn summary_style_for(style: SpinnerStyle) -> SummaryStyle {
 
 pub(crate) fn style_summary_text(text: &str, style: SummaryStyle) -> String {
     match style {
-        SummaryStyle::Reasoning => format!("\x1b[38;5;10m{text}\x1b[0m"),
+        SummaryStyle::Reasoning => format!("{THINKING_STYLE}{text}\x1b[0m"),
         SummaryStyle::Tool => format!("\x1b[2m{text}\x1b[0m"),
     }
 }

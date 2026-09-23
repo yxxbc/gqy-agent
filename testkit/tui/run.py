@@ -894,10 +894,11 @@ def main():
         report["item06_command_glyph_is_dollar"] = bool(
             re.search(r"  \$ 运行命令", whole)
         )
-        # item17：全屏下等待动画是点阵转轮，不是那条绿色横向点进度条
+        # item17：全屏下等待动画是点阵转轮，不是那条横向点进度条（旧版亮绿
+        # 38;5;10，现在跟主色 34 槽位）
         report["item17_braille_spinner"] = bool(
             re.search(r"[⠁-⣿]", whole)
-        ) and "\x1b[38;5;10m●" not in whole
+        ) and "\x1b[38;5;10m●" not in whole and "\x1b[34m●" not in whole
         # item18：思考那一步的图标是原子（Nerd Font 私有区 U+F0768）
         # 思考那一步的图标是原子（MDI 段 U+F0768）
         report["item18_atom_glyph"] = chr(0xF0768) in whole

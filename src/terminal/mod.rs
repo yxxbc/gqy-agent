@@ -81,3 +81,5 @@ pub(crate) fn release_alt_screen_if_held() {
 pub(crate) mod palette;
 /// 星空、渐变艺术字、扫光。
 pub(crate) mod starfield;
+/// 终端底色深浅（渲染层配色按它选套）。
+pub(crate) mod tone;

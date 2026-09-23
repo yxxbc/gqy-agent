@@ -235,6 +235,18 @@
           unit: "轮",
           default: 3,
         },
+        {
+          path: "display.theme",
+          label: "终端底色",
+          hint: "影响代码高亮、diff 等内容色，界面色跟终端配色走",
+          kind: "select",
+          choices: [
+            { value: "auto", label: "自动检测" },
+            { value: "dark", label: "深色" },
+            { value: "light", label: "浅色" },
+          ],
+          default: "auto",
+        },
       ],
     },
     {

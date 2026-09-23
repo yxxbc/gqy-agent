@@ -7,6 +7,7 @@
 //! 错误，所以 `is_remote_turn_detached` 单独判——当成错误会让用户以为出事了。
 
 use crate::cli::*;
+use crate::render::style::DANGER;
 
 /// Which session a one-shot CLI turn lands in.
 #[derive(Clone, Debug, PartialEq, Eq)]
@@ -647,7 +648,7 @@ pub(in crate::cli) async fn repl_ipc_admin(
         Err(err) => {
             repl_note(
                 live,
-                &format!("\x1b[31m{}: {err}\x1b[0m\n", t("error", "错误")),
+                &format!("{DANGER}{}: {err}\x1b[0m\n", t("error", "错误")),
             )?;
             Ok(None)
         }

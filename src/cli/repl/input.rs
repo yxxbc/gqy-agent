@@ -7,6 +7,7 @@
 use crate::cli::repl::editor::*;
 use crate::cli::repl::width::*;
 use crate::cli::*;
+use crate::render::style::DANGER;
 
 pub(in crate::cli) fn read_live_repl_input(
     live: &mut LiveReplTail,
@@ -106,7 +107,7 @@ pub(in crate::cli) fn read_live_repl_input(
                         repl_note(
                             live,
                             &format!(
-                                "\x1b[31m{}: {message}\x1b[0m\n",
+                                "{DANGER}{}: {message}\x1b[0m\n",
                                 t("dictation failed", "听写失败")
                             ),
                         )?;
@@ -843,10 +844,21 @@ pub(in crate::cli) fn render_repl_input_with_footer(
         raw_pasted_lines,
     );
     let display_rows = repl_wrapped_input_rows_for_cols(&plain_prefix, &display_lines, cols);
-    let display_rows: Vec<String> = display_rows
+    let mut display_rows: Vec<String> = display_rows
         .iter()
         .map(|line| colorize_repl_placeholders(line))
         .collect();
+    // 选区按 `drawn` 取字，空白提示不算输入框里的字，记没加提示的那份。
+    let plain_rows = display_rows.clone();
+    if input.is_empty() {
+        let room = cols.saturating_sub(visible_width(&prompt_prefix) + visible_width(plain_prefix));
+        if let (Some(first), Some(hint)) = (
+            display_rows.first_mut(),
+            crate::cli::repl::composer_hint::styled(mode, room),
+        ) {
+            first.push_str(&hint);
+        }
+    }
     let input_rows = display_rows.len().max(1).min(u16::MAX as usize) as u16;
     let show_hint = show_shortcut_hint && suggestions.is_empty();
     let current_rows = input_rows.saturating_add(if show_hint { 4 } else { 3 });
@@ -865,11 +877,11 @@ pub(in crate::cli) fn render_repl_input_with_footer(
     queue!(stdout, MoveTo(x0, *input_row), Print(&prompt_prefix))?;
     row_offset = row_offset.saturating_add(1);
     let pad = " ".repeat(usize::from(x0));
-    for line in &display_rows {
+    for (line, plain) in display_rows.iter().zip(&plain_rows) {
         let row = (*input_row).saturating_add(row_offset);
         queue!(stdout, MoveTo(x0, row))?;
         queue!(stdout, Print(&prompt_prefix), Print(line))?;
-        drawn.push((row, format!("{pad}{prompt_prefix}{line}")));
+        drawn.push((row, format!("{pad}{prompt_prefix}{plain}")));
         row_offset = row_offset.saturating_add(1);
     }
     queue!(

@@ -227,7 +227,7 @@ impl Screen {
         // 通知用主色（和代码块、表头一个色），暗色那套是"附注"的语气——
         // 而通知是要人看见的。候选面板照旧走暗色：它是打字时的陪衬。
         let dim = if matches!(align, FloatAlign::Right) {
-            crate::render::PRIMARY_STYLE
+            crate::render::PRIMARY_STYLE.as_str()
         } else {
             "\x1b[2m"
         };

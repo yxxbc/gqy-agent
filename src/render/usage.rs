@@ -120,6 +120,22 @@ pub(crate) fn format_token_usage_inline_opts(
     show_percent: bool,
     show_speed: bool,
 ) -> String {
+    format_token_usage_inline_with(meter, show_percent.then_some(paren_percent), show_speed)
+}
+
+/// `47k/168k` 后面默认跟的占用写法：`(28.0%)`。
+fn paren_percent(ratio: f64) -> String {
+    format!("({:.1}%)", ratio * 100.0)
+}
+
+/// 同 [`format_token_usage_inline_opts`]，但占用比例怎么画由调用方给：底栏
+/// 画占用条，`Token:` 行用括号百分比。`percent` 收到的是 0..=1 附近的比例
+/// （可能超过 1），返回值直接接在 `47k/168k` 后面。
+pub(crate) fn format_token_usage_inline_with(
+    meter: &TokenMeter,
+    percent: Option<fn(f64) -> String>,
+    show_speed: bool,
+) -> String {
     let context_window = meter.context_window.map(|value| value as u64);
     let context = context_window
         .map(|value| {
@@ -139,18 +155,14 @@ pub(crate) fn format_token_usage_inline_opts(
     let usage_ratio = context_window
         .filter(|value| *value > 0)
         .filter(|_| !meter.context_window_assumed)
-        .map(|context_window| {
-            format!(
-                "{:.1}%",
-                meter.session_tokens as f64 / context_window as f64 * 100.0
-            )
-        });
+        .map(|context_window| meter.session_tokens as f64 / context_window as f64);
 
-    let mut session = match usage_ratio {
-        Some(usage_ratio) if show_percent => format!(
-            "{}/{}({usage_ratio})",
+    let mut session = match (usage_ratio, percent) {
+        (Some(usage_ratio), Some(percent)) => format!(
+            "{}/{}{}",
             format_compact_count(meter.session_tokens),
             context,
+            percent(usage_ratio),
         ),
         _ => format!("{}/{}", format_compact_count(meter.session_tokens), context),
     };

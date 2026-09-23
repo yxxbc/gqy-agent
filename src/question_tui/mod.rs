@@ -8,6 +8,7 @@ use crate::question::{
     validate_answers, QuestionAnswers, QuestionPrompt, QuestionRequest, QuestionResponse,
     MAX_CUSTOM_ANSWER_CHARS,
 };
+use crate::render::style::FAINT;
 use anyhow::{bail, Result};
 use crossterm::cursor::{Hide, MoveTo, Show};
 use crossterm::event::{
@@ -487,7 +488,8 @@ impl QuestionSession {
             self.stdout,
             MoveTo(0, self.anchor_y),
             crossterm::style::Print(format!(
-                "{BAR} \x1b[2m{}\x1b[0m",
+                "{} \x1b[2m{}\x1b[0m",
+                bar(),
                 t("Question cancelled", "已取消提问")
             )),
             MoveTo(0, self.anchor_y.saturating_add(1)),
@@ -503,8 +505,8 @@ impl QuestionSession {
             self.stdout,
             MoveTo(0, self.anchor_y.saturating_add(row)),
             Clear(ClearType::CurrentLine),
-            crossterm::style::Print(ANSWERED_BAR),
-            crossterm::style::Print(" \x1b[2m\x1b[90m"),
+            crossterm::style::Print(answered_bar()),
+            crossterm::style::Print(format!(" \x1b[2m{FAINT}")),
             crossterm::style::Print(truncate_width(text, width)),
             crossterm::style::Print("\x1b[0m")
         )?;

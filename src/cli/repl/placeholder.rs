@@ -8,6 +8,7 @@
 //! 去了。
 
 use crate::cli::*;
+use crate::render::style::TERTIARY_STYLE;
 
 pub(in crate::cli) const REPL_PASTE_PLACEHOLDER_MIN_LINES: usize = 3;
 
@@ -419,7 +420,7 @@ pub(in crate::cli) fn colorize_repl_placeholders(line: &str) -> String {
     let mut last_end = 0;
     for (start, end) in placeholders {
         result.extend(&chars[last_end..start]);
-        result.push_str("\x1b[35m");
+        result.push_str(&TERTIARY_STYLE);
         result.extend(&chars[start..end]);
         result.push_str("\x1b[0m");
         last_end = end;

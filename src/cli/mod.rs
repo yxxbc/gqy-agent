@@ -474,6 +474,10 @@ async fn run_one_shot(
     plain: bool,
     mode: AgentMode,
 ) -> Result<()> {
+    // 不发 OSC 11 查询：shellhook 形态下终端输入不归我们。
+    if let Ok(config) = AppConfig::load_or_default(paths) {
+        crate::terminal::tone::init(&config.display.theme, false);
+    }
     let message = if read_stdin {
         append_stdin_to_eof(message)?
     } else {
@@ -565,6 +569,10 @@ async fn run_one_shot(
 }
 
 async fn run_repl(paths: &GqyPaths, initial_mode: AgentMode) -> Result<()> {
+    let config = AppConfig::load_or_default(paths).unwrap_or_default();
+    // 必须早于任何渲染和输入线程：OSC 11 的回包要在输入线程起来之前读走。
+    crate::terminal::tone::init(&config.display.theme, true);
+    repl::composer_hint::refresh(&config, paths);
     if direct_mode_requested() {
         run_direct_repl(paths, initial_mode).await
     } else {
@@ -583,6 +591,7 @@ fn reload_repl_config(
     client: &mut OpenAiCompatibleClient,
 ) -> Result<()> {
     *config = AppConfig::load(paths)?;
+    repl::composer_hint::refresh(config, paths);
     apply_session_model_override(state, config);
     *client = OpenAiCompatibleClient::from_config(config, paths)?;
     Ok(())

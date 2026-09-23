@@ -225,6 +225,13 @@ pub(in crate::web) fn persona_identity(
     }
 }
 
+/// 当前人格的输入框空白提示。TUI 与 WebUI 同源：人格看板配了就用配的，
+/// 没配按人格名生成。读不到人格文件时退回默认人格的那句。
+pub(crate) fn composer_placeholder(config: &AppConfig, paths: &GqyPaths) -> String {
+    let prompts = read_prompt_documents(config, paths).unwrap_or_default();
+    persona_identity(config, &prompts).composer_placeholder
+}
+
 pub(in crate::web) fn active_persona_avatar_path(
     config: &AppConfig,
     prompts: &PromptDocuments,

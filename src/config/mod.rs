@@ -571,6 +571,10 @@ pub struct DisplayConfig {
     /// 关掉就只剩输入框。艺术字可用 `config/banner.txt` 替换。
     #[serde(default = "default_true")]
     pub banner: bool,
+    /// 终端底色深浅：`auto`（查询终端）、`dark`、`light`。只影响内容色
+    /// （代码高亮、diff、展开区底色），界面色始终跟终端 16 色槽位走。
+    #[serde(default = "default_display_theme")]
+    pub theme: String,
     /// 这个版本不认识的显示项，原样留着写回。见 [`AppConfig::extra`]。
     #[serde(flatten, skip_serializing_if = "BTreeMap::is_empty")]
     pub extra: BTreeMap<String, serde_json::Value>,
@@ -630,6 +634,8 @@ struct RawDisplayConfig {
     repl_replay_turns: Option<usize>,
     #[serde(default)]
     banner: Option<bool>,
+    #[serde(default)]
+    theme: Option<String>,
     #[serde(flatten, default)]
     extra: BTreeMap<String, serde_json::Value>,
 }
@@ -674,6 +680,7 @@ impl<'de> Deserialize<'de> for DisplayConfig {
                 .repl_replay_turns
                 .unwrap_or_else(default_repl_replay_turns),
             banner: raw.banner.unwrap_or(true),
+            theme: raw.theme.unwrap_or_else(default_display_theme),
             extra: raw.extra,
         })
     }
@@ -1063,6 +1070,7 @@ impl Default for DisplayConfig {
             command_output_lines: default_command_output_lines(),
             repl_replay_turns: default_repl_replay_turns(),
             banner: true,
+            theme: default_display_theme(),
             extra: BTreeMap::new(),
         }
     }

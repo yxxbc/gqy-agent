@@ -704,19 +704,17 @@ pub(crate) fn sanitize_stream_chunk(state: &mut TerminalControlState, text: &str
     output
 }
 
+/// 每块自带开头与收尾：思考是弱化 + 斜体，不收尾的话会漏到后面的正文上。
 pub(crate) fn write_full_reasoning_chunk(writer: &mut impl Write, text: &str) -> Result<()> {
-    execute!(writer, SetForegroundColor(Color::Green))?;
-    write!(writer, "{text}")?;
+    write!(writer, "{THINKING_STYLE}{text}{RESET}")?;
     Ok(())
 }
 
 pub(crate) fn print_reasoning(reasoning: &str) -> Result<()> {
     let mut stdout = io::stdout();
-    execute!(stdout, SetForegroundColor(Color::Green))?;
     for line in reasoning.trim().lines() {
-        writeln!(stdout, "  {line}")?;
+        writeln!(stdout, "  {THINKING_STYLE}{line}{RESET}")?;
     }
-    execute!(stdout, ResetColor)?;
     if terminal::size().is_ok() {
         writeln!(stdout)?;
     }

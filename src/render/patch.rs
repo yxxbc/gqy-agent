@@ -119,7 +119,7 @@ pub(crate) fn patch_envelope_lines(patch: &str, width: usize) -> Option<Vec<Stri
         }
         if diff.is_empty() {
             out.push(format!(
-                "\x1b[2m{}  \x1b[38;5;250m{path}\x1b[0m",
+                "\x1b[2m{}  {SOFT}{path}\x1b[0m",
                 t("Deleted", "已删除")
             ));
             continue;
@@ -167,7 +167,7 @@ pub(crate) fn render_patch_diff_at(
         t("Modified", "已修改")
     };
     if heading {
-        output.push_str(&format!("\x1b[2m{label}  \x1b[38;5;250m{path}\x1b[0m\n\n"));
+        output.push_str(&format!("\x1b[2m{label}  {SOFT}{path}\x1b[0m\n\n"));
     }
 
     // 先把每一行算出来，再决定行号栏多宽。
@@ -200,18 +200,18 @@ pub(crate) fn render_patch_diff_at(
         let (line_no, sign, body, style) = if let Some(body) = raw_line.strip_prefix('-') {
             let line_no = old_line;
             old_line += 1;
-            (line_no, '-', body, PATCH_DELETE_STYLE)
+            (line_no, '-', body, PATCH_DELETE_STYLE.as_str())
         } else if let Some(body) = raw_line.strip_prefix('+') {
             let line_no = new_line;
             new_line += 1;
-            (line_no, '+', body, PATCH_INSERT_STYLE)
+            (line_no, '+', body, PATCH_INSERT_STYLE.as_str())
         } else if let Some(body) = raw_line.strip_prefix(' ') {
             let line_no = new_line;
             old_line += 1;
             new_line += 1;
-            (line_no, ' ', body, "\x1b[38;5;245m")
+            (line_no, ' ', body, FAINT.as_str())
         } else {
-            (new_line, ' ', raw_line, "\x1b[38;5;245m")
+            (new_line, ' ', raw_line, FAINT.as_str())
         };
         widest = widest.max(line_no);
         rows.push(Row::Line(line_no, sign, body, style));
@@ -258,8 +258,8 @@ pub(crate) fn push_patch_diff_line(
 ) {
     // 行号 + 符号 + 正文，**没有竖线**：符号那一列已经把增删说清楚了，再加一根
     // 分隔线只是把正文往右推两格、和别的展开内容对不上（用户拍板：不需要左侧竖线）。
-    let first_prefix = format!("\x1b[38;5;102m{line_no:>gutter$}\x1b[0m {style}{sign} ");
-    let continuation_prefix = format!("\x1b[38;5;102m{:gutter$}\x1b[0m {style}  ", "");
+    let first_prefix = format!("{FAINT}{line_no:>gutter$}\x1b[0m {style}{sign} ");
+    let continuation_prefix = format!("{FAINT}{:gutter$}\x1b[0m {style}  ", "");
     let prefix_width = visible_width(&first_prefix);
     let body_width = terminal_width.saturating_sub(prefix_width + 1).max(1);
     let wrapped = wrap_ansi_text(body, body_width);

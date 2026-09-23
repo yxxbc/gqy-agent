@@ -73,10 +73,6 @@ pub(in crate::cli) fn decoration_of(spans: &[AnsiSpan]) -> u16 {
     decoration_width(spans)
 }
 
-/// 展开区的底色。比终端背景深一档——用 256 色的近黑灰，深浅主题下都还看得出
-/// 层次，又不至于像另开了一个控件。
-const EXPANSION_BG: ratatui::style::Color = ratatui::style::Color::Indexed(236);
-
 fn char_columns(ch: char) -> usize {
     ch.width().unwrap_or(0)
 }
@@ -98,7 +94,7 @@ pub(in crate::cli) fn paint_expansion_bg(spans: Vec<AnsiSpan>, width: usize) -> 
             //（用户实测：diff 颜色需要优化）。
             style: match span.style.bg {
                 Some(_) => span.style,
-                None => span.style.bg(EXPANSION_BG),
+                None => span.style.bg(crate::render::style::expansion_bg()),
             },
             ..span
         })
@@ -106,7 +102,7 @@ pub(in crate::cli) fn paint_expansion_bg(spans: Vec<AnsiSpan>, width: usize) -> 
     if used < width {
         out.push(AnsiSpan {
             text: " ".repeat(width - used),
-            style: ratatui::style::Style::new().bg(EXPANSION_BG),
+            style: ratatui::style::Style::new().bg(crate::render::style::expansion_bg()),
             link: None,
         });
     }

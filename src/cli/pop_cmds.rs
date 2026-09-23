@@ -10,6 +10,7 @@
 
 use crate::cli::repl::width::*;
 use crate::cli::*;
+use crate::render::style::{SUCCESS, TERTIARY_STYLE};
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub(in crate::cli) struct PopOutcome {
@@ -448,9 +449,9 @@ pub(in crate::cli) fn pop_menu_turn_lines(
     lines.map(|line| {
         let line = truncate_visible_width(&line, width);
         if focused {
-            format!("\x1b[1m\x1b[35m{line}\x1b[0m")
+            format!("\x1b[1m{TERTIARY_STYLE}{line}\x1b[0m")
         } else if checked {
-            format!("\x1b[1m\x1b[32m{line}\x1b[0m")
+            format!("\x1b[1m{SUCCESS}{line}\x1b[0m")
         } else {
             format!("\x1b[2m{line}\x1b[0m")
         }

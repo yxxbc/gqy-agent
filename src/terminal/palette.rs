@@ -99,7 +99,7 @@ const ANSI16: [Rgb; 16] = [
 ];
 
 /// RGB → xterm-256 索引。6×6×6 色立方 + 24 级灰阶，标准近似法。
-fn to_256(color: Rgb) -> u8 {
+pub(crate) fn to_256(color: Rgb) -> u8 {
     let (r, g, b) = color;
     if r == g && g == b {
         if r < 8 {
@@ -123,7 +123,7 @@ fn to_256(color: Rgb) -> u8 {
 }
 
 /// RGB → 16 色里最近的一个。欧氏距离足够，不必上 CIELAB。
-fn to_16(color: Rgb) -> u8 {
+pub(crate) fn to_16(color: Rgb) -> u8 {
     let (r, g, b) = (i32::from(color.0), i32::from(color.1), i32::from(color.2));
     let mut best = 7u8;
     let mut best_distance = i32::MAX;

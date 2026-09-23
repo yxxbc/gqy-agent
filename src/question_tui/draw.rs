@@ -5,12 +5,17 @@
 //! 滚动。
 
 use crate::question_tui::*;
+use crate::render::style::{DANGER, FAINT, TERTIARY_STYLE, WARNING};
 
 pub(in crate::question_tui) const MAX_PANEL_LINES: u16 = 16;
 
-pub(in crate::question_tui) const BAR: &str = "\x1b[1m\x1b[35m┃\x1b[0m";
+pub(in crate::question_tui) fn bar() -> String {
+    format!("\x1b[1m{TERTIARY_STYLE}┃\x1b[0m")
+}
 
-pub(in crate::question_tui) const ANSWERED_BAR: &str = "\x1b[2m\x1b[90m┃\x1b[0m";
+pub(in crate::question_tui) fn answered_bar() -> String {
+    format!("\x1b[2m{FAINT}┃\x1b[0m")
+}
 
 pub(in crate::question_tui) fn draw(
     session: &mut QuestionSession,
@@ -36,7 +41,7 @@ pub(in crate::question_tui) fn draw(
         for (question, selected) in request.questions.iter().zip(&state.answers) {
             if selected.is_empty() {
                 body_lines.push(format!(
-                    "{}: \x1b[31m{}\x1b[0m",
+                    "{}: {DANGER}{}\x1b[0m",
                     question.header,
                     t("unanswered", "未回答")
                 ));
@@ -153,7 +158,7 @@ pub(in crate::question_tui) fn draw(
 
     if state.cancel_armed_until.is_some() {
         footer_lines.push(format!(
-            "\x1b[1m\x1b[33m{}\x1b[0m",
+            "\x1b[1m{WARNING}{}\x1b[0m",
             t(
                 "Press Esc again to cancel this response",
                 "再次按 Esc 取消本轮回复"
@@ -216,7 +221,7 @@ pub(in crate::question_tui) fn draw(
             session.stdout,
             MoveTo(0, base.saturating_add(row as u16)),
             Clear(ClearType::CurrentLine),
-            crossterm::style::Print(BAR),
+            crossterm::style::Print(bar()),
             crossterm::style::Print(" "),
             crossterm::style::Print(truncate_width(line, content_width))
         )?;
@@ -335,14 +340,18 @@ pub(in crate::question_tui) fn option_lines(
 ) -> Vec<String> {
     let marker = if multiple {
         if picked {
-            "\x1b[35m[✓]\x1b[0m "
+            format!("{TERTIARY_STYLE}[✓]\x1b[0m ")
         } else {
-            "\x1b[2m[ ]\x1b[0m "
+            "\x1b[2m[ ]\x1b[0m ".to_string()
         }
     } else {
-        ""
+        String::new()
     };
-    let pointer = if active { "\x1b[35m›\x1b[0m " } else { "  " };
+    let pointer = if active {
+        format!("{TERTIARY_STYLE}›\x1b[0m ")
+    } else {
+        "  ".to_string()
+    };
     let label_prefix_width = if multiple { 6 } else { 2 };
     let label_indent = " ".repeat(label_prefix_width);
     let label_width = content_width.saturating_sub(label_prefix_width).max(1);
@@ -352,7 +361,7 @@ pub(in crate::question_tui) fn option_lines(
         .enumerate()
     {
         let part = if active || picked {
-            format!("\x1b[35m{part}\x1b[0m")
+            format!("{TERTIARY_STYLE}{part}\x1b[0m")
         } else {
             part
         };
@@ -387,12 +396,12 @@ pub(in crate::question_tui) fn editor_option_line(
 ) -> String {
     let marker = if multiple {
         if picked {
-            "\x1b[35m[✓]\x1b[0m "
+            format!("{TERTIARY_STYLE}[✓]\x1b[0m ")
         } else {
-            "\x1b[2m[ ]\x1b[0m "
+            "\x1b[2m[ ]\x1b[0m ".to_string()
         }
     } else {
-        ""
+        String::new()
     };
     let value = if editor.is_empty() {
         format!(
@@ -402,7 +411,7 @@ pub(in crate::question_tui) fn editor_option_line(
     } else {
         editor.to_string()
     };
-    format!("\x1b[35m›\x1b[0m {marker}{value}")
+    format!("{TERTIARY_STYLE}›\x1b[0m {marker}{value}")
 }
 
 pub(in crate::question_tui) fn wrap_display_text(value: &str, width: usize) -> Vec<String> {

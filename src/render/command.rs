@@ -8,6 +8,7 @@
 //!
 //! `decode_utf8_prefix` 处理的是流式解码——一个字符可能被切在两次读取之间。
 
+use crate::render::style::{DANGER, DANGER_DIM, INFO, WARNING};
 use crate::render::*;
 
 #[derive(Clone)]
@@ -374,14 +375,14 @@ impl CommandLiveDisplay {
             //（用户实测：真 TUI 里报错展开不是红的）。
             let failed = matches!(self.status, CommandStatus::Error);
             if self.output.omitted_lines {
-                let style = if failed { "\x1b[31m" } else { "\x1b[2m" };
+                let style = if failed { DANGER.as_str() } else { "\x1b[2m" };
                 lines.push(format!(
                     "{style}⋮ {}\x1b[0m",
                     t("earlier output omitted", "已省略较早输出")
                 ));
             }
             if failed {
-                lines.extend(output_rows_styled(&logical, width, |_| "\x1b[31m"));
+                lines.extend(output_rows_styled(&logical, width, |_| DANGER.as_str()));
             } else {
                 lines.extend(output_rows(&logical, width));
             }
@@ -416,7 +417,7 @@ impl CommandLiveDisplay {
         }
         let logical = self.output.logical_lines();
         let mut rows = if failed {
-            output_rows_styled(&logical, width, |_| "\x1b[31m")
+            output_rows_styled(&logical, width, |_| DANGER.as_str())
         } else {
             output_rows(&logical, width)
         };
@@ -430,7 +431,7 @@ impl CommandLiveDisplay {
         let mut lines = Vec::with_capacity(keep + 1);
         if omitted && max_rows > 1 {
             // 跑砸了的话省略标记也跟着红：整段红里夹一行灰，看着像两块东西。
-            let style = if failed { "\x1b[31m" } else { "\x1b[2m" };
+            let style = if failed { DANGER.as_str() } else { "\x1b[2m" };
             lines.push(format!(
                 "{style}⋮ {}\x1b[0m",
                 t("earlier output omitted", "已省略较早输出")
@@ -558,7 +559,7 @@ impl CommandLiveDisplay {
         output.extend(rows[start..].iter().map(|line| {
             let style = match line.stream {
                 CommandOutputStream::Stdout => "\x1b[2m",
-                CommandOutputStream::Stderr => "\x1b[2m\x1b[31m",
+                CommandOutputStream::Stderr => DANGER_DIM.as_str(),
             };
             format!("\x1b[2m  │\x1b[0m {style}{}\x1b[0m", line.text)
         }));
@@ -571,7 +572,7 @@ impl CommandLiveDisplay {
 fn output_rows(logical: &[CommandLogLine], width: usize) -> Vec<String> {
     output_rows_styled(logical, width, |stream| match stream {
         CommandOutputStream::Stdout => "\x1b[2m",
-        CommandOutputStream::Stderr => "\x1b[2m\x1b[31m",
+        CommandOutputStream::Stderr => DANGER_DIM.as_str(),
     })
 }
 
@@ -742,7 +743,7 @@ pub(crate) fn format_command_preview_line(
 ) -> String {
     let prefix = match prefix {
         CommandPreviewPrefix::First if spinning => format!(
-            "\x1b[2m\x1b[36m{}\x1b[0m \x1b[2m↳\x1b[0m ",
+            "\x1b[2m{INFO}{}\x1b[0m \x1b[2m↳\x1b[0m ",
             braille_frame(frame)
         ),
         CommandPreviewPrefix::First => "  \x1b[2m↳\x1b[0m ".to_string(),
@@ -751,7 +752,7 @@ pub(crate) fn format_command_preview_line(
         CommandPreviewPrefix::SoftWrap => "  \x1b[2m│\x1b[0m   ".to_string(),
         CommandPreviewPrefix::LastSoftWrap => "  \x1b[2m└\x1b[0m   ".to_string(),
     };
-    format!("{prefix}\x1b[33m{text}\x1b[0m")
+    format!("{prefix}{WARNING}{text}\x1b[0m")
 }
 
 pub(crate) fn wrap_plain_text(text: &str, width: usize) -> Vec<String> {
@@ -1086,7 +1087,7 @@ pub(crate) fn write_fenced_block(stdout: &mut impl Write, label: &str, text: &st
     writeln!(stdout, "\x1b[2m,-- {label}\x1b[0m")?;
     let sanitized = sanitize_terminal_text(text);
     let style = if label.starts_with("err") {
-        "\x1b[2m\x1b[31m"
+        DANGER_DIM.as_str()
     } else {
         "\x1b[2m"
     };

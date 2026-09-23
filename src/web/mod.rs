@@ -86,6 +86,7 @@ use ipc_server::*;
 use job_access::*;
 use map_api::*;
 use ownership::*;
+pub(crate) use persona::composer_placeholder;
 use persona::*;
 use prompt_files::*;
 use providers_api::*;

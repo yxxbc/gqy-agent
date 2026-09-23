@@ -5,9 +5,6 @@ use crate::render::*;
 
 #[test]
 fn full_reasoning_reapplies_color_for_every_chunk() {
-    let mut green = Vec::new();
-    execute!(green, SetForegroundColor(Color::Green)).unwrap();
-    let green = String::from_utf8(green).unwrap();
     let mut output = Vec::new();
 
     write_full_reasoning_chunk(&mut output, "用户").unwrap();
@@ -15,8 +12,9 @@ fn full_reasoning_reapplies_color_for_every_chunk() {
     write_full_reasoning_chunk(&mut output, "询问明天几号").unwrap();
 
     let output = String::from_utf8(output).unwrap();
-    assert_eq!(output.matches(&green).count(), 2);
-    assert!(output.ends_with("询问明天几号"));
+    assert_eq!(output.matches(THINKING_STYLE).count(), 2);
+    // 每块自己收尾，斜体不会漏到后面的正文上。
+    assert!(output.ends_with("询问明天几号\x1b[0m"));
 }
 
 #[test]

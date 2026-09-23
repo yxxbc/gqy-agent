@@ -22,14 +22,14 @@ pub(crate) fn highlight_code_line(lang: &str, line: &str) -> String {
     while index < chars.len() {
         if let Some(marker) = comment_marker {
             if chars[index] == marker {
-                output.push_str(CODE_COMMENT_STYLE);
+                output.push_str(&CODE_COMMENT_STYLE);
                 output.extend(chars[index..].iter());
                 output.push_str(CODE_TOKEN_RESET);
                 return output;
             }
         }
         if index + 1 < chars.len() && chars[index] == '/' && chars[index + 1] == '/' {
-            output.push_str(CODE_COMMENT_STYLE);
+            output.push_str(&CODE_COMMENT_STYLE);
             output.extend(chars[index..].iter());
             output.push_str(CODE_TOKEN_RESET);
             return output;
@@ -54,7 +54,7 @@ pub(crate) fn highlight_code_line(lang: &str, line: &str) -> String {
                 }
                 index += 1;
             }
-            output.push_str(CODE_STRING_STYLE);
+            output.push_str(&CODE_STRING_STYLE);
             output.extend(chars[start..index].iter());
             output.push_str(CODE_TOKEN_RESET);
             continue;
@@ -67,7 +67,7 @@ pub(crate) fn highlight_code_line(lang: &str, line: &str) -> String {
             {
                 index += 1;
             }
-            output.push_str(CODE_NUMBER_STYLE);
+            output.push_str(&CODE_NUMBER_STYLE);
             output.extend(chars[start..index].iter());
             output.push_str(CODE_TOKEN_RESET);
             continue;
@@ -92,11 +92,11 @@ pub(crate) fn highlight_code_line(lang: &str, line: &str) -> String {
                 None
             };
             if let Some(style) = style {
-                output.push_str(style);
+                output.push_str(&style);
                 output.push_str(&token);
                 output.push_str(CODE_TOKEN_RESET);
             } else {
-                output.push_str(PRIMARY_STYLE);
+                output.push_str(&PRIMARY_STYLE);
                 output.push_str(&token);
                 output.push_str(CODE_TOKEN_RESET);
             }

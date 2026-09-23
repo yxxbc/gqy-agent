@@ -12,6 +12,7 @@ use super::expand::{layer_hit, layer_len, layer_row, Body, Expanded, Layer};
 use super::Screen;
 use crate::cli::t;
 use crate::render::blocks;
+use crate::render::style::{INFO, THINKING_STYLE};
 use crossterm::{
     cursor::MoveTo,
     queue,
@@ -930,7 +931,7 @@ fn with_elapsed(head: &str, elapsed: std::time::Duration) -> String {
 /// 是同一个形状。
 fn log_step_detail(line: &str, step: &LogStep) -> Vec<String> {
     let inner = crate::render::timeline::panel_detail_width();
-    let color = if step.thinking { "\x1b[38;5;10m" } else { "" };
+    let color = if step.thinking { THINKING_STYLE } else { "" };
     let mut body: Vec<String> = Vec::new();
     // 正文第一段是这一步的**主题**（命令全文、路径、检索词），空一行，然后是输出
     // ——和主线那一步点开一个样子。原来是把抬头（`运行命令 · 5.3s · echo …`）整个
@@ -1228,7 +1229,7 @@ impl Screen {
         let rows = self.rows;
         let cols = self.cols;
         let spinner = format!(
-            "\x1b[36m{}\x1b[39m",
+            "{INFO}{}\x1b[39m",
             crate::render::wait_spinner::braille_frame(self.overlay_spinner_frame())
         );
         let Some(panel) = &mut self.overlay else {

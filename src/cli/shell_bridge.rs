@@ -5,6 +5,7 @@
 //! 尽量短。剪贴板粘贴与占位符展开也在这里。
 
 use crate::cli::*;
+use crate::render::style::DANGER;
 
 pub(in crate::cli) fn remove_shell_hooks(paths: &GqyPaths) -> Result<()> {
     let removed = shell::fish::uninstall(paths)?;
@@ -229,7 +230,7 @@ pub(in crate::cli) async fn run_shell_intercept(
         // 看不见（用户实测）。
         Err(err) => {
             println!(
-                "\x1b[31m{}: {:#}\x1b[0m",
+                "{DANGER}{}: {:#}\x1b[0m",
                 crate::i18n::text("error", "错误"),
                 err
             );
