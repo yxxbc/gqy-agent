@@ -48,6 +48,23 @@
 <br/><sub>不用打开对话界面，在命令行里直接和她说话</sub>
 </div>
 
+### 🖥 网页端
+
+在浏览器里也能找到她，手机平板一样能用。
+
+<div align="center">
+<img src="pics/readme-show/webui-speak.png" alt="网页端的新会话页面" width="760" />
+<br/><sub>打开网页就能聊</sub>
+</div>
+
+<table>
+  <tr>
+    <td align="center" width="33%"><img src="pics/readme-show/webui-create-agent.png" alt="新建人格：头像、看板图片与文案" /><br/><sub>捏一个你自己的角色</sub></td>
+    <td align="center" width="33%"><img src="pics/readme-show/webui-show-usage.png" alt="数据统计：用量、调用热力图与每日 token" /><br/><sub>用了多少一目了然</sub></td>
+    <td align="center" width="33%"><img src="pics/readme-show/webui-setting-YouCanShowMore.png" alt="控制台：记忆、知识库、表情包、记账等" /><br/><sub>记忆、图库、记账都在控制台</sub></td>
+  </tr>
+</table>
+
 ## 📦 安装
 
 支持 Linux 和 macOS，复制一行到终端运行即可：
