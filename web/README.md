@@ -29,6 +29,10 @@ Accent roles: secondary = hair gold (tool activity, model badge), tertiary = rib
 crimson (active session marker, stop button), plus a semantic online-green
 (`--md-ext-color-online`) that never follows wallpaper colors.
 
+Non-color tokens also live at the top of `styles.css`: font sizes `--fs-chat/ui/meta/micro`
+(15/13/12/11 px), radii `--radius*`, stacking layers `--z-*`, and durations `--motion-fast/--motion/--motion-slow`
+(120/160/200 ms). Use them instead of new literals. Breakpoints cannot be tokens in plain CSS; reuse 836px (desktop/mobile split) and 640px where possible.
+
 `index.html` loads `/theme.css` after `styles.css`; a matugen-generated override can be
 served there to recolor the whole UI from the desktop wallpaper (see `extra/matugen/`).
 The 404 when no override exists is harmless. Serving `~/.gqy/config/webui-theme.css`
