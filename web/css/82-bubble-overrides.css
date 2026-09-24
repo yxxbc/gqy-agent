@@ -1,0 +1,90 @@
+/* ═══ 气泡:AI 不套气泡,正文直接铺在页面底色上;用户消息改用原先助手气泡的中性色 ═══ */
+.assistant-content {
+  padding: 2px 0 0;
+  border-radius: 0;
+  background: none;
+  box-shadow: none;
+}
+.user-bubble {
+  background: var(--surface-1);
+  color: var(--text);
+  box-shadow: var(--bubble-shadow);
+}
+/* 正文里的面原来都是对着气泡的 surface-1 调的,现在直接落在页面底色上:
+   代码块用 surface-1 加软阴影(和用户气泡同一张卡),行内代码和表格底用
+   正文色兑底色得到的中性灰,亮色下不再和米色底混成一片。 */
+.assistant-content .code-block {
+  --code-bg: var(--surface-1);
+  box-shadow: var(--bubble-shadow);
+}
+.assistant-content .markdown-body code:not(pre code) {
+  border-radius: 8px;
+  background: color-mix(in srgb, var(--text) 9%, var(--app-bg));
+}
+.assistant-content .markdown-table-scroll {
+  border-radius: var(--radius);
+  background: var(--surface-1);
+  box-shadow: var(--bubble-shadow);
+}
+.assistant-content .markdown-body table {
+  background: none;
+}
+.assistant-content .markdown-body th {
+  border-bottom: 1px solid var(--line);
+  background: color-mix(in srgb, var(--text) 5%, var(--surface-1));
+}
+.assistant-content .markdown-body td {
+  border-bottom: 1px solid color-mix(in srgb, var(--line) 70%, transparent);
+}
+.assistant-content .markdown-body tr:last-child td {
+  border-bottom: 0;
+}
+/* 用户气泡现在是中性底,里面的代码块不再是那块深蓝:底色深一档、配色跟正文同一套 */
+.user-bubble .code-block {
+  --code-bg: color-mix(in srgb, var(--text) 7%, var(--surface-1));
+  --code-ink: var(--text);
+  --tok-c: inherit;
+  --tok-p: inherit;
+  --tok-o: inherit;
+  --tok-k: inherit;
+  --tok-s: inherit;
+  --tok-n: inherit;
+  --tok-f: inherit;
+  --tok-t: inherit;
+  --tok-y: inherit;
+}
+.user-bubble > p > code {
+  border-radius: 8px;
+  background: color-mix(in srgb, var(--text) 9%, var(--surface-1));
+}
+
+/* ═══ 排队消息:画在对话末尾的用户气泡,左边一枚「排队中」小签和撤下按钮 ═══ */
+/* 网格两列会把气泡挤成最窄的一柱;改 flex,气泡照旧按 62% 上限自然铺开,小签贴在左边 */
+.user-message.is-queued {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 8px;
+}
+.user-message.is-queued .user-attachments {
+  flex: 0 0 100%;
+}
+.user-message.is-queued .user-bubble {
+  opacity: 0.82;
+}
+.queue-badge {
+  display: inline-flex;
+  align-items: center;
+  color: var(--text-soft);
+  font-size: var(--fs-micro);
+  white-space: nowrap;
+  gap: 2px;
+}
+.queue-badge .queue-remove {
+  width: 20px;
+  height: 20px;
+  flex-basis: 20px;
+}
+
+

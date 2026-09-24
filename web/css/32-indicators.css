@@ -1,0 +1,127 @@
+/* 打字 / 载入指示:三点弹跳(金 / accent / ribbon) */
+.loading-mark {
+  position: relative;
+  width: 7px;
+  height: 7px;
+  margin: 0 14px;
+  border: 0;
+  border-radius: 50%;
+  background: var(--accent);
+  animation: typing-bounce 1.2s ease-in-out 0.15s infinite;
+}
+
+.loading-mark::before,
+.loading-mark::after {
+  position: absolute;
+  top: 0;
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  content: "";
+}
+
+.loading-mark::before {
+  left: -12px;
+  background: var(--gold);
+  animation: typing-bounce 1.2s ease-in-out infinite;
+}
+
+.loading-mark::after {
+  left: 12px;
+  background: var(--ribbon);
+  animation: typing-bounce 1.2s ease-in-out 0.3s infinite;
+}
+
+@keyframes typing-bounce {
+  0%,
+  60%,
+  100% {
+    transform: translateY(0);
+  }
+
+  30% {
+    transform: translateY(-5px);
+  }
+}
+
+/* 等待回复:气泡内三点弹跳(金 / accent / ribbon) */
+.typing-indicator {
+  display: inline-flex;
+  align-items: center;
+  padding: 5px 2px 3px;
+  gap: 5px;
+}
+
+.typing-indicator.is-streaming {
+  padding: 4px 2px;
+}
+
+/* 输入框那排的运行指示器。原来它在气泡左下角，且只在「第一个块到达前」出现
+   ——推理和工具阶段反而没有，而那两段恰恰最需要「它还在动」。现在整个回合
+   期间都在，位置固定，不随气泡内容跳来跳去。 */
+.typing-indicator.is-composer {
+  padding: 0 2px;
+  gap: 4px;
+  align-self: center;
+}
+
+.typing-indicator.is-composer i {
+  width: 5px;
+  height: 5px;
+}
+
+.typing-indicator.is-streaming i {
+  width: 5px;
+  height: 5px;
+}
+
+/* 输入框「加载中」进度点(用户拍板换成编排动效):三颗点走一整套
+   三角·顺时针 → 聚合 → 三角 → 逆时针 → 聚合 → 水平跳动,循环,6s/圈。
+   三色用 顾清影 logo 三原色(发金/丝带/瞳蓝)。无光效。 */
+.gqy-run {
+  --mrun: 6s;
+  display: inline-block;
+  width: 34px;
+  height: 20px;
+  position: relative;
+  align-self: center;
+}
+.gqy-run .mr-spin {
+  position: absolute;
+  inset: 0;
+  animation: mr-spin var(--mrun) ease-in-out infinite;
+}
+.gqy-run i {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  width: 6px;
+  height: 6px;
+  margin: -3px;
+  border-radius: 50%;
+}
+.gqy-run .mr1 { background: var(--gold); animation: mr1 var(--mrun) ease-in-out infinite; }
+.gqy-run .mr2 { background: var(--ribbon); animation: mr2 var(--mrun) ease-in-out infinite; }
+.gqy-run .mr3 { background: var(--accent); animation: mr3 var(--mrun) ease-in-out infinite; }
+/* 8-28% 顺时针一圈,28-46% 保持,46-66% 逆时针转回,其余不转 */
+@keyframes mr-spin { 0%,8%{transform:rotate(0)} 28%{transform:rotate(360deg)} 46%{transform:rotate(360deg)} 66%,100%{transform:rotate(0)} }
+/* 行 L(-9,0) M(0,0) R(9,0);三角 TL(-8,5) TOP(0,-7) TR(8,5);聚合 中心 scale .72 */
+@keyframes mr1 {
+  0%{transform:translate(-9px,0)} 8%{transform:translate(-8px,5px)} 28%{transform:translate(-8px,5px)}
+  38%{transform:translate(0,0) scale(.72)} 46%{transform:translate(-8px,5px)} 66%{transform:translate(-8px,5px)}
+  76%{transform:translate(0,0) scale(.72)} 86%{transform:translate(-9px,0)} 93%{transform:translate(-9px,-5px)} 100%{transform:translate(-9px,0)} }
+@keyframes mr2 {
+  0%{transform:translate(0,0)} 8%{transform:translate(0,-7px)} 28%{transform:translate(0,-7px)}
+  38%{transform:translate(0,0) scale(.72)} 46%{transform:translate(0,-7px)} 66%{transform:translate(0,-7px)}
+  76%{transform:translate(0,0) scale(.72)} 86%{transform:translate(0,0)} 94%{transform:translate(0,-5px)} 100%{transform:translate(0,0)} }
+@keyframes mr3 {
+  0%{transform:translate(9px,0)} 8%{transform:translate(8px,5px)} 28%{transform:translate(8px,5px)}
+  38%{transform:translate(0,0) scale(.72)} 46%{transform:translate(8px,5px)} 66%{transform:translate(8px,5px)}
+  76%{transform:translate(0,0) scale(.72)} 86%{transform:translate(9px,0)} 95%{transform:translate(9px,-5px)} 100%{transform:translate(9px,0)} }
+@media (prefers-reduced-motion: reduce) {
+  .gqy-run .mr-spin, .gqy-run i { animation-duration: 0s; }
+}
+/* AI 输出气泡里那份「加载中」:留一点上下留白,别贴着头像行。
+   整体缩小一点(用户觉得偏大):等比缩到 0.7,左对齐锚点不动。 */
+.gqy-run.typing-run { margin: 3px 0 5px 2px; transform: scale(0.7); transform-origin: left center; }
+

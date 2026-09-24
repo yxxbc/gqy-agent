@@ -1,0 +1,223 @@
+/* ── 地图卡片 ─────────────────────────────────────────────────────────
+   工具签外面的产出卡:上面一张可拖可缩的切片地图,下面是结果列表。
+   瓦片是 <img>,绝对定位在一层 .map-tiles 里,位置由 mapcard.js 按
+   Web Mercator 算——这里只负责盖住溢出、给层级和配色。 */
+.map-card {
+  margin-top: 10px;
+  overflow: hidden;
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  background: var(--surface-2);
+}
+
+.map-card-head {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 12px;
+  border-bottom: 1px solid var(--line);
+}
+
+.map-card-title { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.map-card-sub { flex: 1; color: var(--text-soft); font-size: var(--fs-meta); white-space: nowrap; }
+
+.map-viewport {
+  position: relative;
+  height: 260px;
+  overflow: hidden;
+  background: var(--surface-1);
+  cursor: grab;
+  touch-action: none;
+  user-select: none;
+}
+.map-viewport.is-dragging { cursor: grabbing; }
+.map-viewport:focus-visible { outline: 2px solid var(--accent); outline-offset: -2px; }
+
+.map-tiles, .map-markers { position: absolute; inset: 0; }
+.map-markers { pointer-events: none; }
+
+.map-tile {
+  position: absolute;
+  width: 256px;
+  height: 256px;
+  /* 取不到的瓦片留一块底色,比一个裂图图标体面 */
+  background: var(--surface-1);
+  pointer-events: none;
+}
+.map-tile.is-blank { visibility: hidden; }
+
+.map-marker {
+  position: absolute;
+  /* 定位点是针尖:左右居中、底边对齐坐标点 */
+  transform: translate(-50%, -100%);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
+  border: none;
+  background: none;
+  color: var(--accent);
+  cursor: pointer;
+  pointer-events: auto;
+  filter: drop-shadow(0 1px 2px rgb(0 0 0 / 0.35));
+}
+.map-marker.is-selected { color: var(--md-sys-color-tertiary, var(--accent)); }
+.map-pin-icon { width: 30px; height: 30px; fill: currentColor; stroke: none; }
+.map-pin-dot { fill: var(--surface-2); }
+.map-marker-index {
+  position: absolute;
+  top: 4px;
+  font-size: var(--fs-micro);
+  font-weight: 600;
+  color: var(--accent);
+}
+.map-marker.is-selected .map-marker-index { color: var(--md-sys-color-tertiary, var(--accent)); }
+
+.map-controls {
+  position: absolute;
+  top: 8px;
+  right: 8px;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.map-control {
+  width: 28px;
+  height: 28px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-sm);
+  background: var(--surface-2);
+  color: var(--text);
+  font-size: 14px;
+  line-height: 1;
+  cursor: pointer;
+}
+.map-control:hover { background: color-mix(in srgb, var(--accent) 12%, var(--surface-2)); }
+
+.map-credit {
+  position: absolute;
+  right: 6px;
+  bottom: 4px;
+  padding: 1px 6px;
+  border-radius: var(--radius-sm);
+  background: color-mix(in srgb, var(--surface-2) 82%, transparent);
+  color: var(--text-soft);
+  font-size: var(--fs-micro);
+}
+
+.map-places { list-style: none; margin: 0; padding: 0; }
+
+.map-place {
+  padding: 9px 12px;
+  border-top: 1px solid var(--line);
+  cursor: pointer;
+}
+.map-place:hover { background: color-mix(in srgb, var(--accent) 6%, transparent); }
+.map-place.is-selected { background: color-mix(in srgb, var(--accent) 11%, transparent); }
+
+.map-place-head { display: flex; align-items: baseline; gap: 8px; }
+.map-place-index {
+  flex: none;
+  width: 18px;
+  height: 18px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 50%;
+  background: color-mix(in srgb, var(--accent) 18%, transparent);
+  color: var(--accent);
+  font-size: var(--fs-micro);
+}
+.map-place-name { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.map-place-distance { margin-left: auto; color: var(--text-soft); font-size: var(--fs-meta); }
+.map-place-address { margin: 4px 0 0 26px; color: var(--text-soft); font-size: var(--fs-meta); }
+
+.map-place-meta {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+  margin: 6px 0 0 26px;
+}
+
+.map-chip {
+  padding: 1px 7px;
+  border-radius: var(--radius-pill);
+  background: var(--surface-1);
+  color: var(--text-soft);
+  font-size: var(--fs-micro);
+}
+
+.map-coords { font-size: var(--fs-micro); color: var(--text-soft); }
+
+.map-mini-button {
+  padding: 2px 9px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-pill);
+  background: var(--surface-1);
+  color: var(--text);
+  font-size: var(--fs-micro);
+  line-height: 1.7;
+  text-decoration: none;
+  cursor: pointer;
+}
+.map-mini-button:hover { border-color: color-mix(in srgb, var(--accent) 50%, var(--line)); }
+
+.map-place-more {
+  padding: 8px 12px;
+  border-top: 1px solid var(--line);
+  color: var(--text-soft);
+  font-size: var(--fs-meta);
+}
+
+/* 详细地图:一层模态,地图占大头,列表全展开 */
+.map-detail-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: var(--z-overlay);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 24px;
+  background: rgb(0 0 0 / 0.45);
+}
+
+.map-detail {
+  display: flex;
+  flex-direction: column;
+  width: min(900px, 100%);
+  max-height: min(86vh, 780px);
+  overflow: hidden;
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  background: var(--surface-2);
+}
+
+.map-detail-head {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 12px 14px;
+  border-bottom: 1px solid var(--line);
+}
+.map-detail-count { flex: 1; color: var(--text-soft); font-size: var(--fs-meta); }
+
+.map-detail-body { min-height: 0; overflow-y: auto; -webkit-overflow-scrolling: touch; }
+.map-detail-body .map-viewport { height: min(52vh, 460px); }
+
+@media (max-width: 640px) {
+  .map-viewport { height: 220px; }
+  .map-detail-overlay { padding: 0; }
+  .map-detail {
+    max-height: var(--app-height, 100dvh);
+    height: 100%;
+    border-radius: 0;
+    padding-top: env(safe-area-inset-top);
+    padding-bottom: env(safe-area-inset-bottom);
+  }
+}
+

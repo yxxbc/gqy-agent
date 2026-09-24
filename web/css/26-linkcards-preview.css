@@ -1,0 +1,294 @@
+/* ── 正文链接卡片 ───────────────────────────────────────────────
+   独占一行的链接升级成的卡片。宽度封在 520px:再宽在窄侧栏里会撑破气泡,
+   再窄图就没意义了。抓不到元数据时这些规则一条都不生效,正文保持原样。 */
+p.has-link-card {
+  margin: 10px 0;
+}
+
+.link-card {
+  display: block;
+  max-width: 520px;
+  overflow: hidden;
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  background: var(--surface-2);
+  color: inherit;
+  text-decoration: none;
+  transition: border-color var(--motion) ease, background-color var(--motion) ease, transform var(--motion) ease;
+}
+
+.link-card:hover,
+.link-card:focus-visible {
+  border-color: color-mix(in srgb, var(--accent) 50%, var(--line));
+  background: color-mix(in srgb, var(--accent) 7%, var(--surface-2));
+  transform: translateY(-1px);
+}
+
+.link-card-media {
+  display: block;
+  overflow: hidden;
+  border-bottom: 1px solid var(--line);
+  background: var(--surface-3, var(--surface-1));
+  aspect-ratio: 1.91 / 1;
+}
+
+.link-card-media img {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.link-card-body {
+  display: grid;
+  padding: 11px 13px 10px;
+  gap: 5px;
+}
+
+.link-card-head {
+  display: flex;
+  min-width: 0;
+  align-items: center;
+  gap: 7px;
+}
+
+.link-card-icon {
+  display: grid;
+  width: 16px;
+  height: 16px;
+  flex: 0 0 auto;
+  border-radius: var(--radius);
+  object-fit: contain;
+}
+
+.link-card-icon.is-letter {
+  place-items: center;
+  background: color-mix(in srgb, var(--accent) 20%, transparent);
+  color: var(--accent);
+  font-size: var(--fs-micro);
+  font-weight: 700;
+  line-height: 1;
+}
+
+.link-card-title {
+  display: -webkit-box;
+  overflow: hidden;
+  font-size: 13.5px;
+  font-weight: 650;
+  line-height: 1.4;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+}
+
+.link-card-desc {
+  display: -webkit-box;
+  overflow: hidden;
+  margin: 0;
+  color: var(--text-soft);
+  font-size: var(--fs-meta);
+  line-height: 1.55;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+}
+
+.link-card-foot {
+  display: flex;
+  align-items: center;
+  margin-top: 1px;
+  gap: 6px;
+}
+
+.link-card-site {
+  overflow: hidden;
+  flex: 1 1 auto;
+  color: var(--text-faint);
+  font-size: var(--fs-meta);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.link-card-arrow {
+  width: 12px;
+  height: 12px;
+  flex: 0 0 auto;
+  color: var(--text-faint);
+}
+
+@media (max-width: 836px) {
+  .link-card {
+    max-width: 100%;
+  }
+}
+
+/* 自动成链的裸地址会很长,别把气泡撑破。 */
+.markdown-body a.auto-link {
+  overflow-wrap: anywhere;
+}
+
+/* ── 附件预览浮层 ───────────────────────────────────────────────
+   自己发出去的附件点开后看内容。和 .lightbox 同一套遮罩语言,但内容区是
+   一块可滚动的面板而不是一张图。 */
+.attachment-preview {
+  position: fixed;
+  z-index: var(--z-top);
+  display: grid;
+  align-items: center;
+  justify-items: center;
+  padding: clamp(16px, 4vw, 48px);
+  inset: 0;
+  opacity: 0;
+  transition: opacity var(--motion) ease;
+}
+
+.attachment-preview.is-open {
+  opacity: 1;
+}
+
+.attachment-preview-scrim {
+  position: absolute;
+  border: 0;
+  cursor: zoom-out;
+  inset: 0;
+  background: rgb(0 0 0 / 68%);
+  backdrop-filter: blur(3px);
+}
+
+.attachment-preview-frame {
+  position: relative;
+  display: grid;
+  width: min(920px, 100%);
+  max-height: 100%;
+  grid-template-rows: auto minmax(0, 1fr);
+  border: 1px solid var(--line-strong);
+  border-radius: var(--radius);
+  background: var(--surface-1);
+  box-shadow: var(--artifact-shadow);
+  transform: scale(0.97);
+  transition: transform var(--motion) ease;
+}
+
+.attachment-preview.is-open .attachment-preview-frame {
+  transform: scale(1);
+}
+
+.attachment-preview-bar {
+  display: flex;
+  align-items: center;
+  padding: 6px 8px 6px 14px;
+  border-bottom: 1px solid var(--line);
+  gap: 4px;
+}
+
+.attachment-preview-title {
+  display: flex;
+  min-width: 0;
+  flex: 1 1 auto;
+  align-items: baseline;
+  overflow: hidden;
+  gap: 8px;
+}
+
+.attachment-preview-title strong {
+  overflow: hidden;
+  font-size: var(--fs-ui);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.attachment-preview-title small {
+  flex: 0 0 auto;
+  color: var(--text-soft);
+  font-size: var(--fs-micro);
+}
+
+.attachment-preview-body {
+  overflow: auto;
+  min-height: 0;
+  padding: 14px 16px;
+}
+
+.attachment-preview-text {
+  margin: 0;
+  font-family: var(--font-mono);
+  font-size: var(--fs-meta);
+  line-height: 1.65;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+
+.attachment-preview-video {
+  display: block;
+  width: 100%;
+  max-height: min(72dvh, 900px);
+  border-radius: var(--radius);
+  background: #000;
+}
+
+.attachment-preview-audio {
+  display: block;
+  width: 100%;
+}
+
+.attachment-preview-pdf {
+  display: block;
+  width: 100%;
+  height: min(72dvh, 900px);
+  border: 0;
+  border-radius: var(--radius);
+  background: var(--surface-2);
+}
+
+.attachment-preview-note {
+  margin: 10px 0 0;
+  color: var(--text-soft);
+  font-size: var(--fs-meta);
+}
+
+.attachment-preview-body > .attachment-preview-note:only-child {
+  margin: 0;
+}
+
+body.has-attachment-preview {
+  overflow: hidden;
+}
+
+.lightbox-caption {
+  overflow: hidden;
+  max-width: min(46vw, 420px);
+  margin-right: 6px;
+  color: var(--text-soft);
+  font-size: var(--fs-meta);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.lightbox-caption:empty {
+  display: none;
+}
+
+.lightbox-action,
+.preview-action {
+  display: grid;
+  width: 30px;
+  height: 30px;
+  place-items: center;
+  border-radius: var(--radius);
+  color: var(--text-faint);
+}
+
+.lightbox-action:hover,
+.preview-action:hover {
+  background: var(--surface-2);
+  color: var(--text);
+}
+
+.lightbox-action .icon-slot,
+.preview-action .icon-slot {
+  width: 15px;
+  height: 15px;
+}
+
+body.has-lightbox {
+  overflow: hidden;
+}
+

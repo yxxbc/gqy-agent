@@ -1,0 +1,302 @@
+/* 工具签:气泡内小签。身份用字形色(⚙/$ 金),底色只表状态——
+   运行中浅紫(默认态)、成功中性、失败浅红。 */
+.tool-card {
+  min-width: 0;
+  max-width: 100%;
+  border: 0;
+  border-radius: 0;
+  background: none;
+}
+
+.tool-card.is-command {
+  --command-preview-bg: color-mix(in srgb, var(--gold-soft) 62%, transparent);
+  --command-preview-ink: var(--md-sys-color-on-secondary-container);
+  --command-preview-accent: var(--gold);
+  width: fit-content;
+}
+
+body[data-color-scheme="matugen"] .tool-card.is-command {
+  --command-preview-bg: color-mix(in srgb, var(--md-sys-color-tertiary-container) 70%, var(--surface-1));
+  --command-preview-ink: var(--md-sys-color-on-tertiary-container);
+  --command-preview-accent: var(--md-sys-color-tertiary);
+}
+
+.tool-head {
+  display: flex;
+  width: fit-content;
+  max-width: 100%;
+  min-height: 0;
+  align-items: center;
+  padding: 4px 9px;
+  border-radius: var(--radius);
+  background: var(--chip-live);
+  color: var(--text);
+  cursor: pointer;
+  gap: 5px;
+  font-size: var(--fs-meta);
+  font-weight: 600;
+  text-align: left;
+  transition: background-color var(--motion-slow) ease;
+}
+
+.is-success .tool-head {
+  background: var(--chip-neutral);
+}
+
+.is-success .tool-head:hover {
+  background: var(--surface-2);
+}
+
+.is-failure .tool-head {
+  background: var(--chip-fail);
+}
+
+.tool-card.is-command .tool-head {
+  background: var(--command-preview-bg);
+  color: var(--command-preview-ink);
+}
+
+.tool-card.is-command.is-failure .tool-head {
+  background: var(--chip-fail);
+  color: var(--md-sys-color-on-error-container);
+}
+
+.tool-icon {
+  display: grid;
+  width: 15px;
+  height: 15px;
+  flex: 0 0 15px;
+  place-items: center;
+  border-radius: 0;
+  background: none;
+  color: var(--accent);
+}
+
+.tool-icon .icon-slot {
+  width: 13px;
+  height: 13px;
+}
+
+.is-success .tool-icon {
+  color: var(--gold);
+}
+
+.is-failure .tool-icon {
+  color: var(--danger);
+}
+
+.tool-card.is-command .tool-icon {
+  color: var(--command-preview-accent);
+}
+
+.tool-card.is-command.is-failure .tool-icon {
+  color: var(--danger);
+}
+
+/* 芯片被压窄时,标题这层必须自己截断:没有 overflow 的话
+   flex 只是把这个盒子挤小,里面的粗体名照样画到圆角背景外面去。 */
+.tool-title {
+  display: flex;
+  min-width: 0;
+  flex: 0 1 auto;
+  overflow: hidden;
+  align-items: baseline;
+  gap: 6px;
+}
+
+.tool-title strong,
+.tool-title small {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.tool-title strong {
+  /* 工具名优先完整显示、不被主语挤没(#110):不缩(flex 0 0),靠下面的主语先让位
+     腾空间。不再封 62%——那会在窄面板里把「后台任务」截成「后」(#123);极长的
+     load_tools 名超出时由 .tool-title 的 overflow 兜底裁掉,不会画到圆角外。 */
+  flex: 0 0 auto;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  font-size: var(--fs-meta);
+  font-weight: 600;
+}
+
+.tool-title .tool-technical-name {
+  display: none;
+}
+
+/* 参数 / 命令外显:等宽小字,填名字右边余下空间,先于名字让位、超长省略号(不加淡出
+   遮罩——那会把还没溢出的主语文字也虚掉,读不清 #121)。 */
+.tool-title .tool-summary {
+  flex: 1 1 0;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: var(--text-soft);
+  font-family: var(--font-mono);
+  font-size: var(--fs-micro);
+  font-weight: 400;
+}
+
+.tool-status {
+  display: inline-flex;
+  min-width: 0;
+  align-items: center;
+  color: var(--accent);
+  font-size: var(--fs-micro);
+  gap: 4px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* 状态只留字形:✓ / ✕ / 转圈 */
+.tool-status > span:not(.icon-slot) {
+  display: none;
+}
+
+.is-success .tool-status {
+  color: var(--online);
+}
+
+.is-failure .tool-status {
+  color: var(--danger);
+}
+
+.tool-status .icon-slot {
+  width: 12px;
+  height: 12px;
+}
+
+.tool-chevron {
+  width: 11px;
+  height: 11px;
+  flex: 0 0 11px;
+  color: var(--text-soft);
+  opacity: 0.7;
+  transition: transform var(--motion) ease;
+}
+
+.tool-status .is-spinning svg {
+  animation: spin 900ms linear infinite;
+}
+
+.tool-card.collapsed .tool-chevron {
+  transform: rotate(-90deg);
+}
+
+.tool-card.collapsed .tool-body {
+  display: none;
+}
+
+.tool-card.is-command:not(.collapsed) .tool-command-preview,
+.tool-card.is-command:not(.collapsed) .tool-command-output-preview {
+  display: none;
+}
+
+.tool-artifact-preview {
+  display: grid;
+  grid-template-columns: 16px minmax(0, 1fr) 14px;
+  width: fit-content;
+  max-width: 100%;
+  min-height: 34px;
+  align-items: center;
+  margin-top: 6px;
+  padding: 5px 9px;
+  border-radius: var(--radius);
+  background: var(--surface-2);
+  color: var(--text-soft);
+  cursor: pointer;
+  font-size: var(--fs-micro);
+  gap: 7px;
+}
+
+.tool-artifact-preview:hover {
+  background: var(--surface-3);
+  color: var(--text);
+}
+
+.tool-artifact-preview .icon-slot {
+  width: 14px;
+  height: 14px;
+  color: var(--accent);
+}
+
+.tool-artifact-preview .icon-slot:last-child {
+  color: var(--text-faint);
+}
+
+.tool-artifact-preview > span:not(.icon-slot) {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* 收起时展示命令与最近输出；展开后由完整详情替代这两个预览。 */
+.tool-command-preview {
+  width: fit-content;
+  min-width: 0;
+  max-width: 100%;
+  box-sizing: border-box;
+  margin: 6px 0 0;
+  padding: 8px 12px;
+  max-height: min(calc(9.9em + 16px), 30.9091dvh);
+  overflow-x: hidden;
+  overflow-y: auto;
+  border: 0;
+  border-radius: var(--radius);
+  background: var(--command-preview-bg);
+  color: var(--command-preview-ink);
+  font-family: var(--font-mono);
+  font-size: var(--fs-meta);
+  font-weight: 400;
+  line-height: 1.65;
+  overflow-wrap: anywhere;
+  tab-size: 2;
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+
+.tool-command-output-preview {
+  display: inline-grid;
+  width: fit-content;
+  min-width: 0;
+  max-width: 100%;
+  box-sizing: border-box;
+  margin-top: 6px;
+  padding: 8px 12px;
+  max-height: min(calc(var(--command-output-lines, 8) * 1.6em + 16px), 34.5455dvh);
+  overflow-x: hidden;
+  overflow-y: auto;
+  border-left: 2px solid var(--command-preview-accent);
+  border-radius: 0 var(--radius) var(--radius) 0;
+  background: color-mix(in srgb, var(--command-preview-bg) 58%, var(--surface-1));
+  color: var(--text-soft);
+  font-family: var(--font-mono);
+  font-size: var(--fs-meta);
+  line-height: 1.6;
+}
+
+.tool-command-output-line,
+.tool-command-output-omitted {
+  display: block;
+  min-width: 0;
+  max-width: 100%;
+  overflow-wrap: anywhere;
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+
+.tool-command-output-line.is-stderr {
+  color: var(--danger);
+}
+
+.tool-command-output-omitted {
+  color: var(--text-faint);
+}
+

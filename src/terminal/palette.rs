@@ -67,7 +67,7 @@ impl Depth {
 /// 设计稿里的颜色一律写成 RGB，落地时才降级。
 pub type Rgb = (u8, u8, u8);
 
-/// 种子色取自 web/styles.css（gqy-logo 抽的）。
+/// 种子色取自 web/css/00-tokens.css（gqy-logo 抽的）。
 pub const BLUE: Rgb = (0xae, 0xbd, 0xe8); // primary  瞳色雾蓝
 pub const CORAL: Rgb = (0xe3, 0x8c, 0x9a); // tertiary 丝带酒红
 pub const GOLD: Rgb = (0xe4, 0xbf, 0x79); // secondary 发色暖金

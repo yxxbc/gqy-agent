@@ -1,0 +1,603 @@
+/* 自己发的消息里只会出现三样东西:段落、代码块、链接。段落之间要有气口,
+   代码块贴着气泡边会闷。 */
+.user-bubble > * + * {
+  margin-top: 9px;
+}
+
+/* 自己发的消息里的代码块跟着**气泡**走,不再借用正文那套 --code-bg。
+   借用的写法在亮色主题下必翻车:晨光的气泡是实心主色(深),而 --code-bg 是页面
+   那张奶油纸(浅)——深气泡上贴一张浅纸,谁看都不合理(用户 09-09 裁定)。
+   两套主题的用户气泡都是「深底浅字」(暗色 primary-container / 亮色 primary),
+   所以一条规则通吃:底色 = 气泡色兑进近黑,既比气泡深一档、又留着气泡的色相;
+   字色 = 气泡前景色。语法色跟着钉死在 One Dark 那套上——面板永远是深的,
+   就不该再跟主题的深浅走。 */
+.user-bubble .code-block {
+  margin: 0;
+  --code-bg: color-mix(in srgb, var(--user-bg) 34%, #14141a);
+  --code-ink: var(--user-text);
+  --tok-c: #7f848e;
+  --tok-p: #abb2bf;
+  --tok-o: #56b6c2;
+  --tok-k: #c678dd;
+  --tok-s: #98c379;
+  --tok-n: #d19a66;
+  --tok-f: #61afef;
+  --tok-t: #e5c07b;
+  --tok-y: #e06c75;
+  border-radius: var(--radius);
+  white-space: normal;
+}
+
+.user-bubble .code-block pre {
+  max-height: 320px;
+}
+
+.user-bubble > p > code {
+  padding: 1px 5px;
+  border-radius: var(--radius);
+  background: color-mix(in srgb, var(--user-text) 16%, transparent);
+  font-family: var(--font-mono);
+  font-size: 0.9em;
+}
+
+.user-bubble a {
+  color: inherit;
+  text-decoration: underline;
+  text-underline-offset: 2px;
+  overflow-wrap: anywhere;
+}
+
+.revision-editor {
+  display: grid;
+  width: min(86%, 640px);
+  gap: 8px;
+}
+
+.revision-editor textarea {
+  width: 100%;
+  min-height: 96px;
+  max-height: calc(40vh / var(--ui-scale));
+  resize: vertical;
+  border: 1px solid var(--line-strong);
+  border-radius: var(--radius) var(--radius) var(--radius-sm) var(--radius);
+  outline: none;
+  /* 和当前用户气泡同底色(中性 surface-1),不再是那块强调色(09-12 #12)。 */
+  background: var(--surface-1);
+  color: var(--text);
+  padding: 10px 16px;
+  font: inherit;
+  font-size: var(--fs-chat);
+  line-height: 1.7;
+}
+
+.revision-editor textarea:focus-visible {
+  /* 聚焦高亮改中性(09-12 #14):不再是那圈强调色边线,和消息气泡一致。 */
+  border-color: var(--line-strong);
+  box-shadow: 0 0 0 2px color-mix(in srgb, var(--text) 10%, transparent);
+}
+
+.revision-editor-footer {
+  display: flex;
+  justify-content: flex-end;
+  flex-wrap: wrap;
+  gap: 7px;
+}
+
+.revision-editor-footer button {
+  min-height: 34px;
+  border-radius: var(--radius);
+  padding: 5px 12px;
+  background: var(--surface-2);
+  color: var(--text);
+}
+
+.revision-editor-footer button[type="submit"] {
+  background: var(--accent);
+  color: var(--inverse-text);
+}
+
+.revision-editor-error {
+  color: var(--danger);
+  font-size: var(--fs-meta);
+}
+
+.user-attachments {
+  display: flex;
+  justify-content: flex-end;
+  flex-wrap: wrap;
+  width: fit-content;
+  max-width: 100%;
+  margin-bottom: 5px;
+  gap: 5px;
+}
+
+.user-attachment-image {
+  display: block;
+  width: 96px;
+  height: 96px;
+  flex: 0 0 96px;
+  overflow: hidden;
+  border-radius: var(--radius);
+  background: var(--surface-2);
+}
+
+.user-attachment-image img {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+}
+
+.user-attachment-file {
+  display: grid;
+  grid-template-columns: 28px minmax(0, 1fr) 18px;
+  width: fit-content;
+  min-width: 140px;
+  max-width: min(280px, 100%);
+  flex: 0 1 auto;
+  min-height: 48px;
+  align-items: center;
+  padding: 6px 9px;
+  border-radius: var(--radius);
+  border: 1px solid color-mix(in srgb, var(--line) 65%, transparent);
+  background: var(--surface-2);
+  color: var(--text);
+  gap: 7px;
+}
+
+.user-attachment-file > .icon-slot:first-child {
+  width: 18px;
+  height: 18px;
+  color: var(--accent);
+}
+
+.user-attachment-file > .icon-slot:last-child {
+  width: 14px;
+  height: 14px;
+  opacity: 0.7;
+}
+
+/* 能预览的芯片:整块点开预览,右下角箭头单独负责下载。 */
+.user-attachment-file.is-previewable {
+  cursor: pointer;
+  transition: border-color var(--motion) ease, background-color var(--motion) ease;
+}
+
+.user-attachment-file.is-previewable:hover,
+.user-attachment-file.is-previewable:focus-visible {
+  border-color: color-mix(in srgb, var(--accent) 45%, var(--line));
+  background: color-mix(in srgb, var(--accent) 8%, var(--surface-2));
+}
+
+.user-attachment-download {
+  display: grid;
+  width: 18px;
+  height: 18px;
+  align-content: center;
+  justify-items: center;
+  border-radius: var(--radius);
+  color: inherit;
+  opacity: 0.65;
+}
+
+.user-attachment-download:hover {
+  opacity: 1;
+}
+
+.user-attachment-download .icon-slot {
+  width: 14px;
+  height: 14px;
+}
+
+.user-attachment-file > span:nth-child(2) {
+  display: grid;
+  min-width: 0;
+  width: max-content;
+  max-width: 210px;
+}
+
+.user-attachment-file strong,
+.user-attachment-file small {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.user-attachment-file strong {
+  font-size: var(--fs-meta);
+  font-weight: 600;
+}
+
+.user-attachment-file small {
+  font-size: var(--fs-micro);
+  opacity: 0.72;
+}
+
+.message-actions,
+.assistant-meta {
+  display: flex;
+  min-height: 24px;
+  align-items: center;
+  margin-top: 3px;
+  color: var(--text-faint);
+  font-family: var(--font-mono);
+  font-size: var(--fs-micro);
+  font-variant-numeric: tabular-nums;
+  gap: 5px;
+}
+
+.assistant-stream-rail {
+  display: flex;
+  width: 100%;
+  min-height: 24px;
+  align-items: center;
+  padding-left: 2px;
+}
+
+.assistant-stream-rail[hidden] {
+  display: none;
+}
+
+.message-actions:hover,
+.assistant-meta:hover {
+  color: var(--text-soft);
+}
+
+.assistant-endpoint {
+  color: inherit;
+  font-size: inherit;
+}
+
+.message-actions button,
+.assistant-meta button,
+.code-copy-button {
+  display: grid;
+  width: 25px;
+  height: 23px;
+  place-items: center;
+  border-radius: var(--radius);
+  background: transparent;
+  color: var(--text-faint);
+  cursor: pointer;
+  transition: background-color var(--motion) ease, color var(--motion) ease;
+}
+
+.message-actions button,
+.assistant-meta button {
+  opacity: 0;
+}
+
+.message:hover .message-actions button,
+.assistant-message:hover .assistant-meta button,
+.message-actions button:focus-visible,
+.assistant-meta button:focus-visible {
+  opacity: 1;
+}
+
+.message-actions button:hover,
+.assistant-meta button:hover,
+.code-copy-button:hover {
+  background: var(--surface-2);
+  color: var(--text);
+}
+
+.message-actions .icon-slot,
+.assistant-meta .icon-slot,
+.code-copy-button .icon-slot {
+  width: 13px;
+  height: 13px;
+}
+
+/* 助手消息:92% 列宽的气泡行,30px 金圈头像固定在消息顶部 */
+.assistant-message {
+  position: relative;
+  max-width: 92%;
+  margin-bottom: 30px;
+  padding-left: 40px;
+}
+
+.assistant-message.is-muted {
+  opacity: 0.7;
+}
+
+.assistant-label {
+  display: flex;
+  min-width: 0;
+  align-items: center;
+  margin-bottom: 5px;
+  gap: 8px;
+}
+
+.assistant-label img {
+  position: absolute;
+  top: 0;
+  bottom: auto;
+  left: 0;
+  width: 30px;
+  height: 30px;
+  border: 1.5px solid var(--gold);
+  border-radius: 50%;
+  object-fit: cover;
+}
+
+.assistant-label > div {
+  display: flex;
+  min-width: 0;
+  align-items: baseline;
+  gap: 7px;
+}
+
+.assistant-label strong {
+  color: var(--text-soft);
+  font-size: var(--fs-micro);
+  font-weight: 600;
+}
+
+.assistant-label span {
+  color: var(--text-faint);
+  font-size: var(--fs-micro);
+  overflow-wrap: anywhere;
+}
+
+.assistant-label .live-indicator {
+  color: var(--accent);
+}
+
+/* 助手气泡:surface-1 无边框 + 软阴影,左下角 3px 收尾 */
+.assistant-content {
+  position: relative;
+  min-width: 0;
+  padding: 12px 16px;
+  border-radius: var(--radius) var(--radius) var(--radius) var(--radius-sm);
+  background: var(--surface-1);
+  box-shadow: var(--bubble-shadow);
+  color: var(--text);
+  font-size: var(--fs-chat);
+  line-height: 1.75;
+}
+
+/* 普通正文和小签按内容收缩；长文本仍受消息列最大宽度约束并正常换行。 */
+.assistant-content.is-slim {
+  width: fit-content;
+  max-width: 100%;
+}
+
+.assistant-bubble {
+  position: relative;
+  min-width: 0;
+}
+
+.assistant-bubble:has(.assistant-content.is-slim) {
+  width: fit-content;
+  max-width: 100%;
+}
+
+.assistant-blocks {
+  min-width: 0;
+}
+
+.avatar-path-row { display: flex; align-items: center; gap: 6px; min-width: 0; }
+.avatar-path-row .config-input { flex: 1 1 auto; min-width: 0; }
+.avatar-path-row .icon-button { flex: 0 0 34px; }
+.persona-avatar-preview { display: block; width: 38px; height: 38px; flex: 0 0 38px; border-radius: 50%; object-fit: cover; border: 1px solid var(--outline); }
+.persona-board-preview { border-radius: var(--radius); }
+.persona-avatar-preview.is-missing { background: var(--surface-3); }
+.persona-starter-fields { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 6px; }
+
+.assistant-blocks > * {
+  margin-top: 0;
+  margin-bottom: 10px;
+}
+
+.assistant-blocks > .tool-card,
+.assistant-blocks > .reasoning-block {
+  margin-bottom: 7px;
+}
+
+.assistant-blocks > *:last-child {
+  margin-bottom: 0;
+}
+
+.assistant-meta {
+  min-height: 25px;
+  padding-left: 2px;
+  justify-content: flex-start;
+}
+
+.assistant-meta .meta-spacer {
+  flex: 1;
+}
+
+.turn-status-line {
+  display: flex;
+  min-height: 31px;
+  align-items: center;
+  margin: -18px 0 28px;
+  padding-left: 40px;
+  color: var(--text-faint);
+  font-size: var(--fs-meta);
+  gap: 7px;
+}
+
+.turn-status-line.is-interrupted,
+.run-notice.is-error {
+  color: var(--coral);
+}
+
+.turn-status-line .icon-slot {
+  width: 14px;
+  height: 14px;
+}
+
+.context-state-badge {
+  display: inline-flex;
+  min-height: 20px;
+  align-items: center;
+  padding: 0 6px;
+  border-radius: var(--radius);
+  background: color-mix(in srgb, var(--surface-2) 70%, transparent);
+  color: var(--text-faint);
+  font-size: var(--fs-micro);
+}
+
+.markdown-body {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+.markdown-body > :first-child {
+  margin-top: 0;
+}
+
+.markdown-body > :last-child {
+  margin-bottom: 0;
+}
+
+.markdown-body p {
+  margin: 0 0 10px;
+}
+
+.markdown-body .hl {
+  color: var(--hl);
+  font-weight: 600;
+}
+
+.markdown-body h2,
+.markdown-body h3,
+.markdown-body h4,
+.markdown-body h5,
+.markdown-body h6 {
+  margin: 18px 0 8px;
+  color: var(--text);
+  font-weight: 700;
+  line-height: 1.35;
+  letter-spacing: 0;
+}
+
+.markdown-body h2 {
+  font-size: 17px;
+}
+
+.markdown-body h3 {
+  margin: 14px 0 6px;
+  font-size: 15.5px;
+}
+
+.markdown-body h4,
+.markdown-body h5,
+.markdown-body h6 {
+  margin: 12px 0 5px;
+  font-size: var(--fs-chat);
+}
+
+.markdown-body ul,
+.markdown-body ol {
+  display: grid;
+  margin: 0 0 10px;
+  padding-left: 20px;
+  gap: 3px;
+}
+
+.markdown-body li::marker {
+  color: var(--text-soft);
+}
+
+.markdown-body .task-list {
+  padding-left: 2px;
+}
+
+.markdown-body .task-list-item {
+  display: grid;
+  grid-template-columns: 16px minmax(0, 1fr);
+  align-items: start;
+  column-gap: 8px;
+  list-style: none;
+}
+
+.markdown-body .task-list-item input {
+  width: 15px;
+  height: 15px;
+  margin: 3px 0 0;
+  accent-color: var(--accent);
+  opacity: 1;
+}
+
+.markdown-body blockquote {
+  margin: 0 0 10px;
+  padding: 7px 13px;
+  border-left: 3px solid var(--accent);
+  border-radius: 0 var(--radius) var(--radius) 0;
+  background: color-mix(in srgb, var(--accent-soft) 35%, transparent);
+  color: var(--text-soft);
+  font-size: 14px;
+}
+
+.markdown-body blockquote p:last-child {
+  margin-bottom: 0;
+}
+
+.markdown-body blockquote.markdown-alert,
+.artifact-markdown blockquote.markdown-alert {
+  padding: 8px 12px;
+  margin: 10px 0;
+  border-left: 3.5px solid var(--alert-color, var(--accent));
+  border-radius: 0 var(--radius) var(--radius) 0;
+  background: color-mix(in srgb, var(--alert-color, var(--accent)) 9%, transparent);
+  color: var(--text);
+}
+
+blockquote.markdown-alert-note {
+  --alert-color: var(--accent);
+}
+
+blockquote.markdown-alert-tip {
+  --alert-color: var(--online, #2ea043);
+}
+
+blockquote.markdown-alert-important {
+  --alert-color: var(--coral, #8957e5);
+}
+
+blockquote.markdown-alert-warning {
+  --alert-color: var(--gold, #d29922);
+}
+
+blockquote.markdown-alert-caution {
+  --alert-color: var(--danger);
+}
+
+.markdown-alert-title {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin: 0 0 4px;
+  font-size: var(--fs-ui);
+  font-weight: 600;
+  color: var(--alert-color, var(--accent));
+  line-height: 1.4;
+}
+
+.markdown-alert-title svg,
+.markdown-alert-icon {
+  width: 15px;
+  height: 15px;
+  flex: none;
+}
+
+.markdown-alert-content {
+  font-size: 13.5px;
+  line-height: 1.6;
+  color: var(--text-soft);
+}
+
+.markdown-body hr {
+  height: 1px;
+  margin: 14px 0;
+  border: 0;
+  background: var(--line);
+}
+
+.markdown-body del {
+  color: var(--text-faint);
+}
+

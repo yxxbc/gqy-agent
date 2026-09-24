@@ -1,0 +1,531 @@
+/* 切换会话时铺一层加载动画(09-12「先切后加载」):目标标签已高亮,大会话拉取
+   期间这里转圈,而不是像卡在旧会话上。 */
+.conversation-stage.is-switching::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  z-index: 5;
+  background: color-mix(in srgb, var(--surface-2) 60%, transparent);
+}
+.conversation-stage.is-switching::before {
+  content: "";
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  z-index: 6;
+  width: 30px;
+  height: 30px;
+  margin: -15px 0 0 -15px;
+  border-radius: 50%;
+  border: 3px solid color-mix(in srgb, var(--accent) 28%, transparent);
+  border-top-color: var(--accent);
+  animation: conv-switch-spin 0.7s linear infinite;
+}
+@keyframes conv-switch-spin {
+  to { transform: rotate(360deg); }
+}
+@media (prefers-reduced-motion: reduce) {
+  .conversation-stage.is-switching::before { animation: none; }
+}
+
+.inline-error {
+  grid-row: 1;
+  width: min(100% - 28px, 940px);
+  margin: 8px auto 0;
+  padding: 9px 12px;
+  border: 0;
+  border-left: 3px solid var(--danger);
+  border-radius: var(--radius);
+  background: var(--danger-soft);
+  color: var(--md-sys-color-on-error-container);
+  font-size: var(--fs-meta);
+  line-height: 1.45;
+  overflow-wrap: anywhere;
+}
+
+.chat-scroll {
+  grid-row: 2;
+  min-width: 0;
+  min-height: 0;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  scrollbar-color: var(--line-strong) transparent;
+  scrollbar-width: thin;
+}
+
+.timeline {
+  width: min(100%, 980px);
+  min-height: 100%;
+  margin: 0 auto;
+  padding: 24px 30px 42px;
+}
+
+.day-divider {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin: 0 0 22px;
+  color: var(--text-soft);
+  font-size: var(--fs-micro);
+}
+
+.day-divider:not(:first-child) {
+  margin-top: 28px;
+}
+
+.day-divider > span {
+  border-radius: var(--radius);
+  background: var(--surface-2);
+  padding: 3px 12px;
+}
+
+.system-event {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin: 0 0 18px;
+  color: var(--text-soft);
+  font-size: var(--fs-micro);
+}
+
+.system-event > span {
+  border-radius: var(--radius);
+  background: var(--surface-2);
+  padding: 3px 12px;
+  max-width: 80%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* 目标状态行：贴在输入框上方，跟着阶段变样。目标是会话级的长期状态，
+   放在对话流里会被后面几十轮顶到看不见的地方。 */
+.goal-bar {
+  display: flex;
+  align-items: center;
+  margin-bottom: 6px;
+  padding: 7px 9px 7px 11px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  gap: 9px;
+  background: var(--surface-1);
+}
+
+.goal-bar[hidden] {
+  display: none;
+}
+
+.goal-bar-mark {
+  display: grid;
+  width: 15px;
+  height: 15px;
+  flex: 0 0 15px;
+  place-items: center;
+  color: var(--text-faint);
+}
+
+.goal-bar[data-phase="active"] .goal-bar-mark {
+  color: var(--gold);
+}
+
+.goal-bar[data-phase="blocked"] .goal-bar-mark {
+  color: var(--danger, #e5484d);
+}
+
+/* 一行装下：目标占满剩余宽度，状态贴在它后面。 */
+.goal-bar-objective {
+  overflow: hidden;
+  min-width: 0;
+  flex: 1 1 auto;
+  border-radius: var(--radius);
+  cursor: text;
+  font-size: var(--fs-meta);
+  font-weight: 600;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.goal-bar-objective:hover {
+  background: var(--surface-2);
+  box-shadow: 0 0 0 3px var(--surface-2);
+}
+
+.goal-bar-meta {
+  flex: 0 0 auto;
+  color: var(--text-faint);
+  font-size: var(--fs-micro);
+  white-space: nowrap;
+}
+
+.goal-bar[data-phase="blocked"] .goal-bar-meta {
+  color: var(--danger, #e5484d);
+}
+
+.goal-bar-edit {
+  min-width: 0;
+  flex: 1 1 auto;
+  padding: 4px 7px;
+  border: 1px solid var(--accent);
+  border-radius: var(--radius);
+  background: var(--surface-2);
+  color: var(--text);
+  font-family: inherit;
+  font-size: var(--fs-meta);
+  font-weight: 600;
+  /* 多行文本框(09-12):自动撑高,不手动拉伸,换行随内容走 */
+  resize: none;
+  line-height: 1.45;
+  overflow-y: auto;
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+
+.goal-bar-edit:focus {
+  outline: none;
+}
+
+.goal-bar-actions {
+  display: flex;
+  flex: 0 0 auto;
+  gap: 2px;
+}
+
+.goal-bar-button {
+  display: grid;
+  width: 26px;
+  height: 26px;
+  place-items: center;
+  border: 0;
+  border-radius: var(--radius);
+  background: transparent;
+  color: var(--text-faint);
+  cursor: pointer;
+}
+
+.goal-bar-button:hover {
+  background: var(--surface-2);
+  color: var(--text);
+}
+
+.goal-bar-button .icon-slot {
+  width: 13px;
+  height: 13px;
+}
+
+.jobs-strip {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding: 6px 14px 0;
+  margin-bottom: 8px;
+}
+
+.jobs-strip-toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  align-self: flex-start;
+  border: none;
+  background: var(--surface-2);
+  color: var(--text-soft);
+  font-size: var(--fs-micro);
+  border-radius: var(--radius);
+  padding: 4px 10px;
+  cursor: pointer;
+}
+
+.jobs-strip-toggle:hover {
+  color: var(--text);
+}
+
+/* 桌面端折叠头更醒目：手机端保持紧凑（836px 断点与整体缩放一致）。 */
+@media (min-width: 837px) {
+  .jobs-strip-toggle {
+    font-size: var(--fs-meta);
+    padding: 6px 14px;
+    color: var(--text);
+    border: 1px solid color-mix(in srgb, var(--accent) 35%, transparent);
+    background: color-mix(in srgb, var(--accent-soft) 30%, var(--surface-2));
+  }
+}
+
+.job-chip {
+  display: flex;
+  width: 100%;
+  align-items: center;
+  gap: 8px;
+  border-radius: var(--radius);
+  background: var(--surface-2);
+  color: var(--text-soft);
+  font-size: var(--fs-micro);
+  padding: 4px 10px;
+}
+
+.job-chip.is-done .job-chip-marker {
+  color: var(--ok, #7fb069);
+}
+
+.job-chip.is-failed .job-chip-marker {
+  color: var(--danger, #d08080);
+}
+
+.job-chip-marker {
+  flex: none;
+  width: 1.2em;
+  text-align: center;
+}
+
+.job-chip-marker.is-spinning {
+  animation: job-chip-spin 0.8s linear infinite;
+}
+
+@keyframes job-chip-spin {
+  from { transform: rotate(0deg); }
+  to { transform: rotate(360deg); }
+}
+
+.job-chip-label {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.job-chip-time {
+  flex: none;
+  font-variant-numeric: tabular-nums;
+}
+
+/* 后台子代理任务行:可点开看流式子过程。收起时标题行里带一条单行窥视。 */
+.job-chip-wrap {
+  width: 100%;
+}
+.job-chip.is-expandable {
+  cursor: pointer;
+  transition: background var(--motion) ease;
+}
+/* 可点开的任务行悬浮要有「选中」反馈(#5:悬浮没有选中效果)——chip 本身已是
+   surface-2,再叠一层正文色兑亮一档,和工具行整行悬浮同一套语言。 */
+.job-chip.is-expandable:hover {
+  background: color-mix(in srgb, var(--text) 8%, var(--surface-2));
+}
+.job-chip-label {
+  flex: 1 1 auto;
+}
+/* 左侧标记槽:spinner 与展开箭头叠在同一格,平时显 spinner,悬浮显箭头
+   (09-12 #8b)。 */
+.job-chip-marker-slot {
+  position: relative;
+  flex: none;
+  width: 1.3em;
+  height: 1.3em;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+.job-chip-marker-slot .job-chip-chevron {
+  display: none;
+  position: absolute;
+  inset: 0;
+  margin: auto;
+  width: 15px;
+  height: 15px;
+  opacity: 0.7;
+  transition: transform var(--motion) ease;
+}
+.job-chip:hover > .job-chip-marker-slot > .job-braille {
+  visibility: hidden;
+}
+.job-chip:hover > .job-chip-marker-slot > .job-chip-chevron {
+  display: block;
+}
+/* 「后台任务 ×N」合并行是收起/展开控件,不是某个在跑的任务:一直显箭头(提示可展开/收起),
+   不显盲文转圈(#138)。展开态由下面的 is-open 旋 180°。 */
+.job-chip.is-toggle > .job-chip-marker-slot > .job-braille {
+  display: none;
+}
+.job-chip.is-toggle > .job-chip-marker-slot > .job-chip-chevron {
+  display: block;
+}
+.job-chip.is-open > .job-chip-marker-slot > .job-chip-chevron {
+  transform: rotate(180deg);
+}
+/* 展开后的子过程流:限高可滚,不许顶满全屏(09-11 用户报)。 */
+/* 后台【子代理】展开面板(不含命令日志面板,它自带一层框、别叠成两层框 #134):
+   不要左侧竖线(#116);给一层柔和暖底做外框(和前台活区域同款),节点遮线块用的就是
+   这暖底,面板不上底时节点暖色会浮在纯页面底上露方块(#122)。左缩进从 24 收到 6(#133)。 */
+.job-stream-panel:not(.job-log-panel) {
+  margin: 2px 0 8px 8px;
+  padding: 5px 8px;
+  border-radius: var(--radius);
+  background: color-mix(in srgb, var(--text) 5%, transparent);
+  /* 后台子代理展开区约 5 行高就够,超出滚动(#4:限高丢了顶到全屏)。
+     这条 :not() 特异度比下面那条裸 .job-stream-panel 高,所以限高得写在这里,
+     不然那条 150px 压不过来、又退回了大高度。 */
+  max-height: 150px;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  scrollbar-gutter: stable;
+}
+
+.job-chip-stop {
+  flex: none;
+  border: none;
+  background: transparent;
+  color: var(--text-soft);
+  cursor: pointer;
+  padding: 0 2px;
+  font-size: inherit;
+}
+
+.job-chip-stop:hover {
+  color: var(--text);
+}
+
+/* 09-12 任务条重做:合并行=单行 job-chip 外观;盲文点阵 spinner(JS 驱动,不转);
+   行窥视(跑到工具/思考单行刷新)+ token 显示;展开箭头悬在状态行之后。 */
+.job-chip.is-toggle {
+  cursor: pointer;
+}
+.job-chip.is-toggle .job-chip-label {
+  flex: 1 1 auto;
+}
+.job-braille {
+  animation: none;
+  color: var(--accent, currentColor);
+}
+.job-chip-label {
+  flex: 0 1 auto;
+}
+/* .reasoning-peek(文件后段)会用同特异度的 flex:0 1 auto 盖掉这里,
+   所以用 .job-chip 前缀提高特异度,确保窥视撑开、把 token/时间/✕ 顶到最右
+   (09-12 #8c:命令行 token/时间/✕ 没右对齐)。 */
+.job-chip .job-chip-peek {
+  display: flex;
+  flex: 1 1 auto;
+  min-width: 0;
+  overflow: hidden;
+  margin-left: 2px;
+  color: var(--proc-think, var(--text-soft));
+  font-size: var(--fs-micro);
+  line-height: 1.5;
+}
+.job-chip-peek > span {
+  flex: none;
+  white-space: nowrap;
+}
+/* 用户改主意(#2「窥视右对齐不合理」):任务行窥视改左对齐、紧跟时间,超长向右淡出。
+   .job-chip 前缀把特异度抬到 0,3,0,压过文件后段的 `.reasoning-peek.is-overflow`
+   (0,2,0,那条是给主对话「已思考」尾巴用的右对齐+左淡出,保持不动)。 */
+.job-chip .job-chip-peek.is-overflow {
+  justify-content: flex-start;
+  -webkit-mask-image: linear-gradient(to right, transparent, #000 14px, #000 calc(100% - 28px), transparent);
+  mask-image: linear-gradient(to right, transparent, #000 14px, #000 calc(100% - 28px), transparent);
+}
+.job-chip-token {
+  flex: none;
+  color: var(--text-soft);
+  font-variant-numeric: tabular-nums;
+  font-size: var(--fs-micro);
+  opacity: 0.85;
+}
+.job-chip-token:empty {
+  display: none;
+}
+/* 后台命令展开:拉日志尾巴,限高约 5 行可滚(09-12)。 */
+.job-log-panel {
+  margin: 2px 0 8px 8px;
+}
+.job-log-pre {
+  margin: 0;
+  max-height: 9em;
+  overflow: auto;
+  overscroll-behavior: contain;
+  white-space: pre-wrap;
+  word-break: break-word;
+  font-family: var(--mono, ui-monospace, SFMono-Regular, Menlo, monospace);
+  font-size: var(--fs-micro);
+  color: var(--text-soft);
+  background: color-mix(in srgb, var(--text) 6%, transparent);
+  border-radius: 6px;
+  padding: 6px 8px;
+}
+/* 09-12 item 6:展开的子过程区约 5 行就够,不再 42vh 顶到全屏。 */
+.job-stream-panel {
+  /* 后台子代理展开区也固定约 5 行高(#10,和前台的活区域一个量级),超出滚动。 */
+  max-height: 150px;
+}
+
+/* 09-12 二轮修 #2/#4/#5/#10:标题永远优先(至少放得下「开发中/子代理/命令」),
+   窥视只是次要、可缩、定宽 token 槽减少抖动;展开(is-open)只显标题不显窥视;
+   命令日志面板去掉左侧竖线。用 `.job-chip >` 直接子选择器压过前面几条同名规则。 */
+/* 标题撑开占左边、优先完整显示;窥视靠右、只占一小块、和标题之间留足间距,
+   永远不压标题(09-12 #1 后台标题被窥视覆盖)。token/时间/✕ 被撑开的标题顶到最右。 */
+.job-chip > .job-chip-label {
+  /* 标题优先完整显示(#3/#10:不被窥视盖住/挤掉):不缩、最多占 60%,超了才省略。 */
+  flex: 0 0 auto;
+  max-width: 60%;
+  min-width: 3.6em;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.job-chip > .job-chip-token,
+.job-chip > .job-chip-time {
+  flex: none;
+}
+.job-chip > .job-chip-peek {
+  /* 窥视填右边余下空间,左对齐紧跟秒数。淡出只在真的放不下时才加(见 .is-overflow),
+     内容短、空间够时不加遮罩(#132:短内容被无谓地虚掉了)。 */
+  flex: 1 1 0;
+  min-width: 0;
+  justify-content: flex-start;
+}
+.job-chip.is-open > .job-chip-peek {
+  display: none;
+}
+.job-chip > .job-chip-token {
+  flex: none;
+  min-width: 3.4em;
+  text-align: right;
+  margin-left: 6px;
+}
+.job-chip > .job-chip-time {
+  margin-left: 6px;
+}
+/* 后台命令展开的日志面板不要那条左竖线(用户嫌丑,09-12)。 */
+.job-log-panel {
+  border-left: none;
+  padding-left: 0;
+}
+
+
+.message {
+  width: 100%;
+  min-width: 0;
+}
+
+.user-message {
+  display: grid;
+  justify-items: end;
+  margin-bottom: 27px;
+}
+
+.user-bubble {
+  max-width: min(62%, 640px);
+  padding: 10px 16px;
+  border-radius: var(--radius) var(--radius) var(--radius-sm) var(--radius);
+  background: var(--user-bg);
+  color: var(--user-text);
+  font-size: var(--fs-chat);
+  line-height: 1.7;
+  overflow-wrap: anywhere;
+  white-space: pre-wrap;
+}
+
+.user-bubble p {
+  margin: 0;
+  line-height: 1.7;
+}
+

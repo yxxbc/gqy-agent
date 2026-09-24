@@ -1,0 +1,442 @@
+/* 新对话:brand-row 内 38px 图标方键 */
+.new-chat-button {
+  display: grid;
+  width: 38px;
+  height: 38px;
+  flex: 0 0 38px;
+  place-items: center;
+  border: 0;
+  border-radius: var(--radius);
+  background: var(--accent-soft);
+  color: var(--md-sys-color-on-primary-container);
+  cursor: pointer;
+  transition: filter var(--motion-slow) ease, transform var(--motion) ease;
+}
+
+.new-chat-button:hover:not(:disabled) {
+  filter: brightness(1.05);
+  transform: translateY(-1px);
+}
+
+.new-chat-button:active:not(:disabled) {
+  transform: scale(0.95);
+}
+
+.new-chat-button .icon-slot {
+  width: 17px;
+  height: 17px;
+}
+
+.new-chat-button:disabled {
+  color: var(--text-faint);
+  opacity: 0.58;
+}
+
+.session-list {
+  min-height: 0;
+  padding: 4px 8px 18px;
+  overflow: auto;
+  scrollbar-color: var(--line-strong) transparent;
+  scrollbar-width: thin;
+}
+
+.session-items {
+  display: grid;
+  gap: 3px;
+}
+
+/* 侧栏拖拽排序:拖动中的行半透明,落点用主题色细线指示 */
+.session-item.is-dragging {
+  opacity: 0.45;
+}
+
+.session-item.drop-before {
+  box-shadow: inset 0 2px 0 0 var(--accent);
+}
+
+.session-item.drop-after {
+  box-shadow: inset 0 -2px 0 0 var(--accent);
+}
+
+.session-item {
+  position: relative;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  width: 100%;
+  min-height: 30px;
+  align-items: stretch;
+  border-radius: var(--radius);
+  background: transparent;
+  color: var(--text);
+  gap: 0;
+  text-align: left;
+  transition: background var(--motion-slow) ease;
+}
+
+.session-item:hover,
+.session-item:focus-within {
+  background: color-mix(in srgb, var(--surface-1) 65%, transparent);
+}
+
+.session-item.active,
+.session-item.active:hover {
+  background: var(--surface-1);
+  box-shadow: var(--bubble-shadow);
+}
+
+.session-item.active::before {
+  position: absolute;
+  top: 7px;
+  bottom: 7px;
+  left: 0;
+  width: 3px;
+  border-radius: var(--radius-sm);
+  background: var(--ribbon);
+  content: "";
+}
+
+.session-item-main {
+  display: grid;
+  grid-template-columns: 11px minmax(0, 1fr);
+  min-width: 0;
+  align-items: center;
+  padding: 2px 7px 2px 11px;
+  border-radius: var(--radius);
+  background: transparent;
+  color: inherit;
+  cursor: pointer;
+  gap: 7px;
+  text-align: left;
+}
+
+/* 行首那一格:有状态就画,没有就空着。格子常驻,文字左缘才不会跟着动。 */
+.session-lead {
+  display: grid;
+  width: 11px;
+  height: 11px;
+  place-items: center;
+}
+
+.session-item-main.is-renaming {
+  cursor: default;
+}
+
+
+
+.session-copy {
+  display: grid;
+  min-width: 0;
+  gap: 2px;
+}
+
+.session-title-row {
+  display: flex;
+  min-width: 0;
+  align-items: center;
+  gap: 6px;
+}
+
+/* 会话名的字重定在 `.session-copy strong`(见下方);当前会话提半档到 500。
+   原来写 600 是想要"略重",但本机字体栈没有 SemiBold 字面,600 会回退到
+   Bold——12.5px 实测字面宽度 400=180.50 / 500=181.34 / 600=182.45 / 700=182.45,
+   600 与 700 一模一样,于是当前会话整行变成真加粗(08-26 用户两次点名)。
+   500 命中 Noto Sans CJK Medium,是真实存在的中间档。特异性要压过下面那条,
+   否则被同特异性、位置更靠后的规则盖掉。 */
+.session-item.active .session-copy strong {
+  font-weight: 500;
+}
+
+.session-default-badge {
+  flex: 0 0 auto;
+  padding: 0 5px;
+  border: 0;
+  border-radius: var(--radius);
+  background: var(--accent-soft);
+  color: var(--md-sys-color-on-primary-container);
+  font-size: var(--fs-micro);
+  font-weight: 500;
+  line-height: 15px;
+}
+
+/* 运行中:转圈。动效表达「正在发生」——静态点和「有未读」看不出区别。 */
+/* 盲文点阵转圈,和 REPL 里工具运行时那个同款(`wait_spinner.rs` 的
+   BRAILLE_FRAMES)。同一件事在两个界面用同一个形状;圆环那种到处都是,
+   这个一眼就认得出是 顾清影 在干活。
+
+   换帧交给 JS(`startBrailleTicker`)。CSS 那两种做法都不可靠:动画
+   `content` 只有 Chrome 认;十帧竖排靠 `steps()` 平移则要求行高和字形
+   度量严丝合缝,盲文点阵一旦落到 fallback 字体就错位。 */
+.session-run-spinner {
+  display: grid;
+  width: 11px;
+  height: 14px;
+  flex: 0 0 auto;
+  place-items: center;
+  color: var(--gold);
+  font-family: var(--font-mono);
+  /* 盲文点阵的字面比同号数字小一圈——点只占字身中间那一块,四周留白很多。
+     要和旁边的未读圆点看着一样大,字号得往上顶。 */
+  font-size: 17px;
+  line-height: 1;
+}
+
+/* 未读:实心圆 + 呼吸。生命周期是「回合结束 → 用户切进来」,不是「已完成」。
+   颜色用强调色:亮色主题(linen 的米色底)上金色和背景太接近,看不出来;
+   matugen 取色主题同理,强调色是整套 token 里对比度最有保障的那个。只有
+   graphite(默认暗色)保留亮金——深底上金点醒目,且和运行中的转圈同色系。
+   呼吸动画复用 `status-pulse`,靠 currentcolor 自动取色。 */
+.session-unread-dot {
+  display: inline-block;
+  flex: 0 0 auto;
+  /* 外框与 spinner 同宽,两者互换时整行不抖;真正的点靠 radial-gradient 居中 */
+  width: 11px;
+  height: 11px;
+  border-radius: 50%;
+  color: var(--accent);
+  background: radial-gradient(circle, currentcolor 0 3.5px, transparent 3.5px);
+  animation: status-pulse 2.4s ease-in-out infinite;
+}
+
+body[data-theme="graphite"] .session-unread-dot {
+  color: var(--gold);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .session-run-spinner {
+    animation-duration: 2.4s;
+  }
+}
+
+
+.session-copy strong,
+.session-copy small,
+.session-time {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.session-copy strong {
+  font-size: var(--fs-ui);
+  /* 语义上是 <strong>,视觉上不该整列粗体:层次交给背景与当前项的 500。 */
+  font-weight: 400;
+}
+
+.session-copy small,
+.session-time {
+  color: var(--text-soft);
+  font-size: var(--fs-micro);
+}
+
+.session-time {
+  color: var(--text-faint);
+  font-size: var(--fs-micro);
+}
+
+.session-rename-input {
+  min-width: 0;
+  padding: 2px 6px;
+  border: 1px solid var(--accent);
+  border-radius: var(--radius);
+  background: var(--surface-1);
+  color: var(--text);
+  font-size: var(--fs-meta);
+}
+
+.session-rename-input:focus {
+  outline: none;
+}
+
+.session-trailing {
+  display: flex;
+  /* 横排:指示器与菜单按钮并排,各自垂直居中。竖排时指示器被顶到按钮上方,
+     看着就是偏上的。 */
+  flex-direction: row;
+  align-items: center;
+  justify-content: flex-end;
+  padding: 5px 6px 5px 0;
+  gap: 4px;
+}
+
+.session-time {
+  max-width: 45px;
+}
+
+.session-menu-button {
+  display: inline-grid;
+  width: 22px;
+  height: 22px;
+  place-items: center;
+  border-radius: var(--radius);
+  background: transparent;
+  color: var(--text-soft);
+  cursor: pointer;
+  opacity: 0;
+}
+
+.session-menu-button .icon-slot {
+  display: grid;
+  place-items: center;
+  width: 14px;
+  height: 14px;
+  line-height: 1;
+}
+
+.session-item:hover .session-menu-button,
+.session-item:focus-within .session-menu-button,
+.session-menu-button[aria-expanded="true"] {
+  opacity: 1;
+}
+
+.session-menu-button:hover,
+.session-menu-button[aria-expanded="true"] {
+  background: var(--surface-3);
+  color: var(--text);
+}
+
+.session-menu {
+  position: absolute;
+  top: calc(100% - 12px);
+  right: 6px;
+  z-index: calc(var(--z-popover) - 10);
+  display: grid;
+  min-width: 132px;
+  padding: 4px;
+  border: 0;
+  border-radius: var(--radius);
+  background: var(--surface-1);
+  box-shadow: var(--float-shadow);
+  gap: 1px;
+}
+
+.session-menu.open-up {
+  top: auto;
+  bottom: calc(100% - 12px);
+}
+
+.session-menu button {
+  padding: 7px 10px;
+  border-radius: var(--radius);
+  background: transparent;
+  color: var(--text);
+  cursor: pointer;
+  font-size: var(--fs-meta);
+  text-align: left;
+}
+
+.session-menu button:hover {
+  background: var(--surface-2);
+}
+
+.session-menu button.is-danger {
+  color: var(--danger);
+}
+
+.session-menu button.is-danger:hover {
+  background: var(--danger-soft);
+}
+
+
+.sidebar-footer {
+  padding: 11px 12px max(12px, env(safe-area-inset-bottom));
+  background: var(--sidebar-bg);
+}
+
+.context-summary {
+  display: grid;
+  gap: 6px;
+}
+
+.context-heading {
+  display: flex;
+  justify-content: space-between;
+  color: var(--text-soft);
+  font-size: var(--fs-micro);
+  white-space: nowrap;
+  gap: 6px;
+}
+
+.context-heading > span:last-child {
+  font-size: var(--fs-micro);
+}
+
+.context-track {
+  height: 5px;
+  overflow: hidden;
+  border-radius: var(--radius-sm);
+  background: var(--surface-2);
+}
+
+.context-track i {
+  display: block;
+  width: 0;
+  height: 100%;
+  border-radius: var(--radius-sm);
+  background: linear-gradient(90deg, var(--gold), var(--accent));
+  transition: width 500ms ease;
+}
+
+.context-track.is-high i {
+  background: linear-gradient(90deg, var(--gold), var(--ribbon));
+}
+
+.context-track.is-critical i {
+  background: var(--danger);
+}
+
+.sidebar-actions {
+  display: flex;
+  align-items: center;
+  margin-top: 11px;
+  gap: 2px;
+}
+
+.sidebar-actions > .sidebar-action:first-child {
+  flex: 1 1 auto;
+  min-width: 0;
+}
+
+.sidebar-action {
+  display: inline-flex;
+  min-width: 0;
+  min-height: 32px;
+  align-items: center;
+  padding: 0 8px;
+  border-radius: var(--radius);
+  background: transparent;
+  color: var(--text-soft);
+  cursor: pointer;
+  gap: 7px;
+}
+
+.sidebar-action:hover {
+  background: var(--surface-2);
+  color: var(--text);
+}
+
+.sidebar-action .icon-slot {
+  width: 15px;
+  height: 15px;
+}
+
+.settings-label {
+  min-width: 0;
+  white-space: nowrap;
+}
+
+.main-stage {
+  --artifact-width: 45.4545vw;
+  position: relative;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  grid-template-rows: minmax(0, 1fr);
+  min-width: 0;
+  min-height: 0;
+  background: var(--app-bg);
+  /* 这里曾经是 container-type: inline-size，只为下面那条 @container 判断宽度。
+     WebKit 在容器查询容器的后代被 replaceChildren 时会把 .chat-scroll 的
+     scrollTop 同步归零（WebKitGTK 2.52 实测），于是流式渲染每帧都把视口拽回
+     顶部，滚动跟随自我作废——Safari 独有的气泡抖动。宽度判断改由 app.js 的
+     is-wide 类承担，见 syncArtifactLayout。 */
+}
+

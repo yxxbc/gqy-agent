@@ -1,0 +1,439 @@
+/* 表格:去外框与竖线,只留淡横线,整块坐在淡底容器里 */
+.markdown-body .markdown-table-scroll {
+  max-width: 100%;
+  margin: 0 0 10px;
+  overflow-x: auto;
+  border-radius: var(--radius);
+  background: color-mix(in srgb, var(--surface-2) 45%, transparent);
+  scrollbar-color: var(--line-strong) transparent;
+}
+
+.markdown-body table {
+  width: max-content;
+  min-width: 100%;
+  border-collapse: collapse;
+  font-size: 13.5px;
+}
+
+.markdown-body th,
+.markdown-body td {
+  max-width: 360px;
+  padding: 7px 14px;
+  border: 0;
+  text-align: left;
+  vertical-align: top;
+  overflow-wrap: anywhere;
+}
+
+.markdown-body th {
+  border-bottom: 1px solid var(--line);
+  color: var(--text-soft);
+  font-size: var(--fs-micro);
+  font-weight: 600;
+  letter-spacing: 0.07em;
+}
+
+.markdown-body td {
+  border-bottom: 1px solid color-mix(in srgb, var(--line) 45%, transparent);
+}
+
+.markdown-body tbody tr:last-child td {
+  border-bottom: 0;
+}
+
+.markdown-body .align-center {
+  text-align: center;
+}
+
+.markdown-body .align-right {
+  text-align: right;
+}
+
+.markdown-body code:not(pre code) {
+  padding: 1px 6px;
+  border: 0;
+  border-radius: var(--radius);
+  background: var(--surface-2);
+  font-family: var(--font-mono);
+  font-size: 0.86em;
+  overflow-wrap: anywhere;
+}
+
+.markdown-body a {
+  color: var(--link);
+  font-weight: 600;
+  text-decoration: underline;
+  text-decoration-color: color-mix(in srgb, var(--link) 35%, transparent);
+  text-underline-offset: 3px;
+  overflow-wrap: anywhere;
+}
+
+.markdown-body a:hover {
+  text-decoration-color: var(--link);
+}
+
+/* 「标题 (地址)」整行成链时,地址那半截退半档:标题仍然是主角,但两截同属一个
+   链接,点哪儿都能走。 */
+.link-url {
+  font-weight: 400;
+  opacity: 0.72;
+}
+
+/* 本地路径链接。浏览器不让 http 页面跳 file://,所以这里点一下是复制路径——
+   光标形状先把这件事说清楚,免得点完以为链接坏了。 */
+a.path-link {
+  cursor: copy;
+}
+
+/* 代码块必须一眼看出是「一块面板」,但**不靠描边**(用户 09-09 裁定):层次
+   交给底色,一条线只是把「底色分得不够开」这件事糊过去。
+   两条约束缺一不可:底色跟着主题的色相走(要符合网页背景),同时跟气泡差开一档。
+   走查里 check_surfaces 就是钉这两条的(testkit/webui-links/syntax.py)。 */
+.code-block {
+  margin: 2px 0 12px;
+  overflow: hidden;
+  border: 0;
+  border-radius: var(--radius);
+  background: var(--code-bg);
+  color: var(--code-ink);
+}
+
+.code-toolbar {
+  display: flex;
+  min-height: 30px;
+  align-items: center;
+  justify-content: space-between;
+  padding: 3px 6px 0 14px;
+  color: color-mix(in srgb, var(--code-ink) 50%, transparent);
+  font-family: var(--font-mono);
+  font-size: var(--fs-micro);
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+}
+
+.code-copy-button {
+  color: color-mix(in srgb, var(--code-ink) 60%, transparent);
+}
+
+.code-copy-button:hover {
+  background: color-mix(in srgb, var(--code-ink) 12%, transparent);
+  color: var(--code-ink);
+}
+
+.code-block pre {
+  max-height: 420px;
+  margin: 0;
+  padding: 4px 16px 13px;
+  overflow: auto;
+  color: var(--code-ink);
+  font-family: var(--font-mono);
+  font-size: var(--fs-ui);
+  line-height: 1.7;
+  tab-size: 2;
+}
+
+.code-block code {
+  white-space: pre;
+}
+
+/* ```svg / ```html 围栏预览(fencepreview.js)。切换器挤在语言名与复制按钮之间。 */
+.fence-mode-switch {
+  display: inline-flex;
+  margin-left: auto;
+  margin-right: 4px;
+  gap: 2px;
+}
+
+.fence-mode-switch button {
+  min-height: 22px;
+  padding: 0 8px;
+  border: 0;
+  border-radius: var(--radius);
+  background: transparent;
+  color: color-mix(in srgb, var(--code-ink) 55%, transparent);
+  cursor: pointer;
+  font: inherit;
+  letter-spacing: 0.04em;
+}
+
+.fence-mode-switch button:hover,
+.fence-mode-switch button.active {
+  background: color-mix(in srgb, var(--code-ink) 12%, transparent);
+  color: var(--code-ink);
+}
+
+.fence-preview {
+  padding: 4px 12px 12px;
+}
+
+.fence-preview.is-svg {
+  display: flex;
+  justify-content: center;
+}
+
+.fence-preview.is-svg img {
+  display: block;
+  max-width: 100%;
+  max-height: 480px;
+  height: auto;
+}
+
+.fence-frame {
+  display: block;
+  width: 100%;
+  border: 0;
+  border-radius: var(--radius);
+  /* 沙箱页面自带背景色时照它;没写背景的页面按白底看,和浏览器直接打开一致。 */
+  background: #fff;
+}
+
+/* mermaid 图按当前主题取色画在透明底上,透出代码块底色。 */
+.fence-preview.is-mermaid .fence-frame {
+  background: transparent;
+}
+
+.fence-preview-note {
+  padding: 14px 4px;
+  color: color-mix(in srgb, var(--code-ink) 55%, transparent);
+  font-size: var(--fs-meta);
+}
+
+/* 回复气泡底部的产物 chip(artifactchips.js · webui-delivery §5)。只露类型 + 截断名。 */
+.assistant-artifacts {
+  display: flex;
+  flex-wrap: wrap;
+  margin-top: 8px;
+  gap: 6px;
+}
+
+.artifact-chip {
+  display: inline-flex;
+  max-width: 100%;
+  align-items: stretch;
+  overflow: hidden;
+  border-radius: var(--radius);
+  background: var(--surface-2);
+  color: var(--text-soft);
+  font-size: var(--fs-micro);
+}
+
+.artifact-chip-open {
+  display: inline-flex;
+  min-width: 0;
+  min-height: 30px;
+  align-items: center;
+  padding: 4px 8px;
+  border: 0;
+  background: transparent;
+  color: inherit;
+  cursor: pointer;
+  font: inherit;
+  gap: 6px;
+}
+
+.artifact-chip-open .icon-slot,
+.artifact-chip-download .icon-slot {
+  width: 14px;
+  height: 14px;
+}
+
+.artifact-chip-open .icon-slot {
+  color: var(--accent);
+}
+
+.artifact-chip-type {
+  color: var(--text-faint);
+  font-size: var(--fs-micro);
+  font-weight: 600;
+  letter-spacing: 0.02em;
+}
+
+.artifact-chip-name {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.artifact-chip-download {
+  display: inline-grid;
+  width: 30px;
+  place-items: center;
+  border-left: 1px solid var(--line);
+  color: var(--text-faint);
+}
+
+.artifact-chip-open:hover,
+.artifact-chip-download:hover {
+  background: var(--surface-3);
+  color: var(--text);
+}
+
+/* 代码语法色。类名由 highlight.js 从 Prism 的 token 类型映射过来,九个角色:
+   c 注释 / p 标点 / o 运算符 / k 关键字 / s 字符串 / n 数值 / f 函数 /
+   t 类型标签 / y 属性变量,外加 diff 的增删行与 markdown 的粗斜体。 */
+.tok-c {
+  color: var(--tok-c);
+  font-style: italic;
+}
+
+.tok-p {
+  color: var(--tok-p);
+}
+
+.tok-o {
+  color: var(--tok-o);
+}
+
+.tok-k {
+  color: var(--tok-k);
+}
+
+.tok-s {
+  color: var(--tok-s);
+}
+
+.tok-n {
+  color: var(--tok-n);
+}
+
+.tok-f {
+  color: var(--tok-f);
+}
+
+.tok-t {
+  color: var(--tok-t);
+}
+
+.tok-y {
+  color: var(--tok-y);
+}
+
+.tok-b {
+  font-weight: 650;
+}
+
+.tok-i {
+  font-style: italic;
+}
+
+/* diff 的增删行:颜色之外再垫一层极淡的底,整行扫过去比只认颜色快。 */
+.tok-ins {
+  background: color-mix(in srgb, var(--tok-s) 15%, transparent);
+  color: var(--tok-s);
+}
+
+/* 删除行用红,不是关键字那个紫——补丁里紫色的「删掉」没人认得。 */
+.tok-del {
+  background: color-mix(in srgb, var(--tok-y) 15%, transparent);
+  color: var(--tok-y);
+}
+
+/* 文件编辑工具(edit/kb/artifact)的 diff(web/diff.js):把 patchText 画成分文件、
+   带增删配色的 diff。极简、无描边——只靠一行标题 + 改动行的整行底色区分,和过程
+   时间线那套克制观感一致。增删色不沿用代码高亮那套(在暖米底上发闷),另起一套
+   更干净的绿/红,两个主题各调一档。 */
+:root {
+  --diff-add: #1a7f37;
+  --diff-del: #cf222e;
+}
+body[data-theme="graphite"] {
+  --diff-add: #3fb950;
+  --diff-del: #f85149;
+}
+.diff-view {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  min-width: 0;
+  font-family: var(--mono, ui-monospace, SFMono-Regular, Menlo, monospace);
+  font-size: var(--fs-micro);
+}
+.diff-file {
+  min-width: 0;
+  /* 不要描边(用户 #156):改用柔和阴影 + 一层浅表面把 diff 抬成一张卡。
+     阴影收到 --bubble-shadow 那档(0 1px 4px,随主题),artifact 那档太散(用户嫌大)。 */
+  background: var(--surface-1);
+  border-radius: var(--radius);
+  box-shadow: var(--bubble-shadow);
+  overflow: hidden;
+}
+.diff-file-head {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  padding: 8px 12px 7px;
+}
+.diff-op {
+  flex: none;
+  font-weight: 600;
+  color: var(--text-soft);
+}
+.diff-file.is-add .diff-op { color: var(--diff-add); }
+.diff-file.is-delete .diff-op { color: var(--diff-del); }
+.diff-ns {
+  flex: none;
+  font-size: var(--fs-micro);
+  padding: 0 5px;
+  border-radius: 4px;
+  background: color-mix(in srgb, var(--accent) 14%, transparent);
+  color: var(--accent);
+}
+.diff-path {
+  flex: 1 1 auto;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: var(--text);
+}
+.diff-stat {
+  flex: none;
+  display: flex;
+  gap: 8px;
+  font-variant-numeric: tabular-nums;
+  font-weight: 600;
+}
+.diff-stat-add { color: var(--diff-add); }
+.diff-stat-del { color: var(--diff-del); }
+.diff-lines {
+  margin: 0;
+  max-height: 320px;
+  overflow: hidden auto;
+  overscroll-behavior: contain;
+  line-height: 1.6;
+  padding-bottom: 4px;
+}
+.diff-hunk {
+  padding: 3px 12px;
+  color: var(--text-faint);
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+.diff-line {
+  display: flex;
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+.diff-gutter {
+  flex: none;
+  width: 1.9em;
+  text-align: center;
+  user-select: none;
+  opacity: 0.65;
+}
+.diff-text {
+  flex: 1 1 auto;
+  min-width: 0;
+  padding-right: 12px;
+}
+.diff-line.is-ctx .diff-text { color: var(--text-soft); }
+.diff-line.is-add {
+  background: color-mix(in srgb, var(--diff-add) 13%, transparent);
+}
+.diff-line.is-add .diff-gutter { color: var(--diff-add); opacity: 1; }
+.diff-line.is-del {
+  background: color-mix(in srgb, var(--diff-del) 12%, transparent);
+}
+.diff-line.is-del .diff-gutter { color: var(--diff-del); opacity: 1; }
+

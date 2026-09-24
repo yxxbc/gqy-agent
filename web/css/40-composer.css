@@ -1,0 +1,160 @@
+/* ── 输入框:三行文本区 + 底部一栏(附件左下角,面板/语音/发送右下角);信息移到框下(#99) ── */
+.composer-input-row {
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  width: 100%;
+  min-width: 0;
+}
+.composer-input-row > textarea {
+  width: 100%;
+}
+.composer-inbox-bar {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 0 10px 8px 10px;
+}
+.composer-inbox-right {
+  margin-left: auto;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  /* 停止按钮浮在发送按钮正上方(用户要求),需要相对定位作锚。 */
+  position: relative;
+}
+/* 框内按钮统一一套:副按钮幽灵(透明+悬浮底色),发送圆形强调色作主操作,停止红调;
+   36px 圆角、图标 18px。 */
+.composer-inbox-bar button {
+  width: 36px;
+  height: 36px;
+  flex: 0 0 36px;
+  display: grid;
+  place-items: center;
+  border: 0;
+  border-radius: 10px;
+  background: transparent;
+  color: var(--text-soft);
+  cursor: pointer;
+  transition: background var(--motion) ease, color var(--motion) ease, transform var(--motion-fast) ease;
+}
+.composer-inbox-bar button > .icon-slot,
+.composer-inbox-bar button > .icon-slot svg {
+  width: 18px;
+  height: 18px;
+}
+.composer-inbox-bar button:hover:not(:disabled) {
+  background: var(--surface-2);
+  color: var(--text);
+}
+.composer-inbox-bar button:active:not(:disabled) {
+  transform: scale(0.9);
+}
+.composer-inbox-bar button:disabled {
+  color: var(--text-faint);
+  cursor: not-allowed;
+}
+.composer-inbox-bar .send-button {
+  border-radius: 50%;
+  background: var(--accent);
+  color: var(--md-sys-color-on-primary, #12131b);
+}
+.composer-inbox-bar .send-button:hover:not(:disabled) {
+  background: var(--accent);
+  color: var(--md-sys-color-on-primary, #12131b);
+  filter: brightness(1.1);
+}
+.composer-inbox-bar .send-button:disabled {
+  background: var(--surface-2);
+  color: var(--text-faint);
+}
+.composer-inbox-bar .live-stop-button {
+  background: color-mix(in srgb, var(--ribbon) 20%, transparent);
+  color: var(--ribbon);
+  border: 0;
+}
+.composer-inbox-bar .live-stop-button:hover:not(:disabled) {
+  background: color-mix(in srgb, var(--ribbon) 34%, transparent);
+  color: var(--ribbon);
+}
+.composer-info {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  width: 100%;
+  min-width: 0;
+  box-sizing: border-box;
+  padding: 8px 12px 2px;
+  font-size: var(--fs-micro);
+  color: var(--text-soft);
+}
+.composer-info-spacer {
+  flex: 1 1 auto;
+  min-width: 8px;
+}
+/* 模型选择器不被挤没:不收缩,标题过长才在自己内部省略(#2 手机端只剩「▾」的真因)。 */
+.composer-info .model-menu-wrap {
+  flex: 0 0 auto;
+  min-width: 0;
+}
+.composer-info .model-button {
+  /* 覆盖旧的手机端「只显 ▾」规则(那是模型还在框内时为省地方做的;现在模型移到
+     框下信息行、有空间,手机端也要看得到模型名,#2)。 */
+  width: auto;
+  max-width: 46vw;
+  justify-content: flex-start;
+  padding: 4px 10px;
+}
+.composer-info .model-label {
+  display: inline;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  max-width: 100%;
+}
+.composer-info .k {
+  /* 标签和数值同色(#111:不加粗后颜色还不一样),整行统一用 --text-soft。 */
+  color: inherit;
+}
+.composer-info b {
+  /* 数值不加粗、也不换色(#1/#111):和标签一个色,只靠等宽字形和位置区分。 */
+  font-weight: 400;
+  color: inherit;
+  font-variant-numeric: tabular-nums;
+  font-family: var(--font-mono);
+}
+.composer-speed,
+.composer-cumulative {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  flex: none;
+  white-space: nowrap;
+}
+/* 上下文:小圆环 + 数字(替代原来的长条,用户觉得不美观) */
+.composer-info .composer-context {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  flex: none;
+  /* 2026-09-14 起是按钮:点开上下文分项弹窗。去掉按钮外观,只留悬停底色。 */
+  width: auto;
+  min-width: 0;
+  margin: -3px -6px;
+  padding: 3px 6px;
+  border: 0;
+  border-radius: var(--radius);
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  cursor: pointer;
+}
+.composer-info .composer-context:hover,
+.composer-info .composer-context[aria-expanded="true"] {
+  background: color-mix(in srgb, var(--text) 8%, transparent);
+}
+.composer-info .composer-context:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 1px;
+}
+

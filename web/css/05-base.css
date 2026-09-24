@@ -1,0 +1,249 @@
+/* Android Chrome:body 的 100% 是「工具栏收起」的大布局视口,而外壳只有可视视口那么高,
+   文档比可见区域长出一截,到底后继续拖会把可视视口往下平移,外壳整体上移——输入框
+   底部被推出屏幕、顶部也被切掉(09-11 手机端实测)。文档高度也钉在可视视口上。
+   只在手机端钉:手机端 --ui-scale=1,--app-height 正好等于可视视口;桌面端
+   --ui-scale=1.1,而 --app-height 已按 UI_SCALE 除过(那是给带 zoom 的 .app-shell
+   用的),body 不带 zoom 再吃这个值就比窗口矮 1/1.1≈9%,底部露出一条 app 背景色的
+   空带(09-11 桌面端实测)。桌面端 body 保持前面的 height:100%。 */
+@media (max-width: 836px) {
+  body {
+    height: var(--app-height, 100%);
+  }
+}
+
+body {
+  background: var(--app-bg);
+  color: var(--text);
+  font-family: var(--font-ui);
+  font-size: var(--fs-ui);
+  letter-spacing: 0;
+  -webkit-font-smoothing: antialiased;
+}
+
+/* 数字、ID、命令一律等宽 + tabular-nums */
+.assistant-endpoint,
+.character-count,
+.session-time,
+.capability-list dd,
+.model-menu small,
+.context-heading > span:last-child,
+.settings-model small {
+  font-family: var(--font-mono);
+  font-variant-numeric: tabular-nums;
+}
+
+button,
+input,
+textarea {
+  color: inherit;
+  font: inherit;
+  letter-spacing: 0;
+}
+
+button {
+  border: 0;
+  appearance: none;
+  -webkit-appearance: none;
+}
+
+button:focus-visible,
+input:focus-visible,
+textarea:focus-visible,
+summary:focus-visible,
+a:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+
+button:disabled,
+input:disabled,
+textarea:disabled {
+  cursor: not-allowed;
+}
+
+[hidden] {
+  display: none !important;
+}
+
+/* 高度跟着可视视口走,而不是 100dvh。iOS Safari 不认 viewport meta 里的
+   interactive-widget=resizes-content,软键盘弹出时 dvh 一动不动,外壳就比可见
+   区域高出一个键盘,浏览器为了把输入框顶进视野只能滚动文档——表现是整页上移。
+   --app-height 由 syncAppHeight() 写,JS 没跑起来时回落到 100dvh。 */
+.app-shell {
+  display: grid;
+  grid-template-columns: var(--sidebar-width) minmax(0, 1fr);
+  width: 100%;
+  height: var(--app-height, calc(100dvh / var(--ui-scale)));
+  zoom: var(--ui-scale);
+}
+
+.app-shell.is-sidebar-collapsed {
+  grid-template-columns: minmax(0, 1fr);
+}
+
+.app-shell.is-sidebar-collapsed .sidebar {
+  display: none;
+}
+
+.app-shell.is-sidebar-collapsed .sidebar-expand-button {
+  display: inline-grid;
+}
+
+.icon-slot {
+  display: inline-grid;
+  width: 18px;
+  height: 18px;
+  flex: 0 0 18px;
+  place-items: center;
+  line-height: 1;
+}
+
+.icon-slot svg {
+  width: 100%;
+  height: 100%;
+  stroke-width: 1.8;
+}
+
+.icon-fallback {
+  font-size: 14px;
+  line-height: 1;
+}
+
+.icon-button {
+  display: inline-grid;
+  width: 34px;
+  height: 34px;
+  flex: 0 0 34px;
+  place-items: center;
+  border: 0;
+  border-radius: var(--radius);
+  background: transparent;
+  color: var(--text-soft);
+  cursor: pointer;
+}
+
+.icon-button:hover:not(:disabled) {
+  background: var(--surface-2);
+  color: var(--text);
+}
+
+.icon-button:disabled {
+  color: var(--text-faint);
+  opacity: 0.55;
+}
+
+.status-dot {
+  display: inline-block;
+  width: 6px;
+  height: 6px;
+  flex: 0 0 6px;
+  border-radius: 50%;
+  color: var(--online);
+  background: currentcolor;
+  animation: status-pulse 2.4s ease-in-out infinite;
+}
+
+@keyframes status-pulse {
+  0%,
+  100% {
+    box-shadow: 0 0 0 0 color-mix(in srgb, currentcolor 45%, transparent);
+  }
+
+  50% {
+    box-shadow: 0 0 0 5px transparent;
+  }
+}
+
+.status-dot.is-connecting {
+  color: var(--gold);
+}
+
+.status-dot.is-offline,
+.status-dot.is-blocked {
+  color: var(--danger);
+}
+
+.sidebar {
+  position: relative;
+  z-index: 20;
+  display: grid;
+  grid-template-rows: auto minmax(0, 1fr) auto;
+  min-width: 0;
+  min-height: 0;
+  background: var(--sidebar-bg);
+}
+
+.brand-row {
+  display: flex;
+  min-height: 66px;
+  align-items: center;
+  padding: 13px 14px 11px;
+  gap: 8px;
+}
+
+.brand-identity {
+  display: flex;
+  flex: 1;
+  min-width: 0;
+  align-items: center;
+  gap: 10px;
+}
+
+.brand-avatar {
+  width: 38px;
+  height: 38px;
+  flex: 0 0 38px;
+  border: 2px solid var(--gold);
+  border-radius: 50%;
+  object-fit: cover;
+}
+
+.brand-identity > div {
+  display: grid;
+  min-width: 0;
+  gap: 2px;
+}
+
+.brand-identity strong {
+  font-family: var(--serif);
+  font-size: 17px;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+}
+
+.brand-identity > div > span,
+.runtime-line > span:first-child {
+  display: flex;
+  min-width: 0;
+  align-items: center;
+  color: var(--text-soft);
+  font-size: var(--fs-micro);
+  gap: 6px;
+}
+
+.sidebar-close,
+.mobile-menu-button,
+.sidebar-expand-button {
+  display: none;
+}
+
+.sidebar-collapse-button {
+  width: 30px;
+  height: 30px;
+  flex: 0 0 30px;
+  border-radius: var(--radius);
+  background: transparent;
+  color: var(--text-soft);
+}
+
+.sidebar-collapse-button:hover {
+  background: var(--surface-2);
+  color: var(--text);
+}
+
+.sidebar-collapse-button .icon-slot,
+.sidebar-expand-button .icon-slot {
+  width: 16px;
+  height: 16px;
+}
+

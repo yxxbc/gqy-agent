@@ -1,0 +1,130 @@
+/* ═ LaTeX 公式(KaTeX) ═ 块级横向滚动防溢出;颜色随 currentColor 跟主题。 */
+.markdown-body .math-block { overflow-x: auto; overflow-y: hidden; padding: 6px 2px; margin: 10px 0; }
+.markdown-body .math-block .katex-display { margin: 0; }
+.markdown-body .math-inline .katex { font-size: 1.05em; }
+.markdown-table-scroll .math-inline .katex { font-size: 1em; }
+.u-rec-filters { margin-left: auto; display: flex; gap: 8px; }
+.u-rec-filters select { font: inherit; font-size: var(--fs-meta); color: var(--text-soft);
+  background: var(--surface-soft); border: 1px solid var(--line); border-radius: var(--radius); padding: 3px 8px; }
+.u-rec-filters select:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
+/* CSP style-src 'self' 拦 HTML 解析期的内联样式:静态标注一律走 class。 */
+.u-refresh { align-self: center; margin-left: -6px; }
+/* 清空排在刷新右边;危险动作用弱化底色,悬停才显红。 */
+.u-clear { align-self: center; margin-left: -2px; color: var(--text-faint); }
+.u-clear:hover { color: var(--danger, #c0392b); }
+.u-heat-days span:nth-child(1) { grid-row: 1; }
+.u-heat-days span:nth-child(2) { grid-row: 3; }
+.u-heat-days span:nth-child(3) { grid-row: 5; }
+.u-legend .u-lg1 { background: var(--chart-1); }
+.u-legend .u-lg2 { background: var(--chart-2); }
+.u-legend .u-lg3 { background: var(--chart-3); }
+
+/* ═ 视频消息 ═ 气泡内居中,不超视口;网页全屏铺满窗口(object-fit contain)。 */
+.markdown-body .video-card { display: flex; flex-direction: column; align-items: center; margin: 10px 0 4px; }
+.video-shell { position: relative; width: min(100%, 480px); }
+.video-shell video { display: block; width: 100%; max-height: 56vh; border-radius: var(--radius);
+  background: #000; box-shadow: var(--card-shadow); }
+.vfs-btn { position: absolute; top: 8px; right: 8px; width: 30px; height: 30px; border-radius: var(--radius);
+  background: rgba(0, 0, 0, .48); color: #fff; border: none; cursor: pointer;
+  display: grid; place-items: center; opacity: 0; transition: opacity var(--motion); }
+.vfs-btn svg { width: 15px; height: 15px; stroke: currentColor; stroke-width: 1.8; fill: none;
+  stroke-linecap: round; stroke-linejoin: round; }
+.video-shell:hover .vfs-btn, .vfs-btn:focus-visible { opacity: 1; }
+.video-shell.webfs { position: fixed; inset: 0; z-index: var(--z-overlay-top); width: auto; max-width: none;
+  background: rgba(0, 0, 0, .93); display: grid; place-items: center; padding: 28px; }
+.video-shell.webfs video { width: 100%; height: 100%; max-height: none;
+  object-fit: contain; border-radius: var(--radius); box-shadow: none; }
+.video-shell.webfs .vfs-btn { top: 16px; right: 16px; opacity: 1; }
+.video-caption { margin-top: 7px; font-size: var(--fs-micro); color: var(--text-soft);
+  max-width: min(100%, 480px); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+/* 斜杠命令的补全菜单。挂在 .composer-dock（position: relative）上，从输入框
+   上方弹出——往下弹会被输入框自己盖住。 */
+.commandMenu {
+  position: absolute;
+  /* 贴着输入框会看不出这是两个东西；留一段间距，并收窄到内容宽度， */
+  /* 免得一条两行的菜单横贯整个对话区，比输入框还显眼。 */
+  bottom: calc(100% - 2px);
+  left: max(18px, calc((100% - 940px) / 2));
+  z-index: var(--z-popover);
+  width: min(520px, calc(100% - 2 * max(18px, calc((100% - 940px) / 2))));
+  max-height: min(320px, 50vh);
+  margin-bottom: 10px;
+  overflow-y: auto;
+  padding: 6px;
+  border: 1px solid var(--border-1, rgba(128, 128, 128, 0.22));
+  border-radius: var(--radius);
+  background: var(--surface-1);
+  box-shadow: var(--float-shadow);
+}
+
+.commandMenuItem {
+  display: flex;
+  gap: 14px;
+  align-items: baseline;
+  width: 100%;
+  padding: 8px 10px;
+  border: 0;
+  border-radius: var(--radius);
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+.commandMenuItem:hover,
+.commandMenuItem.isActive {
+  background: var(--surface-2);
+}
+
+.commandMenuName {
+  flex: 0 0 auto;
+  font-family: var(--mono-font, monospace);
+}
+
+.commandMenuHelp {
+  flex: 1 1 auto;
+  min-width: 0;
+  overflow: hidden;
+  color: var(--text-muted, inherit);
+  font-size: 0.86em;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* 命令回执：复用系统事件那条居中小条（后台任务完成同款）。差别只有一点——
+   系统事件是一行短标签，可以 nowrap + 省略号；命令回执常常是一句要读完的
+   解释，截断了等于没说，所以允许换行。 */
+/* 命令还在跑：文字变淡 + 呼吸，和跑完的结果区分开。 */
+.system-event.is-command-result.is-pending > span {
+  opacity: 0.62;
+  animation: command-pending-pulse 1.4s ease-in-out infinite;
+}
+
+@keyframes command-pending-pulse {
+  0%,
+  100% {
+    opacity: 0.62;
+  }
+
+  50% {
+    opacity: 0.35;
+  }
+}
+
+.system-event.is-command-result > span {
+  max-width: min(560px, 80%);
+  overflow: visible;
+  text-overflow: clip;
+  white-space: normal;
+  line-height: 1.5;
+  padding: 6px 12px;
+  text-align: center;
+}
+
+.system-event.is-command-result.is-error > span {
+  background: color-mix(in srgb, var(--danger) 14%, var(--surface-2));
+  color: var(--danger);
+}
+

@@ -1,0 +1,104 @@
+/* ── 快递卡片 ─────────────────────────────────────────────────────────
+   重点是「查到了」与「没查到」看起来明显不同:没查到时画的是一条说明加
+   官方入口,不是一个空时间线。 */
+.express-card {
+  margin-top: 10px;
+  overflow: hidden;
+  border: 1px solid var(--line);
+  border-left: 3px solid var(--line);
+  border-radius: var(--radius);
+  background: var(--surface-2);
+}
+.express-card.is-done { border-left-color: var(--md-sys-color-primary, var(--accent)); }
+.express-card.is-warn { border-left-color: var(--md-sys-color-error, #c0392b); }
+
+.express-head {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 12px;
+  border-bottom: 1px solid var(--line);
+}
+.express-title { display: flex; align-items: baseline; gap: 8px; min-width: 0; }
+.express-number { color: var(--text-soft); font-size: var(--fs-meta); }
+.express-status {
+  margin-left: auto;
+  padding: 1px 9px;
+  border-radius: var(--radius-pill);
+  background: color-mix(in srgb, var(--accent) 16%, transparent);
+  color: var(--accent);
+  font-size: var(--fs-micro);
+  white-space: nowrap;
+}
+.express-status.is-muted { background: var(--surface-1); color: var(--text-soft); }
+
+.express-note { margin: 10px 12px; color: var(--text-soft); font-size: var(--fs-meta); }
+
+.express-traces { list-style: none; margin: 0; padding: 8px 12px; }
+
+.express-trace {
+  position: relative;
+  display: flex;
+  gap: 10px;
+  padding: 6px 0 6px 14px;
+}
+/* 竖线 + 节点:节点画在竖线上,最新那个实心 */
+.express-trace::before {
+  content: "";
+  position: absolute;
+  left: 3px;
+  top: 12px;
+  width: 7px;
+  height: 7px;
+  border: 1px solid var(--accent);
+  border-radius: 50%;
+  background: var(--surface-2);
+}
+.express-trace::after {
+  content: "";
+  position: absolute;
+  left: 6px;
+  top: 19px;
+  bottom: -6px;
+  width: 1px;
+  background: var(--line);
+}
+.express-trace:last-child::after { display: none; }
+.express-trace.is-latest::before { background: var(--accent); }
+.express-trace.is-latest .express-trace-text { font-weight: 600; }
+
+.express-trace-time {
+  flex: none;
+  width: 108px;
+  color: var(--text-soft);
+  font-size: var(--fs-micro);
+  font-variant-numeric: tabular-nums;
+}
+.express-trace-body { min-width: 0; }
+.express-trace-text { margin: 0; font-size: var(--fs-meta); }
+.express-trace-place { color: var(--text-soft); font-size: var(--fs-micro); }
+
+.express-foot {
+  display: flex;
+  gap: 8px;
+  padding: 8px 12px;
+  border-top: 1px solid var(--line);
+}
+
+.express-mini-button {
+  padding: 2px 9px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-pill);
+  background: var(--surface-1);
+  color: var(--text);
+  font-size: var(--fs-micro);
+  line-height: 1.7;
+  text-decoration: none;
+  cursor: pointer;
+}
+.express-mini-button:hover { border-color: color-mix(in srgb, var(--accent) 50%, var(--line)); }
+
+@media (max-width: 640px) {
+  .express-trace { flex-direction: column; gap: 2px; }
+  .express-trace-time { width: auto; }
+}

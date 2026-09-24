@@ -1,0 +1,302 @@
+/* ── 自定义音频播放器 ── */
+
+.media-audio-card {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 12px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  background: var(--surface-1);
+  transition: border-color var(--motion) ease;
+}
+
+.media-audio-card:hover,
+.media-audio-card.is-playing {
+  border-color: color-mix(in srgb, var(--accent) 40%, var(--line));
+}
+
+.media-audio-card audio {
+  display: none;
+}
+
+.media-audio-head {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  min-width: 0;
+}
+
+.media-audio-cover {
+  flex: none;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 44px;
+  height: 44px;
+  border-radius: var(--radius);
+  background: linear-gradient(135deg, var(--accent-soft), color-mix(in srgb, var(--coral-soft) 55%, var(--accent-soft)));
+  color: var(--user-text);
+}
+
+.media-audio-cover svg {
+  width: 20px;
+  height: 20px;
+}
+
+.media-audio-card.is-playing .media-audio-cover {
+  color: color-mix(in srgb, var(--user-text) 80%, var(--accent-strong));
+}
+
+.media-audio-info {
+  flex: 1;
+  min-width: 0;
+}
+
+.media-audio-name {
+  font-size: var(--fs-ui);
+  font-weight: 600;
+  color: var(--text);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.media-audio-meta {
+  margin-top: 2px;
+  font-size: var(--fs-meta);
+  color: var(--text-soft);
+}
+
+.media-audio-card.is-error .media-audio-meta {
+  color: var(--danger);
+}
+
+.media-audio-controls {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+}
+
+.media-audio-play {
+  flex: none;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  border: none;
+  border-radius: 50%;
+  background: var(--accent);
+  color: var(--inverse-text);
+  cursor: pointer;
+  transition: background var(--motion) ease, transform 0.1s ease;
+}
+
+.media-audio-play:hover {
+  background: var(--accent-strong);
+}
+
+.media-audio-play:active {
+  transform: scale(0.94);
+}
+
+.media-audio-play svg {
+  width: 15px;
+  height: 15px;
+}
+
+.media-audio-time {
+  flex: none;
+  font-size: var(--fs-micro);
+  font-variant-numeric: tabular-nums;
+  color: var(--text-soft);
+  min-width: 32px;
+  text-align: center;
+}
+
+.media-audio-track {
+  flex: 1;
+  min-width: 48px;
+  height: 16px;
+  display: flex;
+  align-items: center;
+  cursor: pointer;
+  touch-action: none;
+  border-radius: var(--radius-pill);
+  /* 轨道底色:内嵌渐变画一条 5px 细线,省一层元素 */
+  background: linear-gradient(color-mix(in srgb, var(--text-faint) 45%, transparent) 0 0) center / 100% 5px no-repeat;
+}
+
+.media-audio-track-fill {
+  position: relative;
+  height: 5px;
+  width: 0%;
+  border-radius: var(--radius-pill);
+  background: var(--accent);
+  min-width: 0;
+}
+
+.media-audio-track-fill::after {
+  content: "";
+  position: absolute;
+  right: -5px;
+  top: 50%;
+  width: 11px;
+  height: 11px;
+  border-radius: 50%;
+  background: var(--accent-strong);
+  transform: translateY(-50%) scale(0);
+  transition: transform var(--motion-fast) ease;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.3);
+}
+
+.media-audio-track:hover .media-audio-track-fill::after,
+.media-audio-track.is-scrubbing .media-audio-track-fill::after,
+.media-audio-track:focus-visible .media-audio-track-fill::after {
+  transform: translateY(-50%) scale(1);
+}
+
+.media-audio-track:focus-visible {
+  outline: 2px solid color-mix(in srgb, var(--accent) 60%, transparent);
+  outline-offset: 2px;
+}
+
+.media-audio-track.is-static {
+  cursor: default;
+  opacity: 0.55;
+}
+
+.media-audio-icon-btn {
+  flex: none;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 26px;
+  height: 26px;
+  border: none;
+  border-radius: var(--radius);
+  background: transparent;
+  color: var(--text-soft);
+  cursor: pointer;
+  text-decoration: none;
+  transition: background var(--motion) ease, color var(--motion) ease;
+}
+
+.media-audio-icon-btn:hover {
+  background: var(--surface-2);
+  color: var(--text);
+}
+
+.media-audio-icon-btn svg {
+  width: 15px;
+  height: 15px;
+}
+
+/* 音量条:accent 已播 + 淡轨道,WebKit/Firefox 各写一份 */
+.media-audio-volume {
+  flex: none;
+  width: 56px;
+  height: 16px;
+  margin: 0;
+  appearance: none;
+  -webkit-appearance: none;
+  background: transparent;
+  cursor: pointer;
+}
+
+.media-audio-volume::-webkit-slider-runnable-track {
+  height: 4px;
+  border-radius: var(--radius-pill);
+  background: color-mix(in srgb, var(--text-faint) 45%, transparent);
+}
+
+.media-audio-volume::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  width: 10px;
+  height: 10px;
+  margin-top: -3px;
+  border: none;
+  border-radius: 50%;
+  background: var(--accent);
+}
+
+.media-audio-volume::-moz-range-track {
+  height: 4px;
+  border-radius: var(--radius-pill);
+  background: color-mix(in srgb, var(--text-faint) 45%, transparent);
+}
+
+.media-audio-volume::-moz-range-progress {
+  height: 4px;
+  border-radius: var(--radius-pill);
+  background: var(--accent);
+}
+
+.media-audio-volume::-moz-range-thumb {
+  width: 10px;
+  height: 10px;
+  border: none;
+  border-radius: 50%;
+  background: var(--accent);
+}
+
+/* 窄屏收起音量条,静音键仍在 */
+@media (max-width: 480px) {
+  .media-audio-volume {
+    display: none;
+  }
+}
+
+/* ── G2:不可见即暂停 ──
+   页面隐藏(切标签/最小化)时由 app.js 挂 gqy-paused。所有无限动画
+   (status-pulse/shimmer/typing-bounce/spin 等)暂停,恢复可见时原地续播,
+   视觉零变化。实测隐藏窗口不暂停时合成负载与可见时相同。 */
+body.gqy-paused *,
+body.gqy-paused *::before,
+body.gqy-paused *::after {
+  animation-play-state: paused !important;
+}
+
+/* 生图点阵占位气泡(08-22):工具芯片隐藏,方形气泡内随机区域的小块点阵
+   若隐若现(补丁元素由 app.js 生成,位置/大小/时长随机);tool.image 到达后
+   原地换成图片;失败时占位变错误态并露出芯片。 */
+.tool-card.image-tool-chip {
+  display: none;
+}
+.image-gen-bubble {
+  position: relative;
+  width: min(320px, 70%);
+  min-width: 220px; /* slim 收缩语境下的形状兜底 */
+  aspect-ratio: 1 / 1;
+  margin: 6px 0;
+  border-radius: var(--radius);
+  background: var(--surface-2);
+  overflow: hidden;
+}
+.image-gen-bubble .image-gen-label {
+  position: relative;
+  z-index: 2;
+  display: inline-block;
+  white-space: nowrap; /* 任何退化宽度下 6 个字也不竖排 */
+  margin: 14px 16px;
+  font-size: var(--fs-ui);
+  color: var(--text-soft);
+}
+.image-gen-bubble .dot-patch {
+  position: absolute;
+  pointer-events: none;
+  background-image: radial-gradient(circle, var(--text-faint) 1.4px, transparent 1.6px);
+  background-size: 11px 11px;
+  -webkit-mask-image: radial-gradient(closest-side, #000 30%, transparent 100%);
+  mask-image: radial-gradient(closest-side, #000 30%, transparent 100%);
+  opacity: 0;
+  animation: imageGenDotPatch 2.8s ease-in-out forwards;
+}
+@keyframes imageGenDotPatch {
+  0% { opacity: 0; }
+  45% { opacity: 0.55; }
+  100% { opacity: 0; }
+}
+

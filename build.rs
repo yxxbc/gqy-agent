@@ -104,6 +104,10 @@ fn build_tool_description_index(out_dir: &str) {
 /// Skipped: `vendor/` (gzip bodies and CORS preflight, served by hand),
 /// `index.html` and `fence-frame.html` (their own handlers: versioned rewrite
 /// and a sandbox CSP), and anything that is not a frontend asset.
+///
+/// `css/` is not served file by file: its parts are concatenated in file-name
+/// order into one `/styles.css`, so the cascade order is the file order and the
+/// browser still makes a single request.
 fn build_web_asset_index(out_dir: &str) {
     const ROOT: &str = "web";
     const SPECIAL: &[&str] = &["index.html", "fence-frame.html"];
@@ -131,6 +135,16 @@ fn build_web_asset_index(out_dir: &str) {
             absolute.display().to_string()
         ));
     }
+    let styles = Path::new(out_dir).join("styles.css");
+    fs::write(
+        &styles,
+        concat_css_parts(Path::new(ROOT).join("css").as_path()),
+    )
+    .expect("write concatenated styles.css");
+    source.push_str(&format!(
+        "    (\"/styles.css\", include_bytes!({:?}), \"text/css; charset=utf-8\"),\n",
+        styles.display().to_string()
+    ));
     source.push_str("];\n");
     fs::write(Path::new(out_dir).join("web_assets.rs"), source)
         .expect("write generated web asset index");
@@ -140,13 +154,33 @@ fn collect_web_assets(dir: &Path, files: &mut Vec<PathBuf>) {
     for entry in fs::read_dir(dir).unwrap_or_else(|_| panic!("read {}", dir.display())) {
         let path = entry.expect("web asset entry").path();
         if path.is_dir() {
-            if path.file_name().is_some_and(|name| name != "vendor") {
+            if path
+                .file_name()
+                .is_some_and(|name| name != "vendor" && name != "css")
+            {
                 collect_web_assets(&path, files);
             }
         } else {
             files.push(path);
         }
     }
+}
+
+/// Byte-exact concatenation of `web/css/*.css` in file-name order. The parts
+/// carry their own trailing newlines, so nothing is inserted between them.
+fn concat_css_parts(dir: &Path) -> Vec<u8> {
+    let mut parts = fs::read_dir(dir)
+        .unwrap_or_else(|_| panic!("read {}", dir.display()))
+        .map(|entry| entry.expect("css part entry").path())
+        .filter(|path| path.extension().is_some_and(|ext| ext == "css"))
+        .collect::<Vec<_>>();
+    parts.sort();
+    assert!(!parts.is_empty(), "web/css has no .css parts");
+    let mut out = Vec::new();
+    for part in parts {
+        out.extend(fs::read(&part).unwrap_or_else(|_| panic!("read {}", part.display())));
+    }
+    out
 }
 
 fn web_content_type(path: &Path) -> Option<&'static str> {

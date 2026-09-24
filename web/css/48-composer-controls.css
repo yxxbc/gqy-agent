@@ -1,0 +1,317 @@
+/* 思考档位并进了模型菜单：每行模型右边一个小片,点开就地铺开档位选项。
+   原先它是独立按钮 + 独立浮层,和模型按钮并排占两个位置,而两者常常要一起
+   调(换了模型往往就要换档位)。 */
+.model-menu-row {
+  position: relative;
+  display: flex;
+  align-items: center;
+  padding-right: 9px;
+  border-radius: var(--radius);
+  gap: 3px;
+}
+
+/* 高亮由行来画,行内那个按钮不再自己上色——否则背景在按钮右缘就断了,
+   档位小片被甩在高亮之外,一行看着是两块。 */
+.model-menu-row > .model-menu-item {
+  flex: 1 1 auto;
+  min-width: 0;
+  background: transparent;
+}
+
+.model-menu-row:hover,
+.model-menu-row:has(> .model-menu-item.selected) {
+  background: var(--surface-2);
+}
+
+.model-menu-row:hover > .model-menu-item,
+.model-menu-row > .model-menu-item.selected {
+  color: var(--text);
+}
+
+/* 行内的档位控件。行已经有整块底色了,静息态只要比它高一档就看得出来;
+   点上去/展开时才转成强调色。 */
+.model-level-chip {
+  display: inline-flex;
+  flex: 0 0 auto;
+  align-items: center;
+  height: 24px;
+  padding: 0 6px 0 9px;
+  border: 0;
+  border-radius: var(--radius);
+  background: var(--surface-3);
+  color: var(--text-soft);
+  cursor: pointer;
+  font-family: var(--font-mono);
+  font-size: var(--fs-micro);
+  font-weight: 600;
+  gap: 2px;
+  white-space: nowrap;
+}
+
+.model-level-chip:hover,
+.model-level-chip[aria-expanded="true"] {
+  background: var(--accent);
+  color: var(--md-sys-color-on-primary);
+}
+
+.model-level-chip .icon-slot {
+  width: 11px;
+  height: 11px;
+  opacity: 0.7;
+  transition: transform var(--motion) ease;
+}
+
+.model-level-chip[aria-expanded="true"] .icon-slot {
+  transform: rotate(180deg);
+}
+
+.model-level-menu {
+  position: absolute;
+  z-index: calc(var(--z-popover) + 1);
+  display: grid;
+  min-width: 132px;
+  padding: 4px;
+  border: 1px solid var(--line-strong);
+  border-radius: var(--radius);
+  gap: 1px;
+  background: var(--surface-1);
+  box-shadow: var(--float-shadow);
+}
+
+.model-level-menu[hidden] {
+  display: none;
+}
+
+.model-level-option {
+  display: flex;
+  min-height: 28px;
+  align-items: center;
+  padding: 0 10px;
+  border: 0;
+  border-radius: var(--radius);
+  background: transparent;
+  color: var(--text-soft);
+  cursor: pointer;
+  font-family: var(--font-mono);
+  font-size: var(--fs-micro);
+  text-align: left;
+}
+
+.model-level-option:hover {
+  background: var(--surface-2);
+  color: var(--text);
+}
+
+.model-level-option.selected {
+  background: var(--accent);
+  color: var(--md-sys-color-on-primary);
+  font-weight: 600;
+}
+
+
+.composer-submit {
+  min-width: 0;
+  max-width: 100%;
+  align-items: center;
+}
+
+/* 队列在输入框上方:排队的消息紧贴对话流,是「即将发生的下一条」 */
+.queue-tray {
+  display: grid;
+  padding: 0 0 10px;
+  gap: 5px;
+  border-bottom: 1px solid color-mix(in srgb, var(--line) 55%, transparent);
+  margin-bottom: 10px;
+}
+
+.queue-item {
+  display: flex;
+  min-width: 0;
+  align-items: center;
+  justify-content: space-between;
+  padding: 7px 11px;
+  border-left: 3px solid var(--accent);
+  border-radius: 0 var(--radius) var(--radius) 0;
+  background: color-mix(in srgb, var(--accent-soft) 30%, transparent);
+  color: var(--text-soft);
+  font-size: var(--fs-meta);
+  line-height: 1.45;
+  gap: 8px;
+}
+
+.queue-item > span {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.queue-remove {
+  display: grid;
+  width: 24px;
+  height: 24px;
+  flex: 0 0 24px;
+  place-items: center;
+  border-radius: var(--radius);
+  background: transparent;
+  color: var(--text-faint);
+  cursor: pointer;
+}
+
+.queue-remove:hover {
+  background: var(--surface-2);
+  color: var(--danger);
+}
+
+.composer-context {
+  display: grid;
+  overflow: hidden;
+  width: 132px;
+  min-width: 92px;
+  margin-right: 2px;
+  gap: 4px;
+}
+
+/* 数字过长时省略号截断,不允许伸到发送按钮底下 */
+.composer-context .context-heading {
+  min-width: 0;
+}
+
+.composer-context .context-heading > span:last-child {
+  overflow: hidden;
+  min-width: 0;
+  text-overflow: ellipsis;
+}
+
+.composer-context .context-heading {
+  color: var(--text-soft);
+  font-size: var(--fs-micro);
+}
+
+.composer-context .context-track {
+  height: 5px;
+  margin-top: 1px;
+}
+
+.composer-state,
+.character-count {
+  color: var(--text-faint);
+  font-size: var(--fs-micro);
+  overflow-wrap: anywhere;
+}
+
+.composer-state.is-error,
+.character-count.is-error {
+  color: var(--danger);
+}
+
+.composer-submit {
+  display: flex;
+  position: relative;
+  min-width: 0;
+  flex: 0 1 auto;
+  align-items: center;
+  gap: 8px;
+}
+
+/* 发送键:38px 方形 r8 */
+.send-button {
+  display: grid;
+  width: 38px;
+  height: 38px;
+  flex: 0 0 38px;
+  place-items: center;
+  border-radius: var(--radius);
+  background: var(--accent);
+  color: var(--md-sys-color-on-primary);
+  cursor: pointer;
+  transition: transform var(--motion-slow) cubic-bezier(0.34, 1.56, 0.64, 1), background var(--motion) ease, filter var(--motion-slow) ease;
+}
+
+.send-button:hover:not(:disabled) {
+  filter: brightness(1.06);
+  transform: scale(1.08) rotate(-8deg);
+}
+
+.send-button:active:not(:disabled) {
+  transform: scale(0.92);
+}
+
+/* Compact per-reply stop controls above the composer send button. */
+.live-stop-rail {
+  /* 停止按钮浮在发送按钮正上方(用户要求):绝对定位、右缘对齐发送键、贴其上方一点。 */
+  position: absolute;
+  right: 0;
+  bottom: calc(100% + 8px);
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  z-index: 3;
+}
+.live-stop-rail[hidden] { display: none; }
+
+.live-stop-button {
+  position: relative;
+  display: grid;
+  width: 38px;
+  height: 38px;
+  flex: 0 0 38px;
+  place-items: center;
+  border: 1px solid color-mix(in srgb, var(--ribbon) 42%, transparent);
+  border-radius: var(--radius);
+  background: color-mix(in srgb, var(--ribbon) 18%, var(--surface-1));
+  color: var(--ribbon);
+  cursor: pointer;
+  transition: background var(--motion) ease, color var(--motion) ease, transform var(--motion) ease;
+}
+
+.live-stop-button .icon-slot {
+  width: 20px;
+  height: 20px;
+}
+
+.live-stop-button:hover:not(:disabled) {
+  background: color-mix(in srgb, var(--ribbon) 30%, var(--surface-1));
+}
+
+.live-stop-button:active:not(:disabled) {
+  transform: scale(0.92);
+}
+
+.live-stop-button:disabled {
+  cursor: not-allowed;
+  opacity: 0.55;
+}
+
+.send-button:disabled {
+  background: var(--surface-3);
+  color: var(--text-faint);
+}
+
+/* 停止态:ribbon */
+.send-button.is-cancel {
+  background: var(--ribbon);
+  color: var(--md-sys-color-on-tertiary);
+}
+
+.send-button.is-cancel:hover:not(:disabled) {
+  filter: brightness(1.06);
+}
+
+.send-button .icon-slot {
+  width: 17px;
+  height: 17px;
+}
+
+.page-scrim {
+  position: fixed;
+  inset: 0;
+  z-index: 18;
+  display: none;
+  background: rgba(0, 0, 0, 0.46);
+}
+
+.page-scrim.visible {
+  display: block;
+}
+

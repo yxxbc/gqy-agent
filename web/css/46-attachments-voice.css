@@ -1,0 +1,342 @@
+.composer-info .ctx-ring {
+  width: 16px;
+  height: 16px;
+  flex: none;
+  transform: rotate(-90deg);
+}
+.composer-info .ctx-ring-bg {
+  fill: none;
+  stroke: color-mix(in srgb, var(--text) 14%, transparent);
+  stroke-width: 3;
+}
+.composer-info .ctx-ring-fg {
+  fill: none;
+  stroke: var(--accent);
+  stroke-width: 3;
+  stroke-linecap: round;
+  transition: stroke-dashoffset 0.4s ease, stroke 0.3s ease;
+}
+.composer-info .composer-context.is-high .ctx-ring-fg {
+  stroke: var(--gold, #e9b64a);
+}
+.composer-info .composer-context.is-critical .ctx-ring-fg {
+  stroke: var(--danger);
+}
+.composer-info .ctx-nums {
+  display: inline-flex;
+  gap: 5px;
+  align-items: baseline;
+}
+.composer-info .ctx-nums #contextNumbers {
+  font-family: var(--font-mono);
+  /* 和「上下文」三个字同色(#130),整行统一。 */
+  color: inherit;
+  font-variant-numeric: tabular-nums;
+}
+/* 窄屏:累计/速度可省,模型和上下文优先(#2 手机端要能看到模型)。 */
+@media (max-width: 640px) {
+  .composer-cumulative,
+  .composer-speed { display: none; }
+  .composer-info { gap: 8px; }
+  .composer-info .model-button { max-width: 60vw; }
+}
+
+.attachment-tray {
+  display: flex;
+  width: 100%;
+  min-width: 0;
+  max-width: 100%;
+  box-sizing: border-box;
+  align-items: flex-start;
+  padding: 12px 14px 4px;
+  overflow-x: auto;
+  gap: 7px;
+  scrollbar-color: var(--line-strong) transparent;
+  scrollbar-width: thin;
+}
+
+.attachment-tray[hidden] {
+  display: none;
+}
+
+.attachment-item {
+  position: relative;
+  display: grid;
+  grid-template-columns: 38px minmax(78px, 1fr) 24px 24px;
+  width: 224px;
+  min-width: 224px;
+  height: 54px;
+  align-items: center;
+  padding: 5px 5px 5px 6px;
+  border-radius: var(--radius);
+  background: var(--surface-2);
+  color: var(--text-soft);
+  gap: 7px;
+  flex: 0 0 auto;
+}
+
+.attachment-item.is-image {
+  display: block;
+  width: 96px;
+  min-width: 96px;
+  height: 96px;
+  padding: 0;
+  overflow: hidden;
+  background: var(--surface-2);
+}
+
+.attachment-item.is-file {
+  display: flex;
+  width: fit-content;
+  min-width: 140px;
+  max-width: 280px;
+  padding: 6px;
+}
+
+.attachment-item.is-error {
+  color: var(--danger);
+}
+
+.attachment-item.is-image > img {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+}
+
+.attachment-image-fallback {
+  display: grid;
+  width: 100%;
+  height: 100%;
+  place-items: center;
+  color: var(--danger);
+}
+
+.attachment-image-fallback[hidden] {
+  display: none;
+}
+
+.attachment-image-fallback .icon-slot {
+  width: 20px;
+  height: 20px;
+}
+
+.attachment-file-icon {
+  display: grid;
+  width: 40px;
+  height: 40px;
+  place-items: center;
+  overflow: hidden;
+  border-radius: var(--radius);
+  background: var(--surface-3);
+  color: var(--accent);
+  font-family: var(--font-mono);
+  font-size: var(--fs-micro);
+  font-weight: 700;
+}
+
+.attachment-file-icon .icon-slot {
+  width: 18px;
+  height: 18px;
+}
+
+.attachment-item-copy {
+  display: grid;
+  min-width: 0;
+  width: max-content;
+  max-width: 176px;
+  flex: 0 1 auto;
+  line-height: 1.3;
+}
+
+.attachment-item-copy strong,
+.attachment-item-copy small {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.attachment-item-copy strong {
+  color: var(--text);
+  font-size: var(--fs-meta);
+  font-weight: 600;
+}
+
+.attachment-item-copy small {
+  color: inherit;
+  font-size: var(--fs-micro);
+}
+
+.attachment-action,
+.attach-button {
+  display: grid;
+  place-items: center;
+  border-radius: var(--radius);
+  background: transparent;
+  color: var(--text-faint);
+  cursor: pointer;
+}
+
+.attachment-action {
+  width: 24px;
+  height: 24px;
+  flex: 0 0 24px;
+}
+
+.attachment-action:hover,
+.attach-button:hover:not(:disabled) {
+  background: var(--surface-3);
+  color: var(--text);
+}
+
+/* 语音输入:听写中按钮变红并呼吸;状态行显示「在听」和电平条。 */
+.mic-button.is-recording {
+  color: #fff;
+  background: var(--danger);
+  animation: mic-pulse 1.2s ease-in-out infinite;
+}
+
+/* 听写中悬浮在输入框上方的电平指示:只有麦克风图标和一条电平,没有文字。 */
+.voice-float {
+  position: absolute;
+  left: 50%;
+  top: -34px;
+  transform: translateX(-50%);
+  z-index: 12;
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  padding: 6px 14px;
+  border-radius: var(--radius-pill);
+  color: var(--danger);
+  background: color-mix(in srgb, var(--app-bg) 82%, transparent);
+  backdrop-filter: blur(10px);
+  box-shadow: 0 2px 10px rgba(0, 0, 0, 0.12);
+  pointer-events: none;
+}
+
+.voice-float .icon-slot {
+  width: 16px;
+  height: 16px;
+  animation: mic-pulse 1.2s ease-in-out infinite;
+}
+
+.voice-level {
+  display: inline-block;
+  width: 96px;
+  height: 6px;
+  border-radius: var(--radius-sm);
+  background: color-mix(in srgb, var(--danger) 18%, transparent);
+  overflow: hidden;
+}
+
+.voice-level b {
+  display: block;
+  height: 100%;
+  width: 0;
+  border-radius: var(--radius-sm);
+  background: var(--danger);
+  transition: width 80ms linear;
+}
+
+@keyframes mic-pulse {
+  0%, 100% { filter: brightness(1); }
+  50% { filter: brightness(1.35); }
+}
+
+.attachment-remove:hover {
+  color: var(--danger);
+}
+
+.attachment-remove {
+  grid-column: 4;
+  flex: 0 0 24px;
+}
+
+.attachment-item.is-image .attachment-remove {
+  position: absolute;
+  top: 5px;
+  right: 5px;
+  z-index: 1;
+  background: color-mix(in srgb, var(--surface-1) 84%, transparent);
+  color: var(--text);
+  box-shadow: var(--bubble-shadow);
+}
+
+.attachment-item.is-image > .attachment-spinner,
+.attachment-item.is-image > .attachment-action:not(.attachment-remove) {
+  position: absolute;
+  right: 5px;
+  bottom: 5px;
+  z-index: 1;
+  display: grid;
+  width: 26px;
+  height: 26px;
+  place-items: center;
+  border-radius: var(--radius);
+  background: color-mix(in srgb, var(--surface-1) 84%, transparent);
+  box-shadow: var(--bubble-shadow);
+}
+
+.attachment-action .icon-slot,
+.attachment-spinner {
+  width: 13px;
+  height: 13px;
+}
+
+.attachment-spinner svg {
+  animation: spin 900ms linear infinite;
+}
+
+.attach-button {
+  width: 38px;
+  height: 38px;
+  flex: 0 0 38px;
+  border-radius: var(--radius);
+  background: var(--surface-2);
+  color: var(--text-soft);
+  transition: transform var(--motion-slow) cubic-bezier(0.34, 1.56, 0.64, 1), background var(--motion) ease, filter var(--motion-slow) ease;
+}
+
+.attach-button:disabled {
+  cursor: not-allowed;
+  opacity: 0.4;
+}
+
+.attach-button .icon-slot {
+  width: 17px;
+  height: 17px;
+}
+
+.attach-button:hover:not(:disabled) {
+  filter: brightness(1.04);
+  transform: scale(1.08) rotate(8deg);
+}
+
+.attach-button:active:not(:disabled) {
+  transform: scale(0.92);
+}
+
+.composer.is-dragging {
+  box-shadow: var(--card-shadow), 0 0 0 3px color-mix(in srgb, var(--accent) 32%, transparent);
+}
+
+.composer-footer {
+  display: flex;
+  width: 100%;
+  min-width: 0;
+  max-width: 100%;
+  min-height: 40px;
+  align-items: center;
+  justify-content: space-between;
+  padding: 4px 7px 6px 12px;
+  gap: 10px;
+}
+
+.composer-controls {
+  display: flex;
+  min-width: 0;
+  align-items: center;
+  gap: 9px;
+}
+

@@ -3,6 +3,7 @@
 //! 加一个前端文件 = 把它放进 `web/`，不用再改这里。例外只有三类，各有自己的
 //! handler：`index.html`（引用要加版本号）、`fence-frame.html`（沙箱 CSP）、
 //! `vendor/`（gzip 原样发出与 CORS 预检）。
+//! `css/` 不逐个提供：build.rs 按文件名顺序拼成一份 `/styles.css`，文件顺序就是层叠顺序。
 //!
 //! `web/assets/` 里的 logo 与壁纸是 `pics/` 原图的显示尺寸副本（原图解码要占
 //! 30 MiB 显存去画两个缩略图），重新生成见 `test_scripts/gen_web_assets.py`。

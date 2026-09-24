@@ -1,0 +1,435 @@
+/* ── 知识库面板:宽版内容区、内联卡、目录树、代码预览、搜索结果、上传记录 ── */
+.con-inner.is-wide { max-width: 1400px; }
+.dash-banner {
+  margin: 0 0 12px; padding: 10px 14px; border-radius: var(--radius);
+  background: color-mix(in srgb, var(--gold, #d4a017) 14%, var(--surface-1)); color: var(--text-soft); font-size: var(--fs-ui);
+}
+.dash-card-actions { margin-top: 8px; }
+.dash-card-actions .dash-button { padding: 4px 10px; font-size: var(--fs-meta); }
+.dash-inline-card {
+  display: flex; align-items: center; gap: 12px; flex-wrap: wrap;
+  padding: 10px 16px; margin-bottom: 18px; border: 1px solid var(--line); border-radius: var(--radius); background: var(--surface-1);
+  font-size: var(--fs-ui);
+}
+.dash-inline-main { font-weight: 600; white-space: nowrap; }
+.dash-inline-card .dash-button { margin-left: auto; }
+/* 紧凑版:一行装下,中段文字截断而不是换行。整条换行之后按钮独占一行,看着
+   像一根进度条(09-09 用户反馈内置库那条「占地方太大」)。 */
+.dash-inline-card.is-tight {
+  flex-wrap: nowrap;
+  gap: 10px;
+  padding: 6px 12px;
+  margin-bottom: 12px;
+}
+.dash-inline-card.is-tight .dash-cell-muted {
+  min-width: 0;
+  flex: 1 1 auto;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.dash-inline-card.is-tight .dash-chip {
+  /* 「上次失败:…」可以很长,给它一个上限,别把整行推歪。 */
+  max-width: 18em;
+  flex: 0 1 auto;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.dash-inline-card.is-tight .dash-chip.is-builtin { flex: none; }
+.dash-button.is-slim { padding: 4px 10px; }
+@media (max-width: 700px) {
+  .dash-inline-card.is-tight { flex-wrap: wrap; }
+  .dash-inline-card.is-tight .dash-cell-muted { flex-basis: 100%; }
+}
+.dash-split { display: grid; grid-template-columns: minmax(260px, 1fr) minmax(0, 2.2fr); gap: 16px; align-items: start; }
+@media (max-width: 900px) { .dash-split { grid-template-columns: 1fr; } }
+.dash-tree-pane, .dash-main-pane {
+  border: 1px solid var(--line); border-radius: var(--radius); background: var(--surface-1); min-height: 320px; overflow: hidden;
+}
+.dash-tree-pane { max-height: 72vh; overflow-y: auto; padding: 6px 0; }
+.dash-tree { list-style: none; margin: 0; padding: 0; }
+.dash-tree-row {
+  display: flex; align-items: center; gap: 6px; padding: 5px 10px 5px 8px; cursor: pointer; font-size: var(--fs-ui); user-select: none;
+}
+.dash-tree-row:hover { background: var(--surface-2); }
+.dash-tree-row.is-selected { background: color-mix(in srgb, var(--accent) 16%, transparent); }
+.dash-tree-row svg { width: 13px; height: 13px; color: var(--text-faint); flex: none; }
+.dash-tree-indent { flex: none; display: inline-block; }
+.dash-tree-name { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.dash-tree-row.is-dir .dash-tree-name { color: var(--text-soft); }
+.dash-tree-count, .dash-tree-size { color: var(--text-faint); font-size: var(--fs-micro); font-variant-numeric: tabular-nums; }
+.dash-tree-row .dash-icon-button { width: 22px; height: 22px; opacity: 0; }
+.dash-tree-row:hover .dash-icon-button { opacity: 1; }
+.dash-index-dot { width: 7px; height: 7px; border-radius: 50%; flex: none; background: var(--text-faint); }
+.dash-index-dot.is-fresh { background: var(--online); }
+.dash-index-dot.is-stale { background: var(--gold, #d4a017); }
+.dash-preview-head { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; padding: 10px 14px; border-bottom: 1px solid var(--line); font-size: var(--fs-ui); }
+.dash-preview-name { font-family: var(--font-mono); font-size: var(--fs-meta); word-break: break-all; }
+.dash-code {
+  margin: 0; padding: 8px 0; max-height: 66vh; overflow: auto; font-family: var(--font-mono); font-size: var(--fs-meta); line-height: 1.55; tab-size: 4;
+}
+.dash-code-line { display: flex; }
+.dash-code-no { flex: none; width: 52px; padding-right: 12px; text-align: right; color: var(--text-faint); user-select: none; }
+.dash-code-text { white-space: pre-wrap; word-break: break-word; padding-right: 14px; }
+.dash-code-more { padding: 8px 14px 12px; }
+.dash-results { display: flex; flex-direction: column; }
+.dash-result { padding: 10px 14px; border-bottom: 1px solid var(--line); cursor: pointer; }
+.dash-result:hover { background: var(--surface-2); }
+.dash-result-head { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; font-size: var(--fs-ui); }
+.dash-snippet { margin: 6px 0 0; padding: 6px 10px; border-radius: var(--radius); background: var(--surface-2); font-size: var(--fs-meta); line-height: 1.5; white-space: pre-wrap; word-break: break-word; color: var(--text-soft); }
+.dash-upload-log { margin-bottom: 14px; padding: 10px 14px; border: 1px solid var(--line); border-radius: var(--radius); background: var(--surface-1); }
+.dash-upload-head { display: flex; align-items: center; gap: 8px; font-size: var(--fs-ui); }
+.dash-upload-list { list-style: none; margin: 8px 0 0; padding: 0; max-height: 180px; overflow-y: auto; display: flex; flex-direction: column; gap: 4px; }
+.dash-upload-list li { display: flex; align-items: center; gap: 10px; font-size: var(--fs-meta); }
+.dash-upload-list .dash-cell-mono { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+/* ── 表情包面板:标签云、画廊、卡片、抽屉大图 ── */
+.dash-scope-hint { color: var(--text-faint); font-size: var(--fs-micro); white-space: nowrap; }
+.dash-tag-cloud { display: flex; flex-wrap: wrap; gap: 6px; margin: -8px 0 14px; }
+.dash-chip.is-clickable { border: none; cursor: pointer; font: inherit; font-size: var(--fs-micro); }
+.dash-chip.is-clickable:hover { background: var(--surface-3); color: var(--text); }
+.dash-search-hint { margin: -6px 0 12px; color: var(--text-soft); font-size: var(--fs-meta); }
+.dash-gallery { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 12px; }
+/* 瀑布流:行单位 1px,跨行数由 JS 按卡片实际高度算(见 dash-memes.js)。
+   列还是自动填充,所以从左到右的顺序不变——搜索命中的前几张仍在最前。
+   JS 没跑起来时靠这里的默认跨行数兜底,不至于塌成一条线。 */
+.dash-gallery.is-masonry { grid-auto-rows: 1px; row-gap: 0; align-items: start; }
+.dash-gallery.is-masonry .dash-meme { grid-row-end: span 212; margin-bottom: 12px; }
+/* min-height:0 是关键:缩略图是列向 flex 的子项,它的「自动最小尺寸」会按
+   <img> 的固有高度算,于是 aspect-ratio 定的高度被顶掉——一张 120×420 的图
+   照样撑出 646px 的格子(实测)。 */
+.dash-gallery.is-masonry .dash-meme-thumb { aspect-ratio: 1; min-height: 0; overflow: hidden; }
+/* 手机:150px 一格会退成单列巨卡,收到三列;页头的「人格 → 库」提示与下拉里的「(当前人格)」重复,让位给上传按钮 */
+@media (max-width: 473px) {
+  .dash-gallery { grid-template-columns: repeat(auto-fill, minmax(104px, 1fr)); gap: 8px; }
+  .dash-gallery.is-masonry { row-gap: 0; }
+  .dash-gallery.is-masonry .dash-meme { grid-row-end: span 150; margin-bottom: 8px; }
+  .dash-scope { flex-wrap: wrap; min-width: 0; }
+  .dash-scope select { min-width: 0; max-width: 100%; }
+  .dash-scope-hint { display: none; }
+}
+.dash-meme {
+  margin: 0; border: 1px solid var(--line); border-radius: var(--radius); background: var(--surface-1); overflow: hidden; cursor: pointer;
+  display: flex; flex-direction: column; transition: transform var(--motion-fast) ease, box-shadow var(--motion-fast) ease;
+}
+.dash-meme:hover, .dash-meme:focus-visible { transform: translateY(-2px); box-shadow: var(--card-shadow); outline: none; }
+.dash-meme.is-disabled .dash-meme-thumb img { opacity: .35; filter: grayscale(1); }
+.dash-meme-thumb { position: relative; background: var(--surface-2); display: flex; align-items: center; justify-content: center; }
+.dash-meme-thumb img { width: 100%; height: 100%; object-fit: contain; }
+.dash-meme-badge {
+  position: absolute; right: 6px; top: 6px; padding: 1px 6px; border-radius: var(--radius);
+  background: color-mix(in srgb, var(--app-bg) 70%, transparent); color: var(--text); font-size: var(--fs-micro); font-weight: 600;
+}
+.dash-meme-badge.is-count { right: auto; left: 6px; font-weight: 400; color: var(--text-soft); }
+.dash-meme-cap { display: flex; align-items: center; gap: 6px; padding: 8px 10px; font-size: var(--fs-meta); }
+.dash-meme-name { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.dash-meme-hero { display: flex; justify-content: center; margin-bottom: 14px; padding: 10px; border-radius: var(--radius); background: var(--surface-2); }
+.dash-meme-full { max-width: 100%; max-height: 300px; object-fit: contain; }
+
+/* ── 群聊 / 群管面板:发送者单元、媒体 chip、领奖台、横向条形、星期×小时热力、事件卡、危险区 ── */
+.dash-sender { display: flex; align-items: center; gap: 6px; }
+.dash-row > span > small { display: block; }
+.dash-row.is-recalled .dash-cell-main { color: var(--text-faint); text-decoration: line-through; }
+.dash-media-chips { display: flex; flex-wrap: wrap; gap: 4px; }
+.dash-podium { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; margin-bottom: 14px; }
+.dash-podium-item { display: flex; flex-direction: column; gap: 3px; padding: 10px 12px; border-radius: var(--radius); background: var(--surface-2); font-size: var(--fs-ui); }
+.dash-podium-rank { font-size: 20px; }
+.dash-hbars { display: flex; flex-direction: column; gap: 6px; }
+.dash-hbar { display: grid; grid-template-columns: minmax(120px, 1fr) minmax(0, 3fr) 48px; align-items: center; gap: 10px; font-size: var(--fs-meta); }
+.dash-hbar-label { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.dash-hbar-track { height: 10px; border-radius: var(--radius-pill); background: var(--surface-2); overflow: hidden; }
+.dash-hbar-fill { display: block; height: 100%; border-radius: var(--radius-pill); background: var(--chart-1, var(--accent)); }
+.dash-heat { display: grid; grid-template-columns: 22px repeat(24, 1fr); gap: 3px; align-items: center; }
+.dash-heat i { display: block; aspect-ratio: 1; border-radius: var(--radius-sm); background: var(--heat-0, var(--surface-2)); }
+.dash-heat i[data-l="1"] { background: var(--heat-1); }
+.dash-heat i[data-l="2"] { background: var(--heat-2); }
+.dash-heat i[data-l="3"] { background: var(--heat-3); }
+.dash-heat i[data-l="4"] { background: var(--heat-4); }
+.dash-heat-axis { font-size: var(--fs-micro); color: var(--text-faint); text-align: center; }
+.dash-two-col { display: grid; grid-template-columns: minmax(0, 2fr) minmax(220px, 1fr); gap: 12px; }
+@media (max-width: 900px) { .dash-two-col { grid-template-columns: 1fr; } }
+.dash-kv { display: grid; grid-template-columns: auto 1fr; gap: 6px 14px; font-size: var(--fs-ui); }
+.dash-kv strong { font-variant-numeric: tabular-nums; }
+.dash-event { display: flex; flex-direction: column; gap: 4px; }
+.dash-event-head { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; font-size: var(--fs-ui); }
+.dash-danger { margin-top: 26px; padding-top: 6px; border-top: 1px solid var(--line); }
+.dash-timeline-card > .dash-chip { align-self: flex-start; }
+
+/* ── 好感·情绪面板:等级分布条、分数头、复选行 ── */
+.dash-level-bar { display: flex; gap: 3px; height: 26px; }
+.dash-level-cell { display: flex; align-items: center; justify-content: center; min-width: 6px; border-radius: var(--radius); background: color-mix(in srgb, var(--accent) 28%, var(--surface-2)); overflow: hidden; }
+.dash-level-cell.is-empty { background: var(--surface-2); }
+.dash-level-cell i { font-style: normal; font-size: var(--fs-micro); color: var(--text); white-space: nowrap; padding: 0 6px; }
+.dash-score-head { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; margin-bottom: 8px; }
+.dash-score-big { font-family: var(--serif); font-size: 30px; font-weight: 600; }
+.dash-check { display: flex; align-items: center; gap: 8px; margin: 4px 0 12px; font-size: var(--fs-ui); }
+
+/* ── 情绪标签:二维方格、点、区域标注、量表、表单 ── */
+.dash-emo-layout { display: grid; grid-template-columns: minmax(220px, 300px) minmax(0, 1fr); gap: 18px; align-items: start; }
+@media (max-width: 900px) { .dash-emo-layout { grid-template-columns: 1fr; } }
+.dash-emo-grid {
+  position: relative; aspect-ratio: 1; border-radius: var(--radius); overflow: hidden;
+  background:
+    linear-gradient(to right, transparent 49.5%, var(--line) 49.5%, var(--line) 50.5%, transparent 50.5%),
+    linear-gradient(to bottom, transparent 49.5%, var(--line) 49.5%, var(--line) 50.5%, transparent 50.5%),
+    linear-gradient(135deg, color-mix(in srgb, var(--danger) 14%, var(--surface-2)) 0%, var(--surface-2) 50%, color-mix(in srgb, var(--online) 16%, var(--surface-2)) 100%);
+}
+.dash-emo-region { position: absolute; transform: translate(-50%, -50%); font-size: var(--fs-micro); color: var(--text-faint); pointer-events: none; }
+.dash-emo-axis { position: absolute; font-size: var(--fs-micro); color: var(--text-faint); }
+.dash-emo-axis.is-x { right: 8px; bottom: 4px; }
+.dash-emo-axis.is-y { left: 6px; top: 4px; }
+.dash-emo-dot { position: absolute; width: 14px; height: 14px; border-radius: 50%; transform: translate(-50%, -50%); box-sizing: border-box; }
+.dash-emo-dot.is-stored { border: 2px solid var(--accent); background: transparent; }
+.dash-emo-dot.is-effective { background: var(--accent); box-shadow: 0 0 0 4px color-mix(in srgb, var(--accent) 25%, transparent); }
+.dash-emo-side { display: flex; flex-direction: column; gap: 10px; }
+.dash-meter { display: grid; grid-template-columns: 52px minmax(0, 1fr) 48px auto; align-items: center; gap: 10px; font-size: var(--fs-meta); }
+.dash-meter-label { color: var(--text-soft); }
+.dash-meter-track { position: relative; height: 10px; border-radius: var(--radius-pill); background: var(--surface-2); overflow: hidden; }
+.dash-meter-fill { position: absolute; top: 0; height: 100%; background: var(--accent); border-radius: var(--radius-pill); }
+.dash-meter-base { position: absolute; top: -2px; width: 2px; height: 14px; background: var(--text-faint); transform: translateX(-1px); }
+.dash-emo-form { display: flex; flex-direction: column; gap: 10px; margin-bottom: 12px; }
+.dash-emo-form label { display: grid; grid-template-columns: 52px minmax(0, 1fr) 48px; align-items: center; gap: 10px; font-size: var(--fs-meta); color: var(--text-soft); }
+.dash-emo-form input[type="range"] { height: auto; padding: 0; border: none; background: transparent; accent-color: var(--accent); }
+
+/* ── 动效层(09-04):进场淡入上浮、抽屉滑入、条形/量表生长、折线画出;
+   全部短促克制,prefers-reduced-motion 一律关掉。 ── */
+@keyframes dash-fade-up { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: none; } }
+@keyframes dash-fade-in { from { opacity: 0; } to { opacity: 1; } }
+@keyframes dash-slide-in { from { transform: translateX(28px); opacity: .4; } to { transform: none; opacity: 1; } }
+@keyframes dash-grow-x { from { transform: scaleX(0); } to { transform: scaleX(1); } }
+@keyframes dash-draw { from { stroke-dashoffset: 1; } to { stroke-dashoffset: 0; } }
+@keyframes dash-pop { 0% { transform: translate(-50%, -50%) scale(.6); } 70% { transform: translate(-50%, -50%) scale(1.15); } 100% { transform: translate(-50%, -50%) scale(1); } }
+
+.con-panel:not([hidden]) > .con-inner { animation: dash-fade-up .26s ease-out both; }
+.dash-card { animation: dash-fade-up .36s ease-out both; animation-delay: calc(var(--i, 0) * 45ms); transition: transform var(--motion) ease, box-shadow var(--motion) ease; }
+.dash-card:hover { transform: translateY(-2px); box-shadow: var(--card-shadow); }
+.dash-table, .dash-tree-pane, .dash-main-pane, .u-card, .dash-inline-card { animation: dash-fade-up .28s ease-out both; }
+.dash-row > span { animation: dash-fade-in .3s ease-out both; }
+.dash-row:nth-child(2) > span { animation-delay: 22ms; }
+.dash-row:nth-child(3) > span { animation-delay: 44ms; }
+.dash-row:nth-child(4) > span { animation-delay: 66ms; }
+.dash-row:nth-child(5) > span { animation-delay: 88ms; }
+.dash-row:nth-child(6) > span { animation-delay: 110ms; }
+.dash-row:nth-child(7) > span { animation-delay: 132ms; }
+.dash-row:nth-child(8) > span { animation-delay: 154ms; }
+.dash-row:nth-child(9) > span { animation-delay: 176ms; }
+.dash-row:nth-child(10) > span { animation-delay: 198ms; }
+.dash-row:nth-child(11) > span { animation-delay: 220ms; }
+.dash-row:nth-child(12) > span { animation-delay: 242ms; }
+.dash-row:nth-child(13) > span { animation-delay: 264ms; }
+.dash-row:nth-child(14) > span { animation-delay: 286ms; }
+.dash-row:nth-child(15) > span { animation-delay: 308ms; }
+.dash-row:not(.is-head) > span { transition: background-color var(--motion) ease; }
+.dash-meme { animation: dash-fade-up .34s ease-out both; }
+.dash-meme:nth-child(1) { animation-delay: 0ms; }
+.dash-meme:nth-child(2) { animation-delay: 18ms; }
+.dash-meme:nth-child(3) { animation-delay: 36ms; }
+.dash-meme:nth-child(4) { animation-delay: 54ms; }
+.dash-meme:nth-child(5) { animation-delay: 72ms; }
+.dash-meme:nth-child(6) { animation-delay: 90ms; }
+.dash-meme:nth-child(7) { animation-delay: 108ms; }
+.dash-meme:nth-child(8) { animation-delay: 126ms; }
+.dash-meme:nth-child(9) { animation-delay: 144ms; }
+.dash-meme:nth-child(10) { animation-delay: 162ms; }
+.dash-meme:nth-child(11) { animation-delay: 180ms; }
+.dash-meme:nth-child(12) { animation-delay: 198ms; }
+.dash-meme:nth-child(13) { animation-delay: 216ms; }
+.dash-meme:nth-child(14) { animation-delay: 234ms; }
+.dash-meme:nth-child(15) { animation-delay: 252ms; }
+.dash-meme:nth-child(16) { animation-delay: 270ms; }
+.dash-meme:nth-child(17) { animation-delay: 288ms; }
+.dash-meme:nth-child(18) { animation-delay: 306ms; }
+.dash-meme:nth-child(19) { animation-delay: 324ms; }
+.dash-meme:nth-child(20) { animation-delay: 342ms; }
+.dash-meme:nth-child(21) { animation-delay: 360ms; }
+.dash-meme:nth-child(22) { animation-delay: 378ms; }
+.dash-meme:nth-child(23) { animation-delay: 396ms; }
+.dash-meme:nth-child(24) { animation-delay: 414ms; }
+.dash-timeline-item { animation: dash-fade-up .3s ease-out both; }
+.dash-timeline-item:nth-child(1) { animation-delay: 0ms; }
+.dash-timeline-item:nth-child(2) { animation-delay: 40ms; }
+.dash-timeline-item:nth-child(3) { animation-delay: 80ms; }
+.dash-timeline-item:nth-child(4) { animation-delay: 120ms; }
+.dash-timeline-item:nth-child(5) { animation-delay: 160ms; }
+.dash-timeline-item:nth-child(6) { animation-delay: 200ms; }
+.dash-timeline-item:nth-child(7) { animation-delay: 240ms; }
+.dash-timeline-item:nth-child(8) { animation-delay: 280ms; }
+.dash-timeline-item:nth-child(9) { animation-delay: 320ms; }
+.dash-timeline-item:nth-child(10) { animation-delay: 360ms; }
+.dash-timeline-item:nth-child(11) { animation-delay: 400ms; }
+.dash-timeline-item:nth-child(12) { animation-delay: 440ms; }
+.dash-timeline-item::before { transition: transform var(--motion) ease; }
+.dash-timeline-item:hover::before { transform: scale(1.35); }
+.dash-drawer-overlay { animation: dash-fade-in var(--motion-slow) ease-out both; }
+.dash-drawer { animation: dash-slide-in .24s cubic-bezier(.2, .8, .2, 1) both; }
+.dash-confirm[open] { animation: dash-fade-up var(--motion-slow) ease-out both; }
+.dash-hbar-fill, .dash-meter-fill, .dash-level-cell { transform-origin: left center; animation: dash-grow-x .5s cubic-bezier(.2, .8, .2, 1) both; }
+.dash-hbar-track, .dash-meter-track { overflow: hidden; }
+.dash-level-bar .dash-level-cell:nth-child(n+2) { animation-delay: 60ms; }
+.dash-sparkline-line { stroke-dasharray: 1; stroke-dashoffset: 1; animation: dash-draw .9s ease-out .1s both; }
+.dash-heat i { animation: dash-fade-in .4s ease-out both; transition: transform var(--motion-fast) ease; }
+.dash-heat i:hover { transform: scale(1.35); }
+.dash-emo-dot { transition: left .5s cubic-bezier(.2, .8, .2, 1), top .5s cubic-bezier(.2, .8, .2, 1); }
+.dash-emo-dot.is-effective { animation: dash-pop .45s ease-out both; }
+.con-segmented button { transition: background-color var(--motion) ease, color var(--motion) ease, box-shadow var(--motion) ease; }
+.dash-chip.is-clickable, .dash-button, .dash-icon-button { transition: background-color var(--motion) ease, color var(--motion) ease, transform var(--motion-fast) ease; }
+.dash-button:active, .dash-icon-button:active { transform: scale(.96); }
+.dash-tree-row { transition: background-color var(--motion-fast) ease; }
+.dash-index-dot.is-stale { animation: dash-fade-in 1.2s ease-in-out infinite alternate; }
+.con-rail-item { transition: background-color var(--motion) ease, color var(--motion) ease, transform var(--motion-fast) ease; }
+.con-rail-item:active { transform: scale(.98); }
+
+/* ── 记账面板(09-09) ────────────────────────────────────────
+ * 只用别名层变量,跟着主题与 matugen 走。金额同时靠符号与颜色区分方向——
+ * 只用红绿的话,色觉差异的人看到的是两列一样的灰。
+ */
+.dash-led-block { margin-bottom: 6px; }
+.dash-led-block .dash-section { margin-top: 0; }
+
+/* 金额列:主金额一行,外币原值一行小字。整列右对齐、等宽,便于竖着比大小。 */
+.dash-led-amount { display: flex; flex-direction: column; align-items: flex-end; gap: 2px; min-width: 0; }
+.dash-led-money { font-family: var(--font-mono); font-variant-numeric: tabular-nums; font-size: var(--fs-ui); white-space: nowrap; }
+.dash-led-money.is-expense { color: var(--danger); }
+.dash-led-money.is-income { color: var(--md-ext-color-online, var(--online)); }
+.dash-led-money.is-transfer { color: var(--text-soft); }
+.dash-led-origin { color: var(--text-faint); font-size: var(--fs-micro); white-space: nowrap; }
+
+/* 分类占比条:第三列放金额,比通用 hbar 的 48px 宽一些才装得下带小数的钱。 */
+.dash-led-hbar { grid-template-columns: minmax(96px, 1fr) minmax(0, 2.4fr) 84px; }
+.dash-led-hbar .dash-cell-mono { text-align: right; font-variant-numeric: tabular-nums; }
+
+/* 预算行:名称 / 进度条 / 用量 / 删除。 */
+.dash-led-budget { grid-template-columns: minmax(72px, 1fr) minmax(0, 2fr) auto auto; margin-bottom: 8px; }
+.dash-led-budget .dash-cell-mono { white-space: nowrap; font-variant-numeric: tabular-nums; }
+.dash-meter-fill.is-ok { background: var(--md-ext-color-online, var(--online)); }
+.dash-meter-fill.is-near { background: var(--gold); }
+.dash-meter-fill.is-exceeded { background: var(--danger); }
+
+/* 图表区与下面的筛选条之间留一口气,否则折线紧贴分段按钮。 */
+.dash-led-block { margin-bottom: 16px; }
+
+/* 视图标签条:流水 / 账户 / 分类 / 预算 / 数据。 */
+.dash-led-tabs { margin: 0 0 16px; }
+
+/* 视图抬头:标题 + 一句说明 + 右侧的新建按钮。 */
+.dash-led-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16px;
+  flex-wrap: wrap;
+  margin-bottom: 12px;
+}
+.dash-led-head .dash-section { margin: 0 0 4px; }
+.dash-led-hint { margin: 0; max-width: 62ch; color: var(--text-soft); font-size: var(--fs-meta); line-height: 1.6; }
+
+/*
+ * 表单放大一档。原来 .dash-input 的字号写的是 var(--fs-body)——那个变量
+ * 根本不存在,声明整条作废,于是控件字号退回继承(09-09 用户反馈「字体太小」
+ * 的直接原因)。这里显式给足:标签用 UI 档,输入用正文档,高度 40px 保证
+ * 手机上点得准。
+ */
+.dash-led-form .dash-field { gap: 7px; margin-bottom: 16px; }
+.dash-led-form .dash-field-label { font-size: var(--fs-ui); color: var(--text); }
+.dash-led-form .dash-field-hint { font-size: var(--fs-meta); }
+.dash-led-form .dash-input,
+.dash-led-form .dash-select {
+  height: 40px;
+  padding: 0 12px;
+  font-size: var(--fs-chat);
+}
+.dash-led-form input[type="file"].dash-input { height: auto; padding: 9px 12px; }
+.dash-led-form .con-segmented button { padding: 8px 16px; font-size: var(--fs-ui); }
+.dash-led-currency { flex: 0 0 116px; }
+
+/* 就地展开的新建表单,免去一层抽屉。 */
+.dash-led-inline-form {
+  width: min(420px, 100%);
+  margin-bottom: 16px;
+  padding: 14px 16px 4px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  background: var(--surface-1);
+}
+
+/* 自制的文件选择器:原生控件的英文标签盖不住,只好藏起来重做一个。 */
+.dash-led-file { display: flex; align-items: center; gap: 10px; }
+.dash-led-filename {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: var(--text-soft);
+  font-size: var(--fs-meta);
+}
+
+/* 账户 / 账本卡片。 */
+.dash-led-cards { display: flex; flex-wrap: wrap; gap: 12px; margin-bottom: 8px; }
+.dash-led-card {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-width: 200px;
+  padding: 12px 14px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  background: var(--surface-1);
+}
+.dash-led-card.is-current { border-color: var(--accent); }
+.dash-led-card-name { font-size: var(--fs-ui); }
+.dash-led-card-value {
+  margin-left: auto;
+  font-family: var(--font-mono);
+  font-variant-numeric: tabular-nums;
+  font-size: var(--fs-ui);
+}
+.dash-led-chips { display: flex; flex-wrap: wrap; gap: 8px; }
+
+/* 区块内部的行距:说明、按钮、表单各自留白,否则按钮会压到说明上。 */
+.dash-led-block > .dash-led-hint { margin-bottom: 12px; }
+.dash-led-block > .dash-actions { margin-top: 4px; }
+.dash-led-block > .dash-led-form { max-width: 480px; margin-top: 14px; }
+
+/*
+ * 两块图各自成卡片。不给容器的话,左边占比条最右那列金额会紧贴右边的
+ * 折线,读起来像是折线的纵轴刻度(09-09 桌面走查实测)。
+ */
+.dash-led-charts { gap: 16px; margin-bottom: 14px; }
+.dash-led-chart {
+  background: var(--surface-1);
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  padding: 12px 16px 14px;
+}
+.dash-led-chart .dash-section { margin: 0 0 10px; }
+.dash-led-chart .dash-sparkline { height: 84px; }
+
+@media (max-width: 640px) {
+  /*
+   * 窄屏收起备注列。四列在 390px 下挤不开,金额会被裁成「−128.」——
+   * 钱看不全比看不见备注严重得多(09-09 手机走查实测)。备注点开行还在。
+   * 列模板是 D.table 用 element.style 设的,这里必须 !important 才盖得住。
+   */
+  .dash-led-table { --dash-cols: 62px minmax(0, 1fr) minmax(96px, auto) !important; }
+  .dash-led-table .dash-row > *:nth-child(3) { display: none; }
+  .dash-led-hbar { grid-template-columns: minmax(72px, 1fr) minmax(0, 1.6fr) 72px; }
+  .dash-led-budget { grid-template-columns: minmax(56px, 1fr) minmax(0, 1.2fr) auto auto; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .con-panel > .con-inner, .dash-card, .dash-table, .dash-tree-pane, .dash-main-pane, .u-card, .dash-inline-card,
+  .dash-row > span, .dash-meme, .dash-timeline-item, .dash-drawer-overlay, .dash-drawer, .dash-confirm[open],
+  .dash-hbar-fill, .dash-meter-fill, .dash-level-cell, .dash-sparkline-line, .dash-heat i, .dash-emo-dot, .dash-index-dot.is-stale {
+    animation: none !important; transition: none !important;
+  }
+  .dash-sparkline-line { stroke-dasharray: none; stroke-dashoffset: 0; }
+}
+
+/* ── 可排序表头 ── */
+.dash-row.is-head > span.is-sortable { cursor: pointer; user-select: none; gap: 4px; }
+.dash-row.is-head > span.is-sortable:hover, .dash-row.is-head > span.is-sortable.is-active { color: var(--text); }
+.dash-sort-arrow { font-style: normal; font-size: 9px; opacity: .45; transition: opacity var(--motion) ease, transform var(--motion) ease; }
+.is-sortable.is-active .dash-sort-arrow { opacity: 1; color: var(--accent); }
+.is-sortable:hover .dash-sort-arrow { opacity: .9; }
+

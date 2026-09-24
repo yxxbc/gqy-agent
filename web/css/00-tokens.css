@@ -1,0 +1,257 @@
+:root {
+  color-scheme: dark;
+  --font-ui: Inter, "Noto Sans SC", "Microsoft YaHei", system-ui, sans-serif;
+  --font-mono: "JetBrains Mono", "Cascadia Code", "SFMono-Regular", Consolas, "Liberation Mono", monospace;
+  --serif: "Source Han Serif SC", "Noto Serif CJK SC", "Noto Serif SC", "Songti SC", "SimSun", Georgia, serif;
+  --ui-scale: 1.1;
+  --artifact-content-scale: calc(1.2 / var(--ui-scale));
+  --sidebar-width: 252px;
+
+  /* 窗边 r8 字号阶梯:正文 15 / UI 13 / meta 12 / micro 11 */
+  --fs-chat: 15px;
+  --fs-ui: 13px;
+  --fs-meta: 12px;
+  --fs-micro: 11px;
+  --fs-artifact-chat: 16.3636px;
+
+  /*
+   * 圆角。原来散着 22 种取值（4/5/6/7/9/10/11/12/14/16px…），同一类控件在
+   * 不同地方不一样宽。收敛成三个：矩形一律 --radius；12px 以下的小色块
+   * （热力图格子、图例方块、柱状图顶）用 --radius-sm，那个尺寸上 8px 会圆成
+   * 一个点；--radius-pill 只留给「靠圆头表达形状」的东西：开关轨道（38×22，
+   * 圆角就是高度的一半，给 8px 会压成方块）、进度条与滑块轨道、圆头像、
+   * 语音悬浮球。标签、按钮、浮层一律跟 --radius 走。
+   * 圆形 50% 是形状不是圆角，仍写死；气泡那一角刻意留尖（--radius-sm），
+   * 是尾巴，不是没统一。
+   */
+  --radius: 8px;
+  --radius-sm: 3px;
+  --radius-pill: 999px;
+
+  /* 动效时长三档。1s 以上的循环动画（转圈、呼吸）和交错延时按需写死。 */
+  --motion-fast: 120ms;
+  --motion: 160ms;
+  --motion-slow: 200ms;
+
+  /*
+   * 全局层级。30 以下是页面内局部叠放（侧栏、输入坞、悬浮按钮），就地写死；
+   * 跨组件会互相压的浮层走这里。取值沿用收敛前的数字，行为不变。
+   * 需要夹在两层之间的用 calc 偏移，别再发明新数字。
+   */
+  --z-popover: 40;     /* 下拉菜单、上下文弹层、命令面板 */
+  --z-maximized: 50;   /* 最大化的 artifact 工作区 */
+  --z-overlay: 60;     /* 模态遮罩：抽屉、共享文件、地图详情 */
+  --z-overlay-top: 70; /* 压在遮罩上的：设置抽屉、OOBE、选区工具条、网页全屏视频 */
+  --z-toast: 80;       /* 提示条、图表浮窗 */
+  --z-top: 90;         /* 灯箱、附件预览、设置菜单 */
+  --z-fatal: 100;      /* noscript 等整页状态 */
+
+  /*
+   * 夜阑 (dusk) —— 默认暗色主题。
+   * MD3 system tokens;matugen 生成的 /theme.css 可整套覆盖。
+   * 种子色取自 gqy-logo:primary=瞳色减淡的雾蓝,secondary=发色暖金,
+   * tertiary=丝带酒红,surface=傍晚蓝紫。
+   */
+  --md-sys-color-primary: #aebde8;
+  --md-sys-color-on-primary: #1f2c55;
+  --md-sys-color-primary-container: #394877;
+  --md-sys-color-on-primary-container: #dce3f9;
+  --md-sys-color-secondary: #e4bf79;
+  --md-sys-color-on-secondary: #402d02;
+  --md-sys-color-secondary-container: #443716;
+  --md-sys-color-on-secondary-container: #f6e7c4;
+  --md-sys-color-tertiary: #e38c9a;
+  --md-sys-color-on-tertiary: #55212e;
+  --md-sys-color-tertiary-container: #4e242d;
+  --md-sys-color-on-tertiary-container: #fadde3;
+  --md-sys-color-error: #ec7a6e;
+  --md-sys-color-on-error: #3f1210;
+  --md-sys-color-error-container: #47231f;
+  --md-sys-color-on-error-container: #f8dad4;
+  --md-sys-color-surface: #171821;
+  --md-sys-color-surface-container-lowest: #101117;
+  --md-sys-color-surface-container-low: #12131b;
+  --md-sys-color-surface-container: #1f212c;
+  --md-sys-color-surface-container-high: #282b38;
+  --md-sys-color-surface-container-highest: #323648;
+  --md-sys-color-on-surface: #e9e6ef;
+  --md-sys-color-on-surface-variant: #9993a5;
+  --md-sys-color-outline: #4c5065;
+  --md-sys-color-outline-variant: #303341;
+  /* 扩展语义色:在线状态(不属于 MD3 标准 token) */
+  --md-ext-color-online: #7ccb96;
+}
+
+/*
+ * 旧变量层 —— 组件规则引用这些别名,一律从 MD3 token 派生。
+ * 同时挂在 :root 和亮色 body 上:var() 在声明元素上解析,
+ * 只挂 :root 的话亮色主题重定义 token 不会生效。
+ */
+:root,
+body[data-theme="linen"] {
+  --app-bg: var(--md-sys-color-surface);
+  --sidebar-bg: var(--md-sys-color-surface-container-low);
+  --topbar-bg: var(--md-sys-color-surface);
+  --surface-1: var(--md-sys-color-surface-container);
+  --surface-2: var(--md-sys-color-surface-container-high);
+  --surface-3: var(--md-sys-color-surface-container-highest);
+  --surface-soft: color-mix(in srgb, var(--md-sys-color-surface-container) 55%, var(--md-sys-color-surface));
+  --line: var(--md-sys-color-outline-variant);
+  --line-strong: var(--md-sys-color-outline);
+  --text: var(--md-sys-color-on-surface);
+  --text-soft: var(--md-sys-color-on-surface-variant);
+  --text-faint: color-mix(in srgb, var(--md-sys-color-on-surface-variant) 70%, var(--md-sys-color-surface));
+  --inverse-text: var(--md-sys-color-on-primary);
+  --accent: var(--md-sys-color-primary);
+  --accent-strong: color-mix(in srgb, var(--md-sys-color-primary) 82%, #ffffff);
+  --accent-soft: var(--md-sys-color-primary-container);
+  --cyan: var(--md-sys-color-primary);
+  --cyan-soft: var(--md-sys-color-primary-container);
+  --gold: var(--md-sys-color-secondary);
+  --gold-soft: var(--md-sys-color-secondary-container);
+  --coral: var(--md-sys-color-tertiary);
+  --coral-soft: var(--md-sys-color-tertiary-container);
+  --danger: var(--md-sys-color-error);
+  --danger-soft: var(--md-sys-color-error-container);
+  --online: var(--md-ext-color-online);
+  --ribbon: var(--md-sys-color-tertiary);
+  --ribbon-soft: var(--md-sys-color-tertiary-container);
+  --user-bg: var(--md-sys-color-primary-container);
+  --user-text: var(--md-sys-color-on-primary-container);
+  /* 暗色:面板比气泡**亮**一档(One Dark 自己也是这么摆的),不是挖一个更黑的洞。 */
+  --code-bg: var(--md-sys-color-surface-container-high);
+  --code-ink: color-mix(in srgb, var(--md-sys-color-on-surface) 94%, var(--md-sys-color-primary));
+
+  /* 正文高亮:暗色直接用 primary,亮色在 linen 块加深 */
+  --hl: var(--md-sys-color-primary);
+
+  /* 链接色**不**从主题派生(用户 09-09 裁定)。primary 跟着壁纸走,于是「链接」
+     这件事在橄榄色壁纸下是橄榄色、在酒红壁纸下是酒红——而人对「蓝色带下划线
+     = 可点」是有肌肉记忆的,那点主题一致性不值得拿它去换。深浅各一支柔和的蓝,
+     终端那侧(src/render/style.rs 的 LINK_LABEL_STYLE)也是固定蓝,两端一致。 */
+  --link: #8fb6ec;
+
+  /* 三档软阴影(阴影 rgba 常量按主题,允许保留) */
+  --bubble-shadow: 0 1px 4px rgba(0, 0, 0, 0.25);
+  --card-shadow: 0 2px 8px rgba(0, 0, 0, 0.22);
+  --float-shadow: 0 18px 50px rgba(0, 0, 0, 0.5), 0 4px 12px rgba(0, 0, 0, 0.35);
+  --artifact-shadow: 0 0 10px rgba(0, 0, 0, 0.16), 0 2px 6px rgba(0, 0, 0, 0.1);
+  --shadow: var(--float-shadow);
+
+  /* 小签底色:身份用字形色,底色只表状态。中性签=页面背景色(白气泡上的「页面色凹陷」),
+     live/fail 暗色淡混、亮色(linen 块)浓混。 */
+  --chip-neutral: var(--app-bg);
+  --chip-think: color-mix(in srgb, var(--accent-soft) 26%, transparent);
+  --chip-live: color-mix(in srgb, var(--accent-soft) 48%, transparent);
+  --chip-fail: color-mix(in srgb, var(--danger-soft) 55%, transparent);
+
+  /*
+   * 代码语法色。全部从 MD3 token 派生,一个 vendor 主题的十六进制都不抄:
+   * MD3 保证同一个角色在亮色色板是深色调、在暗色色板是浅色调,所以同一条派生
+   * 式在两套内置主题和 matugen 按壁纸生成的任意色板下,都朝着「跟代码底色拉开」
+   * 的方向走(写死一套暗色主题的话,晨光下就是一片看不见的字)。
+   * 每条再往 --code-ink 兑一点:压掉高饱和色在 12.5px 等宽字上的刺眼感,也把
+   * matugen 偶尔给出的低对比色拽回来。
+   * 角色只有九个,故意少——壁纸生成的色板未必有九种分得开的色相,少上色比上一
+   * 堆分不清的色更好读。error 是三套色板下都必定是红的那个角色,给关键字;
+   * online 明确「不跟壁纸走」的固定绿,给字符串;剩下的交给 primary/tertiary。
+   */
+  /* 语法高亮用固定的标准色板(One Dark),不从主题变量派生。
+     派生版能跟着壁纸配色走,但代价是每换一张壁纸就换一套「关键字是什么颜色」——
+     而看代码的人对紫关键字/绿字符串/橙数字/蓝函数是有肌肉记忆的,那点主题一致性
+     不值得拿它去换(用户 09-09 裁定)。深浅两套各一份,见 linen 那块。 */
+  --tok-c: #7f848e;
+  --tok-p: #abb2bf;
+  --tok-o: #56b6c2;
+  --tok-k: #c678dd;
+  --tok-s: #98c379;
+  --tok-n: #d19a66;
+  --tok-f: #61afef;
+  --tok-t: #e5c07b;
+  --tok-y: #e06c75;
+}
+
+body[data-theme="linen"] {
+  color-scheme: light;
+
+  /* 晨光 (dawn) —— 亮色主题。primary=发影藤紫,底色=窗边奶油白。 */
+  --md-sys-color-primary: #7568b0;
+  --md-sys-color-on-primary: #ffffff;
+  --md-sys-color-primary-container: #e6e1f6;
+  --md-sys-color-on-primary-container: #372e66;
+  --md-sys-color-secondary: #8f6b1e;
+  --md-sys-color-on-secondary: #ffffff;
+  --md-sys-color-secondary-container: #f3e2bb;
+  --md-sys-color-on-secondary-container: #4a3608;
+  --md-sys-color-tertiary: #a5495a;
+  --md-sys-color-on-tertiary: #ffffff;
+  --md-sys-color-tertiary-container: #f6dce0;
+  --md-sys-color-on-tertiary-container: #5e222c;
+  --md-sys-color-error: #b3403a;
+  --md-sys-color-on-error: #ffffff;
+  --md-sys-color-error-container: #f6dcd6;
+  --md-sys-color-on-error-container: #5f1d18;
+  --md-sys-color-surface: #f6f0e2;
+  --md-sys-color-surface-container-lowest: #fffdf6;
+  --md-sys-color-surface-container-low: #efe7d3;
+  --md-sys-color-surface-container: #fffdf6;
+  --md-sys-color-surface-container-high: #f1eada;
+  --md-sys-color-surface-container-highest: #e8dfc9;
+  --md-sys-color-on-surface: #34303a;
+  --md-sys-color-on-surface-variant: #797064;
+  --md-sys-color-outline: #c6b795;
+  --md-sys-color-outline-variant: #e3d8c1;
+  --md-ext-color-online: #3e8e5c;
+
+  /* 语法高亮的浅色一套(One Light)。注释比原版的 #a0a1a7 压暗了一档——那个值
+     在浅底上只有 2.6:1,是「眯着眼找」的程度;注释该退到后面,但不该看不见。 */
+  --tok-c: #81828a;
+  --tok-p: #383a42;
+  --tok-o: #017eb4;
+  --tok-k: #a626a4;
+  --tok-s: #3f8141;
+  --tok-n: #986801;
+  --tok-f: #3a6fe0;
+  --tok-t: #a07001;
+  --tok-y: #d3453b;
+
+  /* 亮色下少数别名的映射不同:用户气泡用实心主色,代码块改暖纸浅底 */
+  --user-bg: var(--md-sys-color-primary);
+  --user-text: var(--md-sys-color-on-primary);
+  /* 浅色的代码面板 = **页面自己那张纸**(surface),不是白纸。
+     别再往 surface-container-lowest 上兑:壁纸生成的调色板(matugen)把它定成
+     #ffffff,兑一成暖色只把 R-B 拉到 2,而同一页的气泡是 18、底是 19——量出来
+     就是一块中性白补丁贴在暖奶油纸上,这正是「贴了张打印纸」的来源
+     (09-09 实测 panel rgb(253,253,251) / bubble rgb(242,238,224))。
+     用 surface 则天然跟着主题的色相走,且离气泡正好一档(matugen 亮色 +12、
+     内置晨光 -9),和暗色那边「比气泡高一档」是同一个手法。
+     顺带一提:浅色不能靠「压深」制造层次——One Light 那套色是照着近白底设计的,
+     底色每压深一档就吃掉两成对比度,压到 surface-container-highest 时
+     tok-o/t/y 会掉到 3.5:1 以下,而且 tok-t 补深之后会和 tok-n 撞成同一个色。 */
+  --code-bg: var(--md-sys-color-surface);
+  --code-ink: color-mix(in srgb, var(--md-sys-color-on-surface) 85%, var(--md-sys-color-surface));
+  --hl: color-mix(in srgb, var(--md-sys-color-primary) 78%, var(--md-sys-color-on-surface));
+  /* 亮色那支要压得住奶油纸:实测 4.65:1(近白的 matugen 亮色板上 4.87:1)。 */
+  --link: #3a6ea8;
+  --bubble-shadow: 0 1px 4px rgba(83, 64, 30, 0.07);
+  --card-shadow: 0 2px 8px rgba(83, 64, 30, 0.06);
+  --float-shadow: 0 18px 50px rgba(83, 64, 30, 0.2), 0 4px 12px rgba(83, 64, 30, 0.1);
+  --artifact-shadow: 0 0 10px rgba(83, 64, 30, 0.1), 0 2px 6px rgba(83, 64, 30, 0.06);
+  --chip-think: color-mix(in srgb, var(--accent-soft) 55%, transparent);
+  --chip-live: color-mix(in srgb, var(--accent-soft) 85%, transparent);
+  --chip-fail: color-mix(in srgb, var(--danger-soft) 78%, transparent);
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html,
+body {
+  width: 100%;
+  height: 100%;
+  margin: 0;
+  overflow: hidden;
+  overscroll-behavior: none;
+}
+

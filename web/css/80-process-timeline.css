@@ -1,0 +1,620 @@
+/* ═══════════════════════════ 过程时间线(思考 + 工具) ═══════════════════════════ */
+/*
+ * 连续的思考块和工具签串成一条时间线:一根 1px 细线穿过图标列的中心,图标处断开,
+ * 图标就是节点。没有底板、边框、标签色——简洁靠形式,不靠把过程藏起来。
+ * 线是独立元素(.proc-rail),起点终点由 JS 按可见节点算,高度走 transition,
+ * 新出一行就平滑长到那个图标。动画只有一条曲线一组时长:行淡入/线生长 0.45s,开合 0.38s。
+ * 次要色不用 --text-soft(亮色下是发棕的 on-surface-variant),改从正文色按比例兑底色得中性灰。
+ */
+.proc-line {
+  position: relative;
+  --proc-col: 16px;
+  --proc-gap: 4px;
+  --proc-ease: cubic-bezier(0.22, 0.61, 0.36, 1);
+  --proc-soft: color-mix(in srgb, var(--text) 62%, var(--app-bg));
+  --proc-think: color-mix(in srgb, var(--text) 74%, var(--app-bg));
+  --proc-indent: calc(var(--proc-col) + var(--proc-gap) + 4px);
+  margin: 2px 0;
+}
+.proc-rail {
+  position: absolute;
+  z-index: 0;
+  top: 0;
+  left: calc(var(--proc-col) / 2 - 0.5px);
+  width: 1px;
+  height: 0;
+  background: color-mix(in srgb, var(--line-strong) 75%, var(--line));
+  pointer-events: none;
+  /* 不给线自己的过渡:它靠 ResizeObserver 在内容(grid-rows fold)动画的每一帧
+     重量节点位置、瞬时贴着内容长/缩(#8 线拖后盖字的真因就是这条 0.45s 过渡在追赶)。
+     新节点淡入时线瞬时到位、节点淡上来,观感也对。 */
+}
+.proc-head,
+.proc-wrap {
+  position: relative;
+  z-index: 1;
+}
+@keyframes proc-fadein {
+  from {
+    opacity: 0;
+    transform: translateY(4px);
+  }
+}
+
+/* 节点:图标带上下两段页面色,把线遮出断口 */
+.proc-node,
+.assistant-blocks .proc-steps > .tool-card > .tool-head > .tool-icon,
+.assistant-blocks .proc-steps > .reasoning-block > summary > .reasoning-icon {
+  display: grid;
+  box-sizing: border-box;
+  width: var(--proc-col);
+  height: var(--proc-col);
+  flex: 0 0 var(--proc-col);
+  margin: 0;
+  place-items: center;
+  border-radius: 0;
+  background: var(--app-bg);
+  box-shadow: 0 -2px 0 var(--app-bg), 0 2px 0 var(--app-bg);
+  color: var(--proc-soft);
+}
+/* 子过程时间线在暖色面板里:节点遮线块要用面板的底色,不能用页面 app-bg(那样
+   在暖底上露出一块深色方块),也不能没有背景(那样细线从图标里穿过去)。图标在
+   什么背景上就是什么背景(#4)。 */
+.sub-blocks .proc-steps > .tool-card > .tool-head > .tool-icon,
+.sub-blocks .proc-steps > .reasoning-block > summary > .reasoning-icon,
+.sub-blocks .proc-head > .proc-node {
+  background: color-mix(in srgb, var(--text) 5%, var(--app-bg));
+  box-shadow:
+    0 -2px 0 color-mix(in srgb, var(--text) 5%, var(--app-bg)),
+    0 2px 0 color-mix(in srgb, var(--text) 5%, var(--app-bg));
+}
+.assistant-blocks .proc-steps > .tool-card > .tool-head > .tool-icon .icon-slot,
+.assistant-blocks .proc-steps > .reasoning-block > summary > .reasoning-icon svg,
+.proc-node .icon-slot {
+  width: 13px;
+  height: 13px;
+}
+
+/* 总结行:只在「过程自动收起」开着、且时间线已切断时出现 */
+.proc-head {
+  display: flex;
+  width: 100%;
+  min-height: 30px;
+  align-items: center;
+  margin: 0;
+  padding: 2px 0;
+  border: 0;
+  background: none;
+  color: var(--proc-soft);
+  font: 600 11.5px/1.5 var(--font-ui);
+  text-align: left;
+  cursor: pointer;
+  gap: var(--proc-gap);
+  pointer-events: none;
+}
+.proc-head > * {
+  pointer-events: auto;
+}
+.proc-head[hidden] {
+  display: none;
+}
+.proc-summary {
+  display: inline-flex;
+  align-items: baseline;
+  padding: 0 4px;
+  border-radius: 5px;
+  font-variant-numeric: tabular-nums;
+  transition: background-color var(--motion-slow) ease;
+  animation: proc-fadein 0.45s var(--proc-ease) both;
+}
+.proc-head:hover .proc-summary {
+  background: var(--surface-2);
+}
+.proc-summary b {
+  /* 「Worked for x s」和后面的「1 tool · 1 thought」同色(#129),不再更深一档。 */
+  color: inherit;
+  font-weight: 600;
+}
+.proc-summary .proc-err {
+  color: var(--danger);
+}
+.proc-summary .proc-dot {
+  padding: 0 2px;
+  opacity: 0.6;
+}
+.proc-chevron {
+  width: 12px;
+  height: 12px;
+  transition: transform 0.38s var(--proc-ease);
+}
+.proc-line.is-open .proc-chevron {
+  transform: rotate(90deg);
+}
+/* 开合是高度过渡:外层 grid 行高 0fr↔1fr,内层 overflow hidden */
+.proc-wrap {
+  display: grid;
+  grid-template-rows: 0fr;
+  opacity: 0;
+  transition: grid-template-rows 0.38s var(--proc-ease), opacity 0.25s ease;
+}
+.proc-line.is-open .proc-wrap {
+  grid-template-rows: 1fr;
+  opacity: 1;
+}
+.proc-wrap > div {
+  min-height: 0;
+  overflow: hidden;
+}
+.proc-steps {
+  display: flex;
+  min-width: 0;
+  flex-direction: column;
+  padding: 0 0 2px;
+  gap: 0;
+}
+.assistant-blocks .proc-steps > * {
+  margin: 0;
+  animation: proc-fadein 0.45s var(--proc-ease) both;
+}
+.proc-line.is-static .proc-steps > * {
+  animation: none;
+}
+/* 思考中:节点保持原子图标,只让它轻轻呼吸;芯片形态那三个跳动点不进时间线 */
+.assistant-blocks .proc-steps > .reasoning-block.is-live > summary > .reasoning-icon {
+  display: grid;
+  width: var(--proc-col);
+  gap: 0;
+}
+.assistant-blocks .proc-steps > .reasoning-block.is-live > summary > .reasoning-icon svg {
+  display: block;
+  animation: proc-breathe 1.6s ease-in-out infinite;
+}
+.assistant-blocks .proc-steps > .reasoning-block.is-live > summary > .reasoning-icon i {
+  display: none;
+}
+@keyframes proc-breathe {
+  50% {
+    opacity: 0.35;
+  }
+}
+
+/* 「准备 xx」占位签:时间线上的一行,转圈图标就是节点,文字和工具行同款 */
+.assistant-blocks .proc-steps > .tool-preparing-tag {
+  /* 和其它节点一样走 proc-fadein 平滑滑入;顶替它的正式卡不再重放动画(#17) */
+  display: flex;
+  width: 100%;
+  max-width: 100%;
+  min-height: 30px;
+  align-items: center;
+  margin: 0;
+  padding: 4px 0;
+  border-radius: 0;
+  background: none;
+  color: var(--proc-soft);
+  gap: var(--proc-gap);
+  overflow: visible;
+  white-space: normal;
+}
+.assistant-blocks .proc-steps > .tool-preparing-tag > .icon-slot {
+  display: grid;
+  box-sizing: border-box;
+  width: var(--proc-col);
+  height: var(--proc-col);
+  flex: 0 0 var(--proc-col);
+  place-items: center;
+  background: var(--app-bg);
+  box-shadow: 0 -2px 0 var(--app-bg), 0 2px 0 var(--app-bg);
+  color: var(--proc-soft);
+}
+.assistant-blocks .proc-steps > .tool-preparing-tag > .icon-slot svg {
+  width: 13px;
+  height: 13px;
+}
+.assistant-blocks .proc-steps > .tool-preparing-tag > .tool-preparing-label {
+  min-width: 0;
+  padding: 1px 4px;
+  overflow: hidden;
+  color: var(--proc-soft);
+  font-size: var(--fs-meta);
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* 工具行:节点 + 名字 + 等宽主语,右侧耗时。不再是各自宽度的彩色芯片 */
+.assistant-blocks .proc-steps > .tool-card {
+  width: 100%;
+  max-width: 100%;
+  border: 0;
+  border-radius: 0;
+  background: none;
+}
+.assistant-blocks .proc-steps > .tool-card > .tool-head {
+  display: flex;
+  width: 100%;
+  max-width: 100%;
+  min-height: 30px;
+  align-items: center;
+  padding: 4px 0;
+  border-radius: 0;
+  background: none;
+  color: var(--proc-soft);
+  gap: var(--proc-gap);
+  /* 整行可点展开(#11):不再只让 节点/文字/耗时 接指针 */
+  cursor: pointer;
+}
+.assistant-blocks .proc-steps > .tool-card > .tool-head > .tool-title {
+  min-width: 0;
+  max-width: 100%;
+  flex: 0 1 auto;
+  align-items: baseline;
+  padding: 1px 4px;
+  border-radius: 5px;
+  gap: 5px;
+  transition: background-color var(--motion-slow) ease;
+}
+/* 悬浮高亮覆盖整行(#3),不再只高亮标题那一小块 tag;圆角贴合行,图标遮线块
+   在 hover 时也跟成 surface-2,免得中间露出一块 app-bg 小方块。 */
+.assistant-blocks .proc-steps > .tool-card > .tool-head {
+  border-radius: 6px;
+  transition: background-color var(--motion) ease;
+}
+.assistant-blocks .proc-steps > .tool-card > .tool-head:hover {
+  background: var(--surface-2);
+}
+.assistant-blocks .proc-steps > .tool-card > .tool-head:hover > .tool-icon {
+  background: var(--surface-2);
+  box-shadow: 0 -2px 0 var(--surface-2), 0 2px 0 var(--surface-2);
+}
+.assistant-blocks .proc-steps > .tool-card .tool-title strong {
+  color: var(--text);
+  transition: color 0.35s ease;
+  /* 时间线全宽,工具名不必留 4em 下限(那让「Bash」这种短名后面空一截,#15)。 */
+  min-width: 0;
+}
+.assistant-blocks .proc-steps > .tool-card .tool-title .tool-summary {
+  color: var(--proc-soft);
+  transition: color 0.35s ease;
+}
+.assistant-blocks .proc-steps > .tool-card > .tool-head > .tool-status {
+  margin-left: 4px;
+  color: var(--proc-soft);
+  font-family: var(--font-mono);
+  font-size: var(--fs-micro);
+  font-variant-numeric: tabular-nums;
+  transition: color 0.35s ease;
+}
+/* 成功不打勾:右侧就是耗时 */
+.assistant-blocks .proc-steps > .tool-card.is-success > .tool-head > .tool-status .icon-slot,
+.assistant-blocks .proc-steps > .tool-card > .tool-head > .tool-chevron {
+  display: none;
+}
+/* 颜色只给失败一处:那一行的节点、名字、主语、状态全红,线不变色 */
+.assistant-blocks .proc-steps > .tool-card.is-failure > .tool-head > .tool-icon,
+.assistant-blocks .proc-steps > .tool-card.is-failure .tool-title strong,
+.assistant-blocks .proc-steps > .tool-card.is-failure .tool-title .tool-summary,
+.assistant-blocks .proc-steps > .tool-card.is-failure > .tool-head > .tool-status {
+  color: var(--danger);
+}
+/* 命令签:命令写在行里,不再单独一块粉底预览;收起态的输出预览缩进到文字列 */
+.assistant-blocks .proc-steps > .tool-card > .tool-command-preview {
+  display: none;
+}
+.assistant-blocks .proc-steps > .tool-card > .tool-command-output-preview {
+  display: none;
+}
+.assistant-blocks .proc-steps > .tool-card > .tool-live-progress {
+  margin: 0 0 6px var(--proc-indent);
+}
+/* 展开区平滑高度动画(#7/#9):tool-body 外套一层 grid 容器 .tool-fold,靠
+   grid-template-rows 0fr↔1fr 过渡——所有现代浏览器双向都平滑(和「Worked for」的
+   proc-wrap 同一招),不像 height:auto 那样不被支持时收起就瞬间。垂直外边距也一起
+   过渡到 0,收起后不留空档。 */
+.assistant-blocks .proc-steps > .tool-card > .tool-fold {
+  display: grid;
+  grid-template-rows: 1fr;
+  margin: 2px 0 8px 0;
+  transition: grid-template-rows 0.32s var(--proc-ease), margin 0.32s var(--proc-ease);
+}
+.assistant-blocks .proc-steps > .tool-card.collapsed > .tool-fold {
+  grid-template-rows: 0fr;
+  margin-top: 0;
+  margin-bottom: 0;
+}
+.assistant-blocks .proc-steps > .tool-card > .tool-fold > .tool-body {
+  min-height: 0;
+  overflow: hidden;
+}
+/* 详情:一个面板,细边,参数在前、空一行、结果在后;不再有「参数 / 结果」小标。
+   底色改暖柔(#82/#9b:原来 surface-1 亮色下是刺眼白)。 */
+.assistant-blocks .proc-steps > .tool-card > .tool-fold > .tool-body {
+  width: auto;
+  margin: 0 0 0 var(--proc-indent);
+  padding: 9px 10px;
+  border: 0;
+  background: color-mix(in srgb, var(--text) 5%, transparent);
+  gap: 1em;
+}
+/* 旧的 collapsed display:none 只在没套 fold 的兜底路径生效;套了 fold 就靠 grid 收。 */
+.assistant-blocks .proc-steps > .tool-card .tool-detail-label {
+  display: none;
+}
+.assistant-blocks .proc-steps > .tool-card .tool-detail pre {
+  padding: 0;
+  overflow-x: hidden;
+  background: none;
+  color: var(--text);
+  font-size: var(--fs-meta);
+  line-height: 1.65;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+
+/* 思考行:节点是原子,标题「已思考」,内容是一段淡色文字(没有底色) */
+.assistant-blocks .proc-steps > .reasoning-block {
+  border: 0;
+}
+.assistant-blocks .proc-steps > .reasoning-block > summary {
+  width: 100%;
+  max-width: 100%;
+  min-height: 30px;
+  padding: 4px 0;
+  border-radius: 6px;
+  background: none;
+  color: var(--text);
+  gap: var(--proc-gap);
+  cursor: pointer;
+  transition: background-color var(--motion) ease;
+}
+/* 整行 hover 高亮(#5:思考行原来悬浮无反馈);流光字标题在上层、自己带
+   background-clip:text,行底色在它后面不影响。图标遮线块也跟色免得露出小方块。 */
+.assistant-blocks .proc-steps > .reasoning-block > summary:hover {
+  background: var(--surface-2);
+}
+.assistant-blocks .proc-steps > .reasoning-block > summary:hover > .reasoning-icon {
+  background: var(--surface-2);
+  box-shadow: 0 -2px 0 var(--surface-2), 0 2px 0 var(--surface-2);
+}
+.assistant-blocks .proc-steps > .reasoning-block > summary .reasoning-title {
+  padding: 1px 4px;
+  border-radius: 5px;
+  transition: background-color var(--motion-slow) ease;
+}
+/* 正在思考的标题是 background-clip:text 的流光字,底色一换字就没了(09-11 todolist 截图):
+   hover 底色只给想完的那种。 */
+.assistant-blocks .proc-steps > .reasoning-block:not(.is-live) > summary .reasoning-title:hover {
+  background: var(--surface-2);
+}
+.assistant-blocks .proc-steps > .reasoning-block > summary .reasoning-live-status,
+.assistant-blocks .proc-steps > .reasoning-block > summary .reasoning-chevron {
+  color: var(--proc-soft);
+}
+/* 窥视槽:思考收着时,思考的尾巴放在标题行剩下的空间里。正在想就跟着滚,想完了也留着;
+   尾部对齐——文字比槽宽时从左边溢出被裁掉,再加一层左侧渐隐,看起来就是新字从右边推进来。
+   展开时才藏(内容就在下面)。 */
+.reasoning-peek {
+  display: none;
+  min-width: 0;
+  /* 只占文字那么宽,展开箭头紧跟其后;放不下时才被压到剩余宽度 */
+  flex: 0 1 auto;
+  justify-content: flex-start;
+  margin-left: 6px;
+  overflow: hidden;
+  color: var(--proc-think);
+  font-size: var(--fs-meta);
+  font-weight: 400;
+  line-height: 1.5;
+}
+.reasoning-peek > span {
+  flex: none;
+  white-space: nowrap;
+}
+/* 子代理标题行的单行窥视:复用 reasoning-peek 的尾部对齐/左渐隐。收起态
+   在标题行里显示当前子过程(和「已思考」尾巴同款);展开后让位给子过程时间线。 */
+.tool-card.is-task.collapsed .tool-head .tool-peek {
+  display: flex;
+}
+.tool-card.is-task:not(.collapsed) .tool-head .tool-peek {
+  display: none;
+}
+/* 展开后的子过程时间线容器:proc-line(和主对话过程区同款)挂在里面;限高可滚,
+   不许顶满全屏(09-11 用户报)。 */
+.tool-card.is-task .sub-blocks {
+  /* 前台子代理:一块约四行高的活区域,子过程在里面流式滚动/窥视(用户拍板)。 */
+  margin-bottom: 2px;
+  max-height: 124px;
+  overflow-y: auto;
+  overflow-x: hidden;
+  overscroll-behavior: contain;
+  scroll-behavior: smooth;
+  /* 预留滚动条槽:思考流增长时滚动条忽隐忽现会让整块宽度一跳一跳,连带窥视抖(#3)。 */
+  scrollbar-gutter: stable;
+}
+/* 前台子代理的活区域外框(tool-body)收紧内边距:刚开只有 1 行 brief 时,原来
+   9px 上下 padding + 8px 外边距让这块看着有两行多(#113)。子过程区不是详情面板,
+   不需要那么厚的留白。特异度对齐上面那条详情面板规则(0,5,0)才压得过。 */
+.assistant-blocks .proc-steps > .tool-card.is-task > .tool-fold > .tool-body {
+  padding: 5px 8px;
+}
+/* 子代理任务简介(展开区最上方,09-12 #6):标题 + 整段 prompt,不再让人读裸 JSON。 */
+/* 任务简介:一个可展开 tag,收起只显任务标题,展开才看整段 prompt(prompt 太长会刷屏)。 */
+/* 任务简介=时间线的开头(和其它步同构):summary 一行,无背景,marker 是坐在细线上的
+   节点(平时 📋、悬浮换展开箭头),点开在下面缩进显整段 prompt。 */
+.subagent-brief {
+  margin: 0;
+}
+.subagent-brief > summary {
+  display: flex;
+  align-items: center;
+  gap: var(--proc-gap, 4px);
+  list-style: none;
+  cursor: pointer;
+  min-height: 26px;
+  padding: 3px 0;
+  font-weight: 600;
+  font-size: var(--fs-meta);
+  color: var(--proc-soft);
+  border-radius: 6px;
+  transition: background-color var(--motion) ease;
+}
+.subagent-brief > summary::-webkit-details-marker { display: none; }
+.subagent-brief > summary:hover {
+  background: var(--surface-2);
+}
+/* 节点:和时间线其它图标同一列、坐在细线上,遮线块用面板暖底(#4)。平时 📋,
+   悬浮原地换成展开箭头(不在右侧另起,用户要求)。 */
+.subagent-brief-marker {
+  position: relative;
+  flex: 0 0 var(--proc-col, 16px);
+  width: var(--proc-col, 16px);
+  height: var(--proc-col, 16px);
+  display: grid;
+  place-items: center;
+  background: color-mix(in srgb, var(--text) 5%, var(--app-bg));
+  box-shadow:
+    0 -2px 0 color-mix(in srgb, var(--text) 5%, var(--app-bg)),
+    0 2px 0 color-mix(in srgb, var(--text) 5%, var(--app-bg));
+  color: var(--proc-soft);
+}
+.subagent-brief > summary:hover > .subagent-brief-marker {
+  background: var(--surface-2);
+  box-shadow: 0 -2px 0 var(--surface-2), 0 2px 0 var(--surface-2);
+}
+.subagent-brief-marker .subagent-brief-icon,
+.subagent-brief-marker .subagent-brief-chevron {
+  position: absolute;
+  inset: 0;
+  margin: auto;
+  width: 13px;
+  height: 13px;
+}
+.subagent-brief-chevron {
+  opacity: 0;
+  transition: transform 0.25s ease, opacity var(--motion-fast) ease;
+}
+.subagent-brief > summary:hover .subagent-brief-icon {
+  opacity: 0;
+}
+.subagent-brief > summary:hover .subagent-brief-chevron {
+  opacity: 1;
+}
+.subagent-brief[open] > summary .subagent-brief-icon {
+  opacity: 0;
+}
+.subagent-brief[open] > summary .subagent-brief-chevron {
+  opacity: 1;
+  transform: rotate(90deg);
+}
+.subagent-brief-name {
+  flex: 1 1 auto;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: var(--text);
+}
+.subagent-brief-prompt {
+  white-space: pre-wrap;
+  word-break: break-word;
+  font-size: var(--fs-meta);
+  line-height: 1.55;
+  color: var(--proc-think, var(--text-soft));
+  margin: 2px 8px 6px var(--proc-indent);
+  padding: 0;
+}
+/* 子代理正文(#6):模型在工具轮之间/收尾说的话,流式累加并按 markdown 渲染。
+   是正文不是思考,所以用常规正文色、和时间线内容左缘对齐。 */
+.sub-content {
+  font-size: var(--fs-meta);
+  line-height: 1.6;
+  color: var(--text);
+  margin: 2px 8px 8px var(--proc-indent);
+  padding: 0;
+}
+.sub-content > :first-child { margin-top: 0; }
+.sub-content > :last-child { margin-bottom: 0; }
+/* 子代理正文里的代码块/表格底色:默认 --code-bg 在亮色主题是近白(255,253,246),
+   落在暖米面板上像块白斑(#9「还是白色的底」)。统一改成和工具详情面板同款的柔和暖底。 */
+.sub-content .code-block {
+  --code-bg: color-mix(in srgb, var(--text) 6%, transparent);
+  background: color-mix(in srgb, var(--text) 6%, transparent);
+  box-shadow: none;
+}
+.sub-content .code-block pre,
+.sub-content .markdown-table-scroll,
+.sub-content table {
+  background: color-mix(in srgb, var(--text) 6%, transparent);
+}
+/* 子过程时间线不再吸顶(#112/#117:吸顶行反复透出下面的文字、盖字,做了三版都不稳;
+   这块本就只有约 5 行、滚不远,吸顶收益小于它带来的重叠问题)。行随内容正常滚动。
+   留一层柔和暖底(和面板同视觉),纯为节点遮线用,不再靠它盖住透上来的字。 */
+.sub-blocks .reasoning-block > summary,
+.sub-blocks .tool-card > .tool-head {
+  background: color-mix(in srgb, var(--text) 5%, var(--app-bg));
+}
+/* 不吸顶后横向仍用 clip 裁掉长思考文本(nowrap),纵向交给外层 .sub-blocks/.job-stream-panel
+   的滚动容器(不再需要 overflow-y:visible 去让 sticky 吸到滚动容器)。 */
+.sub-blocks .proc-wrap,
+.sub-blocks .proc-wrap > div {
+  overflow-x: clip;
+  overflow-y: clip;
+}
+/* 前台子代理行在手机端太长(09-12 #8):收起时不显那条单行窥视,活动去展开区看;
+   token/读秒也让位,标题+状态就够窄。 */
+@media (max-width: 836px) {
+  .tool-card.is-task .tool-head > .tool-peek,
+  .tool-card.is-task .tool-head > .tool-task-token {
+    display: none;
+  }
+}
+/* 前台子代理行的 token 消耗 + 读秒(09-12 #6):等宽小字,贴在状态前面。 */
+.tool-card.is-task .tool-head > .tool-task-token,
+.tool-card.is-task .tool-head > .tool-task-seconds {
+  flex: none;
+  margin-left: 6px;
+  color: var(--proc-soft, var(--text-soft));
+  font-family: var(--font-mono);
+  font-size: var(--fs-micro);
+  font-variant-numeric: tabular-nums;
+  pointer-events: auto;
+}
+.tool-card.is-task .tool-head > .tool-task-token:empty {
+  display: none;
+}
+/* 前台子代理行布局(#2):子代理·title 贴左 hug、token/秒数紧跟,窥视占满余下、
+   右对齐滚动、左侧淡出过渡;标题在左永远完整(#7),窥视不再压标题。 */
+.tool-card.is-task .tool-head > .tool-title {
+  /* 标题固定在左、封顶 60% 不缩,永远完整可见,超了才省略(#3/#7 不被窥视盖)。 */
+  flex: 0 1 auto;
+  max-width: 60%;
+  min-width: 0;
+}
+.tool-card.is-task .tool-head > .tool-peek {
+  flex: 1 1 0;
+  min-width: 0;
+  margin-left: 8px;
+  /* 左对齐紧跟秒数;淡出只在放不下时加(#132)。 */
+  justify-content: flex-start;
+}
+/* 真的放不下才加左右淡出(0,4,0 压过 .reasoning-peek.is-overflow 的 0,2,0)。 */
+.tool-card.is-task .tool-head > .tool-peek.is-overflow {
+  -webkit-mask-image: linear-gradient(to right, transparent, #000 14px, #000 calc(100% - 24px), transparent);
+  mask-image: linear-gradient(to right, transparent, #000 14px, #000 calc(100% - 24px), transparent);
+}
+/* 放不下了:尾部对齐(文字从左边溢出被裁),再加一层左侧渐隐,新字从右边推进来 */
+.reasoning-peek.is-overflow {
+  justify-content: flex-end;
+  -webkit-mask-image: linear-gradient(to right, transparent, #000 32px);
+  mask-image: linear-gradient(to right, transparent, #000 32px);
+}
+.assistant-blocks .proc-steps > .reasoning-block:not([open]) > summary .reasoning-peek {
+  display: flex;
+}
+.assistant-blocks .proc-steps > .reasoning-block > .reasoning-text {
+  margin: 0 8px 6px var(--proc-indent);
+  padding: 0;
+  background: none;
+  color: var(--proc-think);
+}
+

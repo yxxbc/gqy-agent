@@ -1,0 +1,122 @@
+/* ── 批量选择(09-04):表情包选择模式、记忆/知识库勾选列、批量操作条 ── */
+.dash-bulk-bar { display: flex; align-items: center; flex-wrap: wrap; gap: 8px 10px; margin: 0 0 12px; padding: 8px 12px; border-radius: var(--radius); background: color-mix(in srgb, var(--accent) 14%, var(--surface-1)); box-shadow: var(--card-shadow); animation: dash-fade-up var(--motion-slow) ease-out both; }
+.dash-bulk-bar strong { flex: none; font-size: var(--fs-ui); }
+/* 按钮成组:窄了整组换行,不会散成三行。margin-left:auto 让宽容器里仍然右对齐。 */
+.dash-bulk-actions { display: flex; flex-wrap: wrap; align-items: center; margin-left: auto; gap: 8px; }
+/* compact:只剩两个按钮,不必再占一整条。 */
+.dash-bulk-bar.is-compact { padding: 6px 8px; }
+.dash-bulk-bar.is-compact .dash-bulk-actions { margin-left: 0; }
+.dash-bulk-spacer { flex: 1 1 auto; }
+.dash-row-check { width: 15px; height: 15px; margin: 0; accent-color: var(--accent); cursor: pointer; }
+.dash-cell-check { justify-content: center; padding: 0 !important; }
+.dash-tree-check { flex: none; }
+.dash-meme.is-selectable { cursor: pointer; }
+.dash-meme.is-selectable .dash-meme-thumb::after { content: ""; position: absolute; inset: 0; background: transparent; transition: background var(--motion-fast) ease; }
+.dash-meme.is-selected { border-color: var(--accent); box-shadow: 0 0 0 2px var(--accent); }
+.dash-meme.is-selected .dash-meme-thumb::after { background: color-mix(in srgb, var(--accent) 22%, transparent); }
+.dash-meme-check { position: absolute; top: 6px; left: 6px; z-index: 1; display: grid; place-items: center; width: 22px; height: 22px; border-radius: var(--radius); border: 2px solid rgba(255, 255, 255, .85); background: rgba(0, 0, 0, .35); color: transparent; transition: background var(--motion-fast) ease, color var(--motion-fast) ease; }
+.dash-meme-check svg { width: 14px; height: 14px; }
+.dash-meme.is-selected .dash-meme-check { background: var(--accent); border-color: var(--accent); color: var(--inverse-text); }
+
+/* 表情包「添加理由」:只给人看的乐子,模型看不到 */
+.dash-meme-reason { margin: 0 0 14px; padding: 10px 12px 10px 14px; border-left: 3px solid var(--gold); border-radius: var(--radius); background: color-mix(in srgb, var(--gold) 12%, var(--surface-2)); }
+.dash-meme-reason-label { display: block; margin-bottom: 4px; color: var(--gold); font-size: var(--fs-micro); font-weight: 700; letter-spacing: .08em; }
+.dash-meme-reason p { margin: 0; font-size: var(--fs-ui); line-height: 1.6; }
+
+/* ── 赞助面板(09-09):领奖台、名次条、首字头像 ──
+   颜色全部由既有 token 混出(--gold / --accent),不新增色值。 */
+.dash-avatar {
+  flex: none; display: grid; place-items: center; width: 30px; height: 30px; border-radius: var(--radius-pill);
+  background: color-mix(in srgb, var(--accent) 20%, var(--surface-2)); color: var(--text);
+  font-size: var(--fs-meta); font-weight: 600; line-height: 1;
+}
+.dash-sponsor-podium { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 10px; }
+.dash-sponsor-podium-item {
+  display: flex; flex-direction: column; gap: 6px; min-width: 0; padding: 12px 14px;
+  border: 1px solid var(--line); border-radius: var(--radius); background: var(--surface-2); cursor: pointer;
+}
+.dash-sponsor-podium-item:hover, .dash-sponsor-podium-item:focus-visible { border-color: var(--accent); }
+/* 前三的强调只差在底色浓淡上：金 → 主色 → 淡金，冠军最实。 */
+.dash-sponsor-podium-item.is-1 { background: color-mix(in srgb, var(--gold) 18%, var(--surface-1)); border-color: color-mix(in srgb, var(--gold) 45%, var(--line)); }
+.dash-sponsor-podium-item.is-2 { background: color-mix(in srgb, var(--accent) 12%, var(--surface-1)); border-color: color-mix(in srgb, var(--accent) 30%, var(--line)); }
+.dash-sponsor-podium-item.is-3 { background: color-mix(in srgb, var(--gold) 8%, var(--surface-1)); border-color: color-mix(in srgb, var(--gold) 20%, var(--line)); }
+.dash-sponsor-head { display: flex; align-items: center; gap: 8px; min-width: 0; }
+.dash-sponsor-medal { flex: none; font-size: 19px; line-height: 1; }
+/* 会被挤的那个孩子必须 flex:0 1 auto + min-width:0，否则长名字把整行撑出去。 */
+.dash-sponsor-name { flex: 0 1 auto; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-weight: 600; }
+.dash-sponsor-amount { font-family: var(--serif); font-size: 22px; font-weight: 600; font-variant-numeric: tabular-nums; }
+.dash-sponsor-sub { display: flex; align-items: center; flex-wrap: wrap; gap: 4px 10px; min-width: 0; font-size: var(--fs-micro); color: var(--text-soft); }
+.dash-sponsor-chips { display: flex; flex-wrap: wrap; gap: 4px; min-width: 0; }
+.dash-sponsor-chips .dash-chip { flex: 0 1 auto; min-width: 0; overflow: hidden; text-overflow: ellipsis; }
+.dash-sponsor-list { display: flex; flex-direction: column; gap: 2px; margin-top: 12px; }
+.dash-sponsor-row {
+  display: grid; grid-template-columns: 34px 30px minmax(0, 1.8fr) minmax(60px, 1.4fr) 100px 54px 84px;
+  align-items: center; gap: 10px; padding: 6px 10px; border-radius: var(--radius); cursor: pointer; font-size: var(--fs-meta);
+}
+.dash-sponsor-row:hover, .dash-sponsor-row:focus-visible { background: var(--surface-2); }
+.dash-sponsor-row > * { min-width: 0; }
+.dash-sponsor-rank { color: var(--text-faint); font-variant-numeric: tabular-nums; }
+.dash-sponsor-who { display: flex; flex-direction: column; min-width: 0; }
+/* 会被挤的孩子:flex 里 0 1 auto + min-width 0,grid 里 block + min-width 0,两种容器同一个类兜住。 */
+.dash-sponsor-cell { display: block; flex: 0 1 auto; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.dash-sponsor-total { text-align: right; font-variant-numeric: tabular-nums; }
+.dash-chip.dash-sponsor-total, .dash-chip.dash-sponsor-amount { justify-self: end; align-self: start; }
+/* 行 hover 时底色就是 --surface-2，进度槽得换一层才看得出来。 */
+.dash-sponsor-row .dash-hbar-track { background: color-mix(in srgb, var(--text-faint) 18%, transparent); }
+/* .dash-field 是 display:flex，会盖掉 [hidden] 的 UA 规则（币种切回人民币时那一格要真消失）。 */
+.dash-field[hidden] { display: none; }
+@media (max-width: 836px) {
+  /* 手机上三个并排只剩几十像素宽，改成竖着排；名次条把进度条与笔数收起来。 */
+  .dash-sponsor-podium { grid-template-columns: 1fr; }
+  .dash-sponsor-row { grid-template-columns: 30px 30px minmax(0, 1fr) 96px; gap: 8px; }
+  .dash-sponsor-row .dash-hbar-track, .dash-sponsor-row > :nth-last-child(-n+2) { display: none; }
+}
+
+/* ── 知识库拖放上传(09-09) ─────────────────────────────────────────── */
+/* 投放区是整个知识库面板而不是右边的文件树:库空时文件树只剩一行提示,而那正是
+   最想拖文件进来的时刻,把最小的目标留给最常见的动作说不过去。min-height 让面板
+   即使内容很短也铺满正文区,不然拖到空白处会被浏览器当成「打开这个文件」。 */
+.dash-drop-host { position: relative; min-height: 100%; }
+.dash-drop-host.is-dropping { outline: 2px dashed var(--accent); outline-offset: -8px; border-radius: var(--radius); }
+.dash-drop-veil {
+  position: absolute; inset: 0; z-index: 5; display: flex; justify-content: center;
+  background: color-mix(in srgb, var(--accent) 8%, transparent); border-radius: var(--radius);
+  /* 不吃指针事件:遮罩自己一旦成为拖放目标,鼠标进它就等于离开下面的面板,
+     指示层会随鼠标疯狂闪。 */
+  pointer-events: none;
+}
+/* .dash-drop-veil 是 display:flex,会盖掉 [hidden] 的 UA 规则。 */
+.dash-drop-veil[hidden] { display: none; }
+/* 面板可能比视口高;标签 sticky 在滚动口顶部,滚到哪都看得见。sticky 要生效,
+   flex 子项不能被拉伸,所以显式 align-self。 */
+.dash-drop-label {
+  position: sticky; top: 24px; align-self: flex-start; margin-top: 24px;
+  display: flex; align-items: center; gap: 8px; padding: 10px 20px;
+  border: 1px dashed var(--accent); border-radius: var(--radius);
+  background: var(--surface-1); box-shadow: var(--card-shadow);
+  color: var(--text); font-size: var(--fs-ui); font-weight: 600;
+}
+.dash-drop-label svg { width: 16px; height: 16px; color: var(--accent); }
+/* 上传结果里的理由是服务端原话,可以很长(守卫那句拒绝有 100 多字符)。让它跟
+   文件名争宽度而不是把整行撑出记录框;全文在 title 上。 */
+.dash-upload-list .dash-chip { flex: 0 1 auto; min-width: 0; max-width: 62%; overflow: hidden; text-overflow: ellipsis; }
+
+/* 重建卡的进度条:只在真跑着且知道总数时才出现,所以它不是常驻元素——
+   高度与 .todo-progress 对齐(3px + 圆角),颜色用 accent 而不是 text-soft,
+   因为它代表「正在发生的事」而不是「已完成比例的静态展示」。 */
+.dash-card-progress {
+  overflow: hidden;
+  height: 3px;
+  margin-top: 8px;
+  border-radius: var(--radius-pill);
+  background: var(--surface-3);
+}
+
+.dash-card-progress > i {
+  display: block;
+  height: 100%;
+  border-radius: inherit;
+  background: var(--accent);
+  transition: width 240ms ease;
+}
+
