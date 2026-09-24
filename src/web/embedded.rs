@@ -5,6 +5,9 @@
 //! `vendor/`（gzip 原样发出与 CORS 预检）。
 //! `css/` 不逐个提供：build.rs 按文件名顺序拼成一份 `/styles.css`，文件顺序就是层叠顺序。
 //!
+//! 开发期可以用 `GQY_WEB_DIR` 让 daemon 现读仓库目录（只在 debug 构建，见 dev_assets.rs）；
+//! 下面几个 `dev_*` 函数在发布版里恒为 None，那条路径不存在。
+//!
 //! `web/assets/` 里的 logo 与壁纸是 `pics/` 原图的显示尺寸副本（原图解码要占
 //! 30 MiB 显存去画两个缩略图），重新生成见 `test_scripts/gen_web_assets.py`。
 
@@ -29,14 +32,96 @@ where
         router = router.route(
             path,
             get(move |headers: HeaderMap| async move {
+                if let Some(response) = dev_asset(&headers, path) {
+                    return response;
+                }
                 embedded_asset(&headers, content, content_type)
             }),
         );
     }
+    attach_dev_fallback(router)
+}
+
+#[cfg(debug_assertions)]
+fn dev_asset(headers: &HeaderMap, path: &str) -> Option<Response> {
+    crate::web::dev_assets::asset(headers, path)
+}
+
+#[cfg(not(debug_assertions))]
+fn dev_asset(_: &HeaderMap, _: &str) -> Option<Response> {
+    None
+}
+
+#[cfg(debug_assertions)]
+fn attach_dev_fallback<S>(router: Router<S>) -> Router<S>
+where
+    S: Clone + Send + Sync + 'static,
+{
+    crate::web::dev_assets::attach(router)
+}
+
+#[cfg(not(debug_assertions))]
+fn attach_dev_fallback<S>(router: Router<S>) -> Router<S>
+where
+    S: Clone + Send + Sync + 'static,
+{
+    if std::env::var_os("GQY_WEB_DIR").is_some() {
+        tracing::warn!("GQY_WEB_DIR is ignored: release builds always serve the embedded WebUI");
+    }
     router
 }
 
+/// 沙箱宿主页正文：开发期现读目录，否则用嵌入的那份。
+pub(in crate::web) fn fence_frame_html() -> std::borrow::Cow<'static, str> {
+    match dev_fence_frame() {
+        Some(html) => std::borrow::Cow::Owned(html),
+        None => std::borrow::Cow::Borrowed(FENCE_FRAME_HTML),
+    }
+}
+
+/// 前端资源从哪来，给 /api/health 报告：`embedded`，或开发期的 `dir:<路径>`。
+pub(in crate::web) fn web_assets_source() -> String {
+    match dev_dir() {
+        Some(dir) => format!("dir:{}", dir.display()),
+        None => "embedded".to_string(),
+    }
+}
+
+// 开发期目录的几个入口：debug 构建转给 dev_assets，发布构建恒为 None。
+#[cfg(debug_assertions)]
+fn dev_index(headers: &HeaderMap) -> Option<Response> {
+    crate::web::dev_assets::index(headers)
+}
+
+#[cfg(not(debug_assertions))]
+fn dev_index(_: &HeaderMap) -> Option<Response> {
+    None
+}
+
+#[cfg(debug_assertions)]
+fn dev_fence_frame() -> Option<String> {
+    crate::web::dev_assets::fence_frame()
+}
+
+#[cfg(not(debug_assertions))]
+fn dev_fence_frame() -> Option<String> {
+    None
+}
+
+#[cfg(debug_assertions)]
+fn dev_dir() -> Option<&'static PathBuf> {
+    crate::web::dev_assets::dir()
+}
+
+#[cfg(not(debug_assertions))]
+fn dev_dir() -> Option<&'static PathBuf> {
+    None
+}
+
 pub(in crate::web) async fn index_asset(headers: HeaderMap) -> Response {
+    if let Some(response) = dev_index(&headers) {
+        return response;
+    }
     static VERSIONED_INDEX: std::sync::LazyLock<String> =
         std::sync::LazyLock::new(|| versioned_index(INDEX_HTML, env!("GQY_BUILD_ID")));
     embedded_asset(
@@ -48,7 +133,7 @@ pub(in crate::web) async fn index_asset(headers: HeaderMap) -> Response {
 
 /// 给 index.html 里每个同源资源引用挂上 `?v=构建号`，升级后浏览器和中间缓存
 /// 不可能再拿旧文件。模块之间的 `import` 不经过这里，由 ETag + no-cache 兜底。
-fn versioned_index(html: &str, build_id: &str) -> String {
+pub(in crate::web) fn versioned_index(html: &str, build_id: &str) -> String {
     // 只挂脚本与样式：图片在 JS 里也按裸路径引用，挂了版本号反而一图两份缓存。
     let paths = WEB_ASSETS
         .iter()

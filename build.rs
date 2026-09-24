@@ -8,6 +8,10 @@ use base64::{engine::general_purpose, Engine as _};
 
 const PROMPT_MASK: &[u8] = b"GqyPromptMask";
 
+// Which files under web/ are served and how: shared with the runtime dev
+// directory (GQY_WEB_DIR) so the two paths cannot drift apart.
+include!("src/web/asset_rules.rs");
+
 fn main() {
     println!("cargo:rerun-if-changed=src/prompts/gqy.md");
     println!("cargo:rerun-if-changed=src/prompts/gqy.hint.md");
@@ -110,10 +114,9 @@ fn build_tool_description_index(out_dir: &str) {
 /// browser still makes a single request.
 fn build_web_asset_index(out_dir: &str) {
     const ROOT: &str = "web";
-    const SPECIAL: &[&str] = &["index.html", "fence-frame.html"];
     let manifest_dir = env::var("CARGO_MANIFEST_DIR").expect("CARGO_MANIFEST_DIR is set by cargo");
     let mut files = Vec::new();
-    collect_web_assets(Path::new(ROOT), &mut files);
+    web_collect_files(Path::new(ROOT), &mut files).expect("scan web/");
     files.sort();
     let mut source = String::from("static WEB_ASSETS: &[(&str, &[u8], &str)] = &[\n");
     for path in &files {
@@ -122,7 +125,7 @@ fn build_web_asset_index(out_dir: &str) {
             .expect("web asset under web/")
             .to_string_lossy()
             .replace('\\', "/");
-        if SPECIAL.contains(&relative.as_str()) {
+        if WEB_SPECIAL_FILES.contains(&relative.as_str()) {
             continue;
         }
         let Some(content_type) = web_content_type(path) else {
@@ -138,7 +141,7 @@ fn build_web_asset_index(out_dir: &str) {
     let styles = Path::new(out_dir).join("styles.css");
     fs::write(
         &styles,
-        concat_css_parts(Path::new(ROOT).join("css").as_path()),
+        web_concat_css(Path::new(ROOT).join("css").as_path()).expect("concatenate web/css"),
     )
     .expect("write concatenated styles.css");
     source.push_str(&format!(
@@ -148,53 +151,6 @@ fn build_web_asset_index(out_dir: &str) {
     source.push_str("];\n");
     fs::write(Path::new(out_dir).join("web_assets.rs"), source)
         .expect("write generated web asset index");
-}
-
-fn collect_web_assets(dir: &Path, files: &mut Vec<PathBuf>) {
-    for entry in fs::read_dir(dir).unwrap_or_else(|_| panic!("read {}", dir.display())) {
-        let path = entry.expect("web asset entry").path();
-        if path.is_dir() {
-            if path
-                .file_name()
-                .is_some_and(|name| name != "vendor" && name != "css")
-            {
-                collect_web_assets(&path, files);
-            }
-        } else {
-            files.push(path);
-        }
-    }
-}
-
-/// Byte-exact concatenation of `web/css/*.css` in file-name order. The parts
-/// carry their own trailing newlines, so nothing is inserted between them.
-fn concat_css_parts(dir: &Path) -> Vec<u8> {
-    let mut parts = fs::read_dir(dir)
-        .unwrap_or_else(|_| panic!("read {}", dir.display()))
-        .map(|entry| entry.expect("css part entry").path())
-        .filter(|path| path.extension().is_some_and(|ext| ext == "css"))
-        .collect::<Vec<_>>();
-    parts.sort();
-    assert!(!parts.is_empty(), "web/css has no .css parts");
-    let mut out = Vec::new();
-    for part in parts {
-        out.extend(fs::read(&part).unwrap_or_else(|_| panic!("read {}", part.display())));
-    }
-    out
-}
-
-fn web_content_type(path: &Path) -> Option<&'static str> {
-    Some(match path.extension()?.to_str()? {
-        "js" => "application/javascript; charset=utf-8",
-        "css" => "text/css; charset=utf-8",
-        "html" => "text/html; charset=utf-8",
-        "json" => "application/json; charset=utf-8",
-        "svg" => "image/svg+xml",
-        "png" => "image/png",
-        "webp" => "image/webp",
-        "woff2" => "font/woff2",
-        _ => return None,
-    })
 }
 
 fn build_jieba_index() {

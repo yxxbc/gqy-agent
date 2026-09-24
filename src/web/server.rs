@@ -703,6 +703,7 @@ pub(in crate::web) async fn health() -> Json<Value> {
     Json(json!({
         "status": "ready",
         "version": env!("CARGO_PKG_VERSION"),
+        "web_assets": web_assets_source(),
     }))
 }
 

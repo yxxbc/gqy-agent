@@ -162,7 +162,7 @@ fn inflate(gzipped: &[u8]) -> Option<Vec<u8>> {
 /// 再补一条 `frame-ancestors` 只许本机页面嵌它。页面本身不含任何数据,正文由父页面
 /// postMessage 送进来,所以不查登录。
 pub(in crate::web) async fn fence_frame_asset(headers: HeaderMap) -> Response {
-    let mut response = FENCE_FRAME_HTML.into_response();
+    let mut response = fence_frame_html().into_owned().into_response();
     let policy = artifact_csp("html", &headers).map(|policy| match request_origin(&headers) {
         Some(origin) => format!("{policy}; frame-ancestors {origin}"),
         None => policy,

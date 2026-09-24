@@ -20,6 +20,9 @@ use crate::question::{self, QuestionAnswers};
 // 平台适配是另外两个。放在 web 里会让平台层反过来依赖 HTTP 服务。
 mod accounts_api;
 mod actor;
+// build.rs 也 include! 这份规则；发布版里只有 build.rs 用得上它，运行时那条路径只在 debug 构建存在。
+#[cfg_attr(not(debug_assertions), allow(dead_code))]
+mod asset_rules;
 mod assets;
 mod attachments;
 mod bridge_progress;
@@ -28,6 +31,8 @@ mod commands_api;
 mod config_api;
 mod context_panel;
 mod dashboards;
+#[cfg(debug_assertions)]
+mod dev_assets;
 mod dto;
 mod embedded;
 mod event_map;

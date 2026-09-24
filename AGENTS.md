@@ -78,7 +78,7 @@ docs/中有所有的计划和文档，可以自行按需阅读。
 
 ## 7. 构建与发布（默认不处理）
 
-7.1 `src/prompts/*`、web/ 静态资源、assets 词表全部编译进二进制——改完必须重新构建，daemon 按 GQY_BUILD_ID 判断重启。
+7.1 `src/prompts/*`、web/ 静态资源、assets 词表全部编译进二进制——改完必须重新构建，daemon 按 GQY_BUILD_ID 判断重启。例外：只改前端时可用 debug 构建加 `GQY_WEB_DIR=<仓库>/web` 让 daemon 现读目录，刷新即生效（`src/web/dev_assets.rs`，发布构建里不存在，也别把它做进配置文件，原因见 `docs/design/2026-09-25-webui-isolation.md` §4）。
 7.2 **Nix 是分发主路**，正典是 `docs/wiki/18-Nix安装开发与发布.md`，动打包/发布前先读它。发版链：Actions 页手动运行 `publish-release.yml` 填版本号 → 工作流用 `.github/scripts/release.py prepare` 把 `CHANGELOG.md` 的 `[Unreleased]` 定稿为 `[X.Y.Z] - 日期` 并同步 `Cargo.toml`/`Cargo.lock`/README 徽章 → github-actions[bot] 提交并打 tag `vX.Y.Z`（bot 推的 tag 不触发工作流，所以定稿与编译发布在同一工作流里串跑）→ 云端编 4 平台发 Release（正文=CHANGELOG 该版本段 + 安装说明，缺段编译前即失败）并自动提交 `nix/release.json` → 本地 `git pull`。hotfix 可本地 prepare 后手动推 tag。`nix/release.json` 只由 `nix/update-release.py` 生成，禁止手改 hash。
 7.3 资源/外部命令/平台的增减要两处同步：`publish-release.yml` 打包步骤、`nix/package.nix`（及 `nix/prebuilt.nix` 的 wrapProgram PATH）。改完 `nix flake check --no-build --all-systems`。Intel Mac 不在 flake 里（nixpkgs 已弃），走 install.sh。
 7.4 Nix 下程序路径是 `/nix/store/<hash>-…`，每次升级都变：`gqy_executable()` 只用于起子进程或每次都会重建的配置，禁止写进 shell rc、launchd/systemd、用户配置等持久文件（写 `gqy` 靠 PATH）。
