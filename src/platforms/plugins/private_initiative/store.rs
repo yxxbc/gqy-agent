@@ -1,14 +1,13 @@
 //! 主动私聊的账本：待执行的计划 + 每人每天已发次数，存在 `state/qq_private_initiative.json`。
 //!
-//! 内存里缓存一份（按文件路径分，测试各用各的临时目录），每次改动整份原子写回。
-//! 取消计划发生在每条私聊的 ingress 钩子里，必须便宜：没有计划时不碰磁盘。
+//! 缓存与原子写回在 `json_ledger`。取消计划发生在每条私聊的 ingress 钩子里，
+//! 必须便宜：没有计划时不碰磁盘。
 
 use crate::paths::GqyPaths;
-use anyhow::{Context, Result};
+use anyhow::Result;
 use serde::{Deserialize, Serialize};
-use std::collections::{BTreeMap, HashMap};
-use std::path::{Path, PathBuf};
-use std::sync::{Mutex, OnceLock};
+use std::collections::BTreeMap;
+use std::path::PathBuf;
 
 const FILE_NAME: &str = "qq_private_initiative.json";
 
@@ -44,39 +43,9 @@ fn file(paths: &GqyPaths) -> PathBuf {
     paths.state_dir.join(FILE_NAME)
 }
 
-fn cache() -> &'static Mutex<HashMap<PathBuf, Ledger>> {
-    static CACHE: OnceLock<Mutex<HashMap<PathBuf, Ledger>>> = OnceLock::new();
-    CACHE.get_or_init(|| Mutex::new(HashMap::new()))
-}
-
-fn load(path: &Path) -> Ledger {
-    std::fs::read(path)
-        .ok()
-        .and_then(|bytes| serde_json::from_slice(&bytes).ok())
-        .unwrap_or_default()
-}
-
-fn save(path: &Path, ledger: &Ledger) -> Result<()> {
-    if let Some(parent) = path.parent() {
-        std::fs::create_dir_all(parent)?;
-    }
-    let temp = path.with_extension("json.tmp");
-    std::fs::write(&temp, serde_json::to_vec_pretty(ledger)?)
-        .with_context(|| format!("writing {}", temp.display()))?;
-    std::fs::rename(&temp, path).with_context(|| format!("replacing {}", path.display()))?;
-    Ok(())
-}
-
-/// 在锁内读改写；`change` 返回 true 才落盘。
+/// 在锁内读改写；`change` 返回 true 才落盘（缓存与原子写回见 `json_ledger`）。
 fn update<T>(paths: &GqyPaths, change: impl FnOnce(&mut Ledger) -> (T, bool)) -> Result<T> {
-    let path = file(paths);
-    let mut cache = cache().lock().unwrap();
-    let ledger = cache.entry(path.clone()).or_insert_with(|| load(&path));
-    let (value, dirty) = change(ledger);
-    if dirty {
-        save(&path, ledger)?;
-    }
-    Ok(value)
+    super::super::json_ledger::update(&file(paths), change)
 }
 
 /// 同一个人只留一份计划：新的覆盖旧的。

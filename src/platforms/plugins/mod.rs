@@ -55,7 +55,9 @@ async fn send_fixed_tool_output(context: &PlatformTurnContext, text: &str) -> Re
 }
 
 mod access_manager;
+pub(crate) mod group_blacklist;
 pub(crate) mod group_management;
+mod json_ledger;
 mod meme_collector;
 pub(crate) mod message_history;
 mod message_recall;
@@ -449,6 +451,7 @@ impl PlatformPluginRegistry {
             Arc::new(reply_processor::ReplyProcessorPlugin::new()?),
             Arc::new(scheduled_messages::ScheduledMessagesPlugin::new()),
             Arc::new(private_initiative::PrivateInitiativePlugin::new()),
+            Arc::new(group_blacklist::GroupBlacklistPlugin::new()),
         ]))
     }
 

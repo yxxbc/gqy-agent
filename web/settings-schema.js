@@ -3521,6 +3521,12 @@
         },
       ],
     },
+    qq_group_blacklist: {
+      title: "群聊黑名单",
+      description: "管理员在群里说「以后别理他」「先晾他一天」，她就不再回应这个人（他的话照常进群聊记录）。可按群或全部群，可设时长。管理员和她自己不能被拉黑",
+      enabledDefault: true,
+      fields: [],
+    },
     qq_private_initiative: {
       title: "主动私聊",
       description: "私聊安静下来后，她自己判断下次什么时候、想聊什么，到点主动找对方。只对管理员和私聊白名单",

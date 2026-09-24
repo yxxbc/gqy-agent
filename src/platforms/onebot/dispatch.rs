@@ -610,6 +610,19 @@ pub(in crate::platforms::onebot) async fn handle_message_with_activity(
         });
         context.set_reply_rate_available(rate_available);
         context.observe_inbound(&inbound_event).await;
+        // 群聊黑名单：他的话照常进了群聊记录（上一行），但不进任何触发判断——
+        // 放在 decide_trigger 之前，real_context 的「处理中」表情与判官调用都不会发生。
+        if inbound_event.conversation.kind == ConversationKind::Group
+            && crate::platforms::plugins::group_blacklist::is_blacklisted(
+                &context.config,
+                &context.paths,
+                &inbound_event.conversation.account_id,
+                &inbound_event.conversation.conversation_id,
+                &inbound_event.sender_id,
+            )
+        {
+            return;
+        }
         context.decide_trigger(&inbound_event, &mut trigger).await;
         if !trigger.should_reply {
             // 票据连同顺序位在这里掉落,后面的消息立刻可以排上。
