@@ -389,10 +389,17 @@ pub async fn run(cli: Cli, paths: GqyPaths) -> Result<()> {
             session_cmds::run_session_command(&paths, args.command, plain).await
         }
         Some(Command::Stdio) => stdio::run_stdio(&paths).await,
-        Some(Command::Dev) => run_repl(&paths, AgentMode::Dev).await,
+        Some(Command::Dev(args)) => {
+            let launch = if args.continue_session {
+                ReplLaunch::Resume
+            } else {
+                ReplLaunch::Fresh
+            };
+            run_repl(&paths, AgentMode::Dev, launch).await
+        }
         Some(Command::Oobe) => {
             if run_oobe_flow(&paths).await? {
-                let result = run_repl(&paths, AgentMode::Normal).await;
+                let result = run_repl(&paths, AgentMode::Normal, ReplLaunch::Fresh).await;
                 // REPL 没能接过备用屏(启动失败)就自己退回主屏,别把终端留在备用屏上。
                 crate::terminal::release_alt_screen_if_held();
                 result
@@ -405,22 +412,19 @@ pub async fn run(cli: Cli, paths: GqyPaths) -> Result<()> {
         None => {
             let message = join_message(cli.message);
             if message.is_empty() && io::stdin().is_terminal() {
-                if session_arg.is_some() || continue_session {
-                    bail!(
-                        "{}",
-                        t(
-                            "--session and --continue only apply to one-shot commands; use /session inside the REPL",
-                            "--session 与 --continue 仅用于一次性命令；REPL 内请使用 /session 切换"
-                        )
-                    );
-                }
                 // 裸 gqy = 普通 REPL(`gqy dev` 才是开发预设)。第一次先走
                 // 新手引导;老配置在 migrate 里已标成做过,不会被拦。
                 let config = AppConfig::load_or_default(&paths)?;
                 if crate::oobe::needed(&config) && !run_oobe_flow(&paths).await? {
                     return Ok(());
                 }
-                let result = run_repl(&paths, AgentMode::Normal).await;
+                // 09-24 起默认开新会话;`-c` 回上次,`--session` 直达指定会话。
+                let (mode, launch) = match session_arg.as_deref() {
+                    Some(target) => (point_repl_at(&paths, target).await?, ReplLaunch::Resume),
+                    None if continue_session => (AgentMode::Normal, ReplLaunch::Resume),
+                    None => (AgentMode::Normal, ReplLaunch::Fresh),
+                };
+                let result = run_repl(&paths, mode, launch).await;
                 crate::terminal::release_alt_screen_if_held();
                 result
             } else {
@@ -568,16 +572,54 @@ async fn run_one_shot(
     outcome
 }
 
-async fn run_repl(paths: &GqyPaths, initial_mode: AgentMode) -> Result<()> {
+/// 打开 REPL 时落在哪条会话上。
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub(in crate::cli) enum ReplLaunch {
+    /// 新会话（车道上次那条还空着就复用）：`gqy`、`gqy dev`。
+    Fresh,
+    /// 回到车道上次的会话：`gqy -c`、`gqy dev -c`、`gqy --session <名字>`。
+    Resume,
+}
+
+async fn run_repl(paths: &GqyPaths, initial_mode: AgentMode, launch: ReplLaunch) -> Result<()> {
     let config = AppConfig::load_or_default(paths).unwrap_or_default();
     // 必须早于任何渲染和输入线程：OSC 11 的回包要在输入线程起来之前读走。
     crate::terminal::tone::init(&config.display.theme, true);
     repl::composer_hint::refresh(&config, paths);
     if direct_mode_requested() {
-        run_direct_repl(paths, initial_mode).await
+        run_direct_repl(paths, initial_mode, launch).await
     } else {
-        run_remote_repl(paths, initial_mode).await
+        run_remote_repl(paths, initial_mode, launch).await
     }
+}
+
+/// `gqy --session <名字>`：把那条会话所在车道的 REPL 指针指过去，返回它的模式。
+/// 之后按 `ReplLaunch::Resume` 打开，就落在这条会话上。
+async fn point_repl_at(paths: &GqyPaths, target: &str) -> Result<AgentMode> {
+    if direct_mode_requested() {
+        bail!(
+            "{}",
+            t(
+                "--session needs the daemon; it is not available with GQY_DIRECT",
+                "--session 需要后台服务，GQY_DIRECT 直连模式下用不了"
+            )
+        );
+    }
+    let entry = turn_request::resolve_managed_session(paths, target).await?;
+    send_ipc_admin(
+        paths,
+        IpcCommand::SetReplSession {
+            target: crate::ipc::SessionRef::Id {
+                id: entry.id.clone(),
+            },
+        },
+    )
+    .await?;
+    Ok(if entry.mode == "dev" {
+        AgentMode::Dev
+    } else {
+        AgentMode::Normal
+    })
 }
 
 fn direct_mode_requested() -> bool {

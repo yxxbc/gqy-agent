@@ -209,6 +209,22 @@ impl StateStore {
         }
     }
 
+    /// 打开 REPL 时用：这条车道上次那条会话还一句没说过就接着用，否则新开一条。
+    ///
+    /// 09-24 起 `gqy` 默认开新会话、`gqy -c` 才回上次（用户裁定）。空会话复用
+    /// 是为了反复开关不攒一堆空会话；「空」的口径和空会话里按 Tab 换车道一致：
+    /// 没有可见回合。
+    pub fn fresh_repl_session(&self, persona: &str) -> Result<String> {
+        if let Some(session_id) = self.repl_session(persona)? {
+            if session_id != crate::state::DEFAULT_SESSION_ID
+                && self.pinned(&session_id).load_visible_turns()?.is_empty()
+            {
+                return Ok(session_id);
+            }
+        }
+        self.new_repl_session(persona)
+    }
+
     /// 给这条人格车道新建一个会话并钉住指针。
     ///
     /// 名字留空是有意的：首条消息会自动命名。不动 `session_id()`——终端车道

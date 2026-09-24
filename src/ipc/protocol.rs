@@ -272,6 +272,10 @@ pub enum Command {
         /// `"dev"` 取 dev 人格的 REPL 指针(无则自举一个 dev 会话)。
         #[serde(default)]
         mode: Option<String>,
+        /// true = 打开 REPL / 换车道时要一条空会话:车道当前那条还空着就用它,
+        /// 否则新建。false = 回到车道当前的会话(`gqy -c`、切走后回落)。
+        #[serde(default)]
+        fresh: bool,
     },
     SetReplSession {
         target: SessionRef,

@@ -503,6 +503,38 @@ fn one_shot_sessions_stay_invisible_and_stale_ones_are_swept() {
     assert!(store.session_record(&user.session_id).unwrap().is_some());
 }
 
+/// 09-24 起 `gqy` 默认开新会话：车道上次那条还一句没说过就复用（反复开关不攒
+/// 空会话），说过话就新开一条，旧会话原样保留；`ensure_repl_session`（`gqy -c`）
+/// 回到车道当前那条。
+#[test]
+fn fresh_repl_session_reuses_an_empty_session_and_opens_a_new_one_after_a_turn() {
+    let (_temp, store) = test_store();
+    store.init_files().unwrap();
+
+    let first = store.fresh_repl_session("gqy").unwrap();
+    assert_eq!(
+        store.fresh_repl_session("gqy").unwrap(),
+        first,
+        "还没说过话的会话应该被复用"
+    );
+
+    let pinned = store.pinned(&first);
+    pinned.start_turn("t1", "hello", 999999).unwrap();
+    pinned.complete_turn("t1", "hi", None).unwrap();
+
+    let second = store.fresh_repl_session("gqy").unwrap();
+    assert_ne!(second, first, "说过话之后打开应该是新会话");
+    assert!(
+        store.session_record(&first).unwrap().is_some(),
+        "旧会话不能被删"
+    );
+    assert_eq!(
+        store.ensure_repl_session("gqy").unwrap(),
+        second,
+        "-c 回到车道当前那条"
+    );
+}
+
 /// normal 车道永不落进终端集成会话(08-25 用户裁定):指针缺失自举新会话;
 /// 指针被(历史 /session 切换或老回落语义)钉在终端会话上时同样自愈成新
 /// 会话并改钉。退回 ensure_repl_session 的守卫前,第二段断言会拿到

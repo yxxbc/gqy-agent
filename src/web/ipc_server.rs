@@ -201,7 +201,7 @@ pub(in crate::web) async fn handle_ipc_connection(
             )
             .await?;
         }
-        IpcCommand::GetReplSession { mode } => {
+        IpcCommand::GetReplSession { mode, fresh } => {
             let dev = mode.as_deref() == Some("dev");
             let persona = if dev {
                 crate::state::DEV_PERSONA.to_string()
@@ -218,9 +218,12 @@ pub(in crate::web) async fn handle_ipc_connection(
             //
             // 空名字是有意的:首条消息会自动命名(与 dev 同路)。不动
             // `store.session_id()`,终端车道保持原样;要回去用 `/session`。
-            let session_id = store
-                .ensure_repl_session(&persona)
-                .map_err(|error| anyhow::anyhow!(safe_error_message(&error)))?;
+            let session_id = if fresh {
+                store.fresh_repl_session(&persona)
+            } else {
+                store.ensure_repl_session(&persona)
+            }
+            .map_err(|error| anyhow::anyhow!(safe_error_message(&error)))?;
             // 指针有效但会话已归档/不是本地会话时同样换一条新的,别把 REPL
             // 卡在一个进不去的会话上。
             let target = ipc::SessionRef::Id { id: session_id };

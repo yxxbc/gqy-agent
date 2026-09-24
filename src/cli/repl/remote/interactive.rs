@@ -12,7 +12,11 @@ use crate::cli::repl::tail::*;
 use crate::cli::*;
 use crate::render::style::DANGER;
 
-pub(in crate::cli) async fn run_remote_repl(paths: &GqyPaths, mut mode: AgentMode) -> Result<()> {
+pub(in crate::cli) async fn run_remote_repl(
+    paths: &GqyPaths,
+    mut mode: AgentMode,
+    launch: crate::cli::ReplLaunch,
+) -> Result<()> {
     let _cursor_restore = ReplCursorRestore;
     ipc::ensure_daemon(paths, None).await?;
     let refreshed = GqyPaths::new()?;
@@ -26,6 +30,7 @@ pub(in crate::cli) async fn run_remote_repl(paths: &GqyPaths, mut mode: AgentMod
         paths,
         IpcCommand::GetReplSession {
             mode: (mode == AgentMode::Dev).then(|| "dev".to_string()),
+            fresh: launch == crate::cli::ReplLaunch::Fresh,
         },
     )
     .await?;
@@ -674,6 +679,7 @@ pub(in crate::cli) async fn run_remote_repl(paths: &GqyPaths, mut mode: AgentMod
                             paths,
                             IpcCommand::GetReplSession {
                                 mode: (mode == AgentMode::Dev).then(|| "dev".to_string()),
+                                fresh: false,
                             },
                         )
                         .await?;

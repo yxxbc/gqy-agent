@@ -132,7 +132,7 @@ pub enum Command {
     Web(WebArgs),
     Daemon(DaemonArgs),
     /// 进入开发模式 REPL(极简编码形态,无人格)
-    Dev,
+    Dev(DevArgs),
     /// 新手引导:人格 / 功能 / 认识你 / 终端集成 / 接模型(裸 gqy 第一次会自动进)
     Oobe,
     /// 工具桥:以当前会话身份调用一个结构化工具(供 run_command 脚本编排)
@@ -157,6 +157,7 @@ pub struct TurnOptions {
     #[arg(long, value_name = "SESSION")]
     pub session: Option<String>,
 
+    /// 回到上次的会话：打开 REPL 时回到普通模式上次的对话；一次性命令接着当前会话说
     #[arg(short = 'c', long = "continue", conflicts_with = "session")]
     pub continue_session: bool,
 
@@ -486,4 +487,11 @@ pub enum ConfigCommand {
     Paths,
     #[command(hide = true)]
     PromptSource,
+}
+
+#[derive(Debug, Args, Clone, Default)]
+pub struct DevArgs {
+    /// 回到开发模式上次的会话（默认开一个新会话）
+    #[arg(short = 'c', long = "continue")]
+    pub continue_session: bool,
 }

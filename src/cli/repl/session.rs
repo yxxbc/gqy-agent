@@ -238,38 +238,16 @@ pub(in crate::cli) async fn switch_repl_lane(
     cumulative_tokens: &mut TurnTokens,
 ) -> Result<()> {
     let lane = (mode == AgentMode::Dev).then(|| "dev".to_string());
-    let (state, _) =
-        send_ipc_admin(paths, IpcCommand::GetReplSession { mode: lane.clone() }).await?;
-    let state = if session_is_empty(paths, &state.session_id) {
-        state
-    } else {
-        let (_, data) = send_ipc_admin(
-            paths,
-            IpcCommand::CreateSession {
-                name: None,
-                switch: false,
-                kind: None,
-                mode: lane,
-            },
-        )
-        .await?;
-        let id = data
-            .get("session")
-            .and_then(|session| session.get("session_id"))
-            .and_then(serde_json::Value::as_str)
-            .map(str::to_string)
-            .ok_or_else(|| {
-                anyhow::anyhow!("{}", t("created session has no id", "新会话缺少 ID"))
-            })?;
-        let (state, _) = send_ipc_admin(
-            paths,
-            IpcCommand::GetSessionState {
-                target: crate::ipc::SessionRef::Id { id },
-            },
-        )
-        .await?;
-        state
-    };
+    // 「车道当前那条空着就用、否则新建」和打开 REPL 是同一条规则，由 daemon
+    // 的 `fresh_repl_session` 统一判定。
+    let (state, _) = send_ipc_admin(
+        paths,
+        IpcCommand::GetReplSession {
+            mode: lane,
+            fresh: true,
+        },
+    )
+    .await?;
     // 先换色再切:切换的回执行和输入框竖条都按新模式画。
     live_repl.set_mode(mode);
     // 换车道不打「已切换到会话」——用户按的是模式切换,不是换会话。
@@ -680,6 +658,7 @@ pub(in crate::cli) async fn repl_fallback_session_state(
             live,
             IpcCommand::GetReplSession {
                 mode: Some("dev".to_string()),
+                fresh: false,
             },
         )
         .await?

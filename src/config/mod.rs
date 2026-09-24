@@ -564,7 +564,8 @@ pub struct DisplayConfig {
     pub mixed_model_endpoint_display: String,
     #[serde(default = "default_command_output_lines")]
     pub command_output_lines: usize,
-    /// How many finished turns a reopened REPL redraws; 0 disables replay.
+    /// How many finished turns `gqy -c` redraws when it resumes the previous
+    /// session; 0 disables replay. A plain `gqy` opens a fresh session.
     #[serde(default = "default_repl_replay_turns")]
     pub repl_replay_turns: usize,
     /// 空会话时在输入框上方画 GQY banner（渐变艺术字 + 星空 + 模式行）。

@@ -226,8 +226,8 @@
         },
         {
           path: "display.repl_replay_turns",
-          label: "重开 REPL 回放的轮数",
-          hint: "0 = 不回放",
+          label: "回到上次会话时回放的轮数",
+          hint: "只在 gqy -c 回到上次会话时生效；0 = 不回放",
           kind: "number",
           integer: true,
           min: 0,

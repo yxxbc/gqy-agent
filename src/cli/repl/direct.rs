@@ -168,7 +168,7 @@ pub(in crate::cli) async fn run_chat_with_options(
 ) -> Result<()> {
     let message = append_stdin_if_piped(message).await;
     if message.is_empty() {
-        return run_repl(paths, mode).await;
+        return run_repl(paths, mode, crate::cli::ReplLaunch::Fresh).await;
     }
     if !direct_mode_requested() {
         let session_override = match &session {
@@ -307,6 +307,7 @@ pub(in crate::cli) async fn run_chat_with_options(
 pub(in crate::cli) async fn run_direct_repl(
     paths: &GqyPaths,
     initial_mode: AgentMode,
+    launch: crate::cli::ReplLaunch,
 ) -> Result<()> {
     let _core_lease = ipc::acquire_direct_core(paths)?;
     initialize_models_cache(paths);
@@ -325,7 +326,10 @@ pub(in crate::cli) async fn run_direct_repl(
     };
     // 与远端 `GetReplSession` 同一条语义（见 `ensure_repl_session`）：指针缺失
     // 就自举本车道的会话，绝不退到终端集成那条。
-    let repl_session_id = state.ensure_repl_session(&persona)?;
+    let repl_session_id = match launch {
+        crate::cli::ReplLaunch::Fresh => state.fresh_repl_session(&persona)?,
+        crate::cli::ReplLaunch::Resume => state.ensure_repl_session(&persona)?,
+    };
     state.adopt_session(&repl_session_id);
     apply_session_model_override(&state, &mut config);
     let memory_organizer = MemoryOrganizer::spawn()?;
