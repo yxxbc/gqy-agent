@@ -2,7 +2,7 @@
 
 TUI 这一批（09-23 定，方案都在 `docs/plan/`）：
 
-- 待验收：TUI 配色（`6f7f4c03` 等，需要一次 macOS 全绿）；CHANGELOG 与一键发版（`41591af3`，下次发版首次实跑）
+- 待验收：TUI 配色（`6f7f4c03` 等，09-24 `147c5a6a` 起 Linux/macOS 全绿，等用户手测）；CHANGELOG 与一键发版（`41591af3`，下次发版首次实跑）
 - 打开方式：`gqy` 默认新会话、空会话复用，`gqy -c` 回到上次，`--session` 直达（`2026-09-23-tui-launch-and-lobby.md` §二）
 - 圆角输入框：淡灰框线 + 主色 `❯`，消息回显 `❯` + 淡底色（`2026-09-23-tui-input-box.md`）
 - 开屏欢迎框：Claude Code 式小框 + 最近会话，吉祥物可选立绘 / 黑猫 / 自定义 / 关（`display.mascot`，素材在 `assets/mascot/`）（`2026-09-23-tui-launch-and-lobby.md` §三）
@@ -25,7 +25,7 @@ TUI 这一批（09-23 定，方案都在 `docs/plan/`）：
 - 寻找正确识别或者读取agy、claude、codex中token详细消耗的方法，去网上寻找答案
 - 修复上下文圆环点击后的浮窗对应的数据要准确,增加agy、claude、codex的订阅时效额度，参考codexbar、(https://github.com/tungcorn/antigravity-usage-checker)、(https://github.com/skainguyen1412/antigravity-usage)、(https://github.com/phuryn/claude-usage)
 - webui 美化意见
-- 外部扩展（脚本、MCP、技能、pm 包）汇总进设置的插件列表，能看能开关。方案：`docs/plan/2026-09-24-extensions-in-plugin-list.md`
+- 外部扩展（脚本、MCP、技能、pm 包）汇总进设置的插件列表，能看能开关。**方案待定**（三个开放问题见文档）：`docs/plan/2026-09-24-extensions-in-plugin-list.md`
 - WebUI 供应商显示彩色品牌图标（现在全是字母），认不出的仍用字母。方案：`docs/plan/2026-09-24-webui-provider-icons.md`
 - Live2D
 - 支持QQ官方机器人
