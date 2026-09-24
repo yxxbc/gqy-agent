@@ -223,7 +223,6 @@
     composerCumulative: document.getElementById("composerCumulative"),
     composerCumulativeValue: document.getElementById("composerCumulativeValue"),
     consoleButton: document.getElementById("consoleButton"),
-    sidebarSettingsButton: document.getElementById("sidebarSettingsButton"),
     consoleView: document.getElementById("consoleView"),
     consoleBack: document.getElementById("consoleBack"),
     conRailToggle: document.getElementById("conRailToggle"),
@@ -532,6 +531,7 @@
     thinkingVariantError: "",
     composing: false,
     settingsView: "interface",
+    platformView: { platform: "qq", tab: "settings" },
     configLoaded: false,
     configLoading: false,
     configSaving: false,
@@ -1275,7 +1275,7 @@
   }
 
   function setSettingsView(view) {
-    const selected = ["interface", "prompts", "providers", "models", "general", "mcp", "plugins", "qq", "advanced"].includes(view) ? view : "interface";
+    const selected = ["interface", "prompts", "providers", "models", "general", "mcp", "plugins", "advanced"].includes(view) ? view : "interface";
     state.settingsView = selected;
     elements.settingsNav.querySelectorAll("[data-settings-view]").forEach((button) => {
       const active = button.dataset.settingsView === selected;
@@ -11574,7 +11574,7 @@
   // 控制台位置写进 URL hash:#console/<面板> 与 #console/settings/<子页>。
   // 刷新、分享链接都能回到同一页;老的裸 #console 仍开数据统计。
   function consoleHashFor(panel, view) {
-    return panel === "settings" && view ? `#console/settings/${view}` : `#console/${panel}`;
+    return (panel === "settings" || panel === "platforms") && view ? `#console/${panel}/${view}` : `#console/${panel}`;
   }
   function writeConsoleHash(hash) {
     const target = hash || `${window.location.pathname}${window.location.search}`;
@@ -11584,11 +11584,18 @@
   function parseConsoleHash() {
     const match = /^#console(?:\/([a-z-]+))?(?:\/([a-z-]+))?$/.exec(window.location.hash || "");
     if (!match) return null;
-    const panel = match[1] || "usage";
+    let panel = match[1] || "usage";
+    let view = match[2] || "";
+    // 旧深链：QQ 的消息记录、群管、设置分页都搬进了平台页。
+    const legacy = { qq: "qq-history", groups: "qq-groups" }[panel] || (panel === "settings" && view === "qq" ? "qq-settings" : "");
+    if (legacy) {
+      panel = "platforms";
+      view = legacy;
+    }
     // 面板清单只有 index.html 一份,这里查 DOM 而不是再抄一遍。
     const known = Boolean(elements.consoleView.querySelector(`.con-panel[data-console-panel="${panel}"]`));
     const allowed = known && (isAdmin() || !isAdminOnlyPanel(panel));
-    return { panel: allowed ? panel : "usage", view: match[2] || "" };
+    return { panel: allowed ? panel : "usage", view: allowed ? view : "" };
   }
 
   function consoleOpen(panel = "usage") {
@@ -11628,7 +11635,80 @@
     if (panel === "settings" && !state.configLoaded && !state.configLoading) loadConfigDraft();
     // 插件 dashboard 面板各自独立文件,首次进入挂载、之后只刷新。
     if (window.GqyDash?.has(panel)) window.GqyDash.open(panel);
-    writeConsoleHash(consoleHashFor(panel, panel === "settings" ? state.settingsView : ""));
+    if (panel === "platforms") setPlatformView(state.platformView.platform, state.platformView.tab);
+    placeSettingsFooter();
+    writeConsoleHash(consoleHashFor(panel, consoleViewFor(panel)));
+  }
+
+  function consoleViewFor(panel) {
+    if (panel === "settings") return state.settingsView;
+    if (panel === "platforms") return `${state.platformView.platform}-${state.platformView.tab}`;
+    return "";
+  }
+
+  /// 通讯平台页。每个平台一行，分页二选一：settingsPage 用设置页的渲染器
+  /// (GqySettings 的页名)，dash 用看板(GqyDash 的面板名)。
+  /// 加平台：index.html 加一个平台按钮和 platform-body，再在这里登记分页。
+  /// 平台 id 里不能有 "-"，深链用它分隔平台与分页(#console/platforms/qq-groups)。
+  const PLATFORMS = {
+    qq: {
+      tabs: {
+        settings: { settingsPage: "qq" },
+        history: { dash: "qq" },
+        groups: { dash: "groups" }
+      }
+    }
+  };
+
+  function parsePlatformView(view) {
+    const [platform, tab] = String(view || "").split("-");
+    return { platform, tab };
+  }
+
+  function setPlatformView(platform, tab) {
+    const known = PLATFORMS[platform] ? platform : Object.keys(PLATFORMS)[0];
+    const tabs = PLATFORMS[known].tabs;
+    const selectedTab = tabs[tab] ? tab : Object.keys(tabs)[0];
+    state.platformView = { platform: known, tab: selectedTab };
+    const panel = elements.consoleView.querySelector('.con-panel[data-console-panel="platforms"]');
+    if (!panel) return;
+    for (const button of panel.querySelectorAll("[data-platform]")) {
+      const active = button.dataset.platform === known;
+      button.classList.toggle("active", active);
+      button.setAttribute("aria-current", active ? "page" : "false");
+    }
+    for (const body of panel.querySelectorAll("[data-platform-body]")) {
+      const current = body.dataset.platformBody === known;
+      body.hidden = !current;
+      if (!current) continue;
+      for (const button of body.querySelectorAll("[data-platform-tab]")) {
+        const active = button.dataset.platformTab === selectedTab;
+        button.classList.toggle("active", active);
+        button.setAttribute("aria-current", active ? "page" : "false");
+      }
+      for (const pane of body.querySelectorAll("[data-platform-pane]")) {
+        pane.hidden = pane.dataset.platformPane !== selectedTab;
+      }
+    }
+    const target = tabs[selectedTab];
+    if (target.settingsPage) {
+      if (!state.configLoaded && !state.configLoading) loadConfigDraft();
+      window.GqySettings?.onShow(target.settingsPage);
+    }
+    if (target.dash) window.GqyDash?.open(target.dash);
+    placeSettingsFooter();
+    if (consoleIsOpen() && state.consolePanel === "platforms") writeConsoleHash(consoleHashFor("platforms", consoleViewFor("platforms")));
+  }
+
+  /// 保存栏只有一个：设置页，或者平台页的设置分页。哪边在显示就挪到哪边，
+  /// 草稿与脏状态照旧只有一份，两处改的是同一份配置。
+  function placeSettingsFooter() {
+    const footer = elements.settingsFooter;
+    if (!footer) return;
+    const { platform, tab } = state.platformView;
+    const onPlatformSettings = state.consolePanel === "platforms" && Boolean(PLATFORMS[platform]?.tabs[tab]?.settingsPage);
+    const host = elements.consoleView.querySelector(`.con-panel[data-console-panel="${onPlatformSettings ? "platforms" : "settings"}"]`);
+    if (host && footer.parentElement !== host) host.append(footer);
   }
 
   async function loadUsageStats() {
@@ -12906,7 +12986,6 @@
     elements.sidebarScrim.addEventListener("click", closeSidebar);
     elements.sidebarCollapseButton?.addEventListener("click", () => setSidebarCollapsed(true));
     elements.sidebarExpandButton?.addEventListener("click", () => setSidebarCollapsed(false));
-    elements.sidebarSettingsButton.addEventListener("click", (event) => openSettings(event.currentTarget));
     elements.artifactToggleButton.addEventListener("click", () => setArtifactWorkspaceOpen(!state.artifactOpen));
     elements.artifactCloseButton.addEventListener("click", () => setArtifactWorkspaceOpen(false));
     // 上下文圆环 → 分项弹窗(contextpanel.js)。压缩成功后的重拉与 /compact 命令同一条路。
@@ -12991,7 +13070,16 @@
     elements.settingsNav.querySelectorAll("[data-settings-view]").forEach((button) => {
       button.addEventListener("click", () => setSettingsView(button.dataset.settingsView));
     });
-    document.getElementById("openGroupsPanel")?.addEventListener("click", () => setConsolePanel("groups"));
+    document.getElementById("openGroupsPanel")?.addEventListener("click", () => {
+      state.platformView = { platform: "qq", tab: "groups" };
+      setConsolePanel("platforms");
+    });
+    elements.consoleView.querySelectorAll("[data-platform]").forEach((button) => {
+      button.addEventListener("click", () => setPlatformView(button.dataset.platform, ""));
+    });
+    elements.consoleView.querySelectorAll("[data-platform-tab]").forEach((button) => {
+      button.addEventListener("click", () => setPlatformView(state.platformView.platform, button.dataset.platformTab));
+    });
     window.GqySettings?.init({
       state,
       configValue,
@@ -13223,6 +13311,7 @@
     const deepLink = parseConsoleHash();
     if (deepLink) {
       if (deepLink.panel === "settings" && deepLink.view) setSettingsView(deepLink.view);
+      if (deepLink.panel === "platforms" && deepLink.view) state.platformView = parsePlatformView(deepLink.view);
       consoleOpen(deepLink.panel);
     }
     setTheme(safeStorageGet("gqy.web.theme") || "graphite", false);

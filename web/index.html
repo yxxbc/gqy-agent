@@ -82,9 +82,6 @@
           <button class="icon-button" id="sharedFilesButton" type="button" title="分享文件" aria-label="分享文件">
             <span class="icon-slot" data-icon="download" aria-hidden="true"><span class="icon-fallback">⇩</span></span>
           </button>
-          <button class="icon-button" id="sidebarSettingsButton" type="button" title="打开设置" aria-label="打开设置" data-admin-only>
-            <span class="icon-slot" data-icon="sliders-horizontal" aria-hidden="true"><span class="icon-fallback">⚙</span></span>
-          </button>
           <button class="icon-button" id="sidebarThemeButton" type="button" title="切换主题" aria-label="切换主题">
             <span class="icon-slot" data-icon="sun-moon" aria-hidden="true"><span class="icon-fallback">◐</span></span>
           </button>
@@ -391,13 +388,9 @@
             <span class="icon-slot" data-icon="image" aria-hidden="true"><span class="icon-fallback">▣</span></span>
             <span>图库</span>
           </button>
-          <button class="con-rail-item" type="button" data-console-panel="qq" data-admin-only>
+          <button class="con-rail-item" type="button" data-console-panel="platforms" data-admin-only>
             <span class="icon-slot" data-icon="messages-square" aria-hidden="true"><span class="icon-fallback">▥</span></span>
-            <span>QQ 消息记录</span>
-          </button>
-          <button class="con-rail-item" type="button" data-console-panel="groups" data-admin-only>
-            <span class="icon-slot" data-icon="lock-keyhole" aria-hidden="true"><span class="icon-fallback">⚑</span></span>
-            <span>群管</span>
+            <span>平台</span>
           </button>
           <button class="con-rail-item" type="button" data-console-panel="affection" data-admin-only>
             <span class="icon-slot" data-icon="sparkles" aria-hidden="true"><span class="icon-fallback">♥</span></span>
@@ -562,11 +555,27 @@
         <div class="con-panel" data-console-panel="album" hidden>
           <div class="con-inner is-wide" id="dashAlbumRoot"></div>
         </div>
-        <div class="con-panel" data-console-panel="qq" hidden>
-          <div class="con-inner is-wide" id="dashQqRoot"></div>
-        </div>
-        <div class="con-panel" data-console-panel="groups" hidden>
-          <div class="con-inner is-wide" id="dashGroupsRoot"></div>
+        <!--
+          通讯平台：每个平台一个 platform-body，平台列表一行一个按钮。
+          加新平台 = 这里加一个按钮和一个 platform-body，再在 features/platforms.js 的
+          PLATFORMS 表里登记它的分页。分页内容沿用已有的渲染器（设置页、看板）。
+        -->
+        <div class="con-panel" data-console-panel="platforms" hidden>
+          <div class="settings-layout platform-layout">
+            <nav class="settings-nav platform-nav" aria-label="通讯平台">
+              <button class="active" type="button" data-platform="qq">QQ</button>
+            </nav>
+            <div class="settings-content platform-body" data-platform-body="qq">
+              <nav class="platform-tabs" aria-label="QQ 分页">
+                <button class="active" type="button" data-platform-tab="settings">连接与设置</button>
+                <button type="button" data-platform-tab="history">消息记录</button>
+                <button type="button" data-platform-tab="groups">群聊管理</button>
+              </nav>
+              <section class="platform-pane st-page" data-platform-pane="settings"><div class="st-root" id="settings-qq"></div></section>
+              <section class="platform-pane" data-platform-pane="history" hidden><div class="con-inner is-wide" id="dashQqRoot"></div></section>
+              <section class="platform-pane" data-platform-pane="groups" hidden><div class="con-inner is-wide" id="dashGroupsRoot"></div></section>
+            </div>
+          </div>
         </div>
         <div class="con-panel" data-console-panel="affection" hidden>
           <div class="con-inner is-wide" id="dashAffectionRoot"></div>
@@ -590,7 +599,6 @@
             <button type="button" data-settings-view="general">全局</button>
             <button type="button" data-settings-view="mcp">MCP</button>
             <button type="button" data-settings-view="plugins">插件</button>
-            <button type="button" data-settings-view="qq">QQ 平台</button>
             <button type="button" data-settings-view="advanced">高级</button>
           </nav>
           <div class="settings-content">
@@ -653,7 +661,6 @@
             <section class="settings-section settings-panel st-page" data-settings-panel="general" hidden><div class="st-root" id="settings-general"></div></section>
             <section class="settings-section settings-panel st-page" data-settings-panel="mcp" hidden><div class="st-root" id="settings-mcp"></div></section>
             <section class="settings-section settings-panel st-page" data-settings-panel="plugins" hidden><div class="st-root" id="settings-plugins"></div></section>
-            <section class="settings-section settings-panel st-page" data-settings-panel="qq" hidden><div class="st-root" id="settings-qq"></div></section>
             <section class="settings-section settings-panel" data-settings-panel="advanced" hidden>
             <h2>完整配置</h2>
             <p class="settings-description">逃生舱：完整配置 JSON，包含表单未单独展示的所有项。应用到草稿后仍需保存。</p>
