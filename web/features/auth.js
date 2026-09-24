@@ -55,7 +55,7 @@ export async function refreshLoginHint() {
     if (!document.body.classList.contains("is-login") || !elements.loginForm || elements.loginForm.hidden) return;
     if (elements.blockedMessage.textContent.startsWith("登录已过期")) return;
     if (status?.setup_pending) {
-      elements.blockedMessage.textContent = "首次使用:用户名 gqy、密码 gqy 登录,然后创建管理员账号。";
+      elements.blockedMessage.textContent = "首次使用:用户名 gqy、密码 GQY520 登录,然后创建管理员账号。";
       elements.loginUsername.placeholder = "gqy";
     } else {
       elements.blockedMessage.textContent = "输入用户名和密码以继续。";
