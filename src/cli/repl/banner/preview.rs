@@ -1,5 +1,6 @@
-//! `gqy --banner`：只看 banner。全屏画空会话那一帧的星空与渐变字（不带输入框），
-//! Tab 切换模式行看两种颜色，其余任意键退出。调 `config/banner.txt` 时用它对样。
+//! `gqy --banner`：只看开屏。全屏画空会话那一帧的欢迎框（吉祥物 + 欢迎语，不带
+//! 输入框），Tab 切换模式行看两种颜色，其余任意键退出。换 `display.mascot` 或调
+//! `config/banner.txt` 时用它对样。
 
 use super::BannerScene;
 use crate::agent::AgentMode;

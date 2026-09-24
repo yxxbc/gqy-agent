@@ -11,7 +11,7 @@ use std::path::PathBuf;
 pub struct Cli {
     #[arg(long, global = true)]
     pub debug: bool,
-    /// 只看空会话的 banner(星空 + 渐变 GQY),按任意键退出
+    /// 只看空会话的开屏欢迎框(吉祥物 + 欢迎语),Tab 切换模式,其余任意键退出
     #[arg(long)]
     pub banner: bool,
 
