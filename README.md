@@ -195,6 +195,8 @@ gqy import gqy-export-*.tar.gz  # 在新电脑上导入（先运行 gqy daemon s
 
 [PolyForm Noncommercial 1.0.0](LICENSE)：个人使用、学习研究、非营利用途都可以自由使用、修改和分享，**禁止商用**。
 
+顾清影 / Selene 的名字、logo、壁纸与立绘不在上述协议内，单独按 [LICENSE-ASSETS](LICENSE-ASSETS) 授权：随原版分发、截图、非商用同人都可以；公开发布的修改版必须换用自己的名字和形象。
+
 本项目源自 [miyu-agent](https://github.com/SHORiN-KiWATA/miyu-agent)，原作者的 MIT 协议声明保留在 [LICENSE-MIT](LICENSE-MIT)。0.6.0 及更早的版本仍按 MIT 发布。
 
 ## 友情链接

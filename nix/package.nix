@@ -54,6 +54,7 @@ rustPlatform.buildRustPackage {
 
     install -m 0644 LICENSE $licenses/LICENSE
     install -m 0644 LICENSE-MIT $licenses/LICENSE-MIT
+    install -m 0644 LICENSE-ASSETS $licenses/LICENSE-ASSETS
     install -m 0644 assets/fonts/NotoSansCJK.LICENSE $licenses/
     install -m 0644 assets/fonts/NotoColorEmoji.LICENSE $licenses/
     install -m 0644 assets/fonts/JetBrainsMono.LICENSE $licenses/
