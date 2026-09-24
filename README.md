@@ -44,6 +44,9 @@
 <img src="pics/readme-show/tui-calltool.png" alt="顾清影在终端里联网搜索" width="760" />
 <br/><sub>在终端里让她帮你查东西</sub>
 <br/><br/>
+<img src="pics/readme-show/tui-show-image.png" alt="顾清影在终端里直接发图片和表情包" width="760" />
+<br/><sub>图片和表情包直接显示在终端里</sub>
+<br/><br/>
 <img src="pics/readme-show/tui-zsh-say.png" alt="在 shell 命令行里直接和顾清影说话" width="760" />
 <br/><sub>不用打开对话界面，在命令行里直接和她说话</sub>
 </div>
@@ -64,6 +67,8 @@
     <td align="center" width="33%"><img src="pics/readme-show/webui-setting-YouCanShowMore.png" alt="控制台：记忆、知识库、表情包、记账等" /><br/><sub>记忆、图库、记账都在控制台</sub></td>
   </tr>
 </table>
+
+> 更多工具与视图等你发现！
 
 ## 📦 安装
 
