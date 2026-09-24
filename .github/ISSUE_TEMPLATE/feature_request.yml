@@ -1,0 +1,44 @@
+name: 功能建议
+description: 想让顾清影多会点什么，或者某处可以更好用
+title: "[Feature] "
+labels: ["enhancement"]
+body:
+  - type: markdown
+    attributes:
+      value: 谢谢你的想法！提交前请搜一下已有 issue，看看是不是有人提过了。
+  - type: textarea
+    id: problem
+    attributes:
+      label: 想解决什么问题
+      description: 你在什么场景下遇到了什么不方便。先说问题，再说方案。
+    validations:
+      required: true
+  - type: textarea
+    id: solution
+    attributes:
+      label: 你设想的样子
+      description: 希望怎么用、界面长什么样。有参考的软件或截图更好。
+    validations:
+      required: true
+  - type: dropdown
+    id: surface
+    attributes:
+      label: 涉及哪里
+      multiple: true
+      options:
+        - 终端界面
+        - 开发模式
+        - 网页（WebUI）
+        - 人格 / 聊天体验
+        - 记忆
+        - 工具 / 插件
+        - 语音
+        - QQ / iMessage
+        - 安装 / 文档
+        - 其他
+  - type: checkboxes
+    id: pr
+    attributes:
+      label: 参与
+      options:
+        - label: 我愿意自己提 PR 实现（大改动请先在这个 issue 里商量方案）

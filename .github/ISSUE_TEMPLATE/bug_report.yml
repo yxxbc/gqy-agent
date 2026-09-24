@@ -1,0 +1,92 @@
+name: 问题反馈
+description: 用起来不对劲、报错、崩溃
+title: "[Bug] "
+labels: ["bug"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        谢谢反馈！提交前请确认：
+        - 看过 [常见问题](https://github.com/yxxbc/gqy-agent/blob/gqy/docs/wiki/17-常见问题.md)，也搜过已有 issue。
+        - 一个 issue 只说一件事。
+        - **日志和截图里的 API key、token、QQ 号、聊天内容已经打码。**
+  - type: input
+    id: version
+    attributes:
+      label: 版本
+      description: 运行 `gqy --version` 的输出
+      placeholder: gqy 0.7.0
+    validations:
+      required: true
+  - type: dropdown
+    id: os
+    attributes:
+      label: 系统
+      options:
+        - macOS（Apple 芯片）
+        - macOS（Intel）
+        - Linux x86_64
+        - Linux ARM64
+    validations:
+      required: true
+  - type: dropdown
+    id: install
+    attributes:
+      label: 安装方式
+      options:
+        - Nix
+        - 一键安装脚本
+        - 手动下载安装包
+        - 从源码编译
+    validations:
+      required: true
+  - type: dropdown
+    id: surface
+    attributes:
+      label: 在哪里出的问题
+      multiple: true
+      options:
+        - 终端界面（gqy）
+        - 开发模式（gqy dev）
+        - 网页（WebUI）
+        - shell 里直接提问
+        - 语音
+        - QQ / iMessage
+        - 安装 / 升级
+        - 其他
+    validations:
+      required: true
+  - type: input
+    id: terminal
+    attributes:
+      label: 终端与模型
+      description: 用的什么终端（kitty、iTerm2、Ghostty…），以及当时用的模型供应商
+      placeholder: kitty · DeepSeek
+  - type: textarea
+    id: steps
+    attributes:
+      label: 怎么复现
+      description: 一步一步写，别人照着做能看到同样的问题
+      placeholder: |
+        1. 运行 gqy
+        2. 输入 ...
+        3. 看到 ...
+    validations:
+      required: true
+  - type: textarea
+    id: expected
+    attributes:
+      label: 期望与实际
+      description: 你期望看到什么，实际看到了什么
+    validations:
+      required: true
+  - type: textarea
+    id: logs
+    attributes:
+      label: 日志
+      description: "`~/.gqy/cache/logs/` 下当天的 `gqy.日期.log`、`daemon.log` 里相关的几行。贴之前先打码。"
+      render: text
+  - type: textarea
+    id: extra
+    attributes:
+      label: 截图或补充

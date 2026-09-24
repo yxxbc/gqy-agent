@@ -1,0 +1,11 @@
+blank_issues_enabled: false
+contact_links:
+  - name: 常见问题
+    url: https://github.com/yxxbc/gqy-agent/blob/gqy/docs/wiki/17-常见问题.md
+    about: 很多安装和使用问题这里已经有答案，提问前先看看。
+  - name: 安全漏洞（私密报告）
+    url: https://github.com/yxxbc/gqy-agent/security/advisories/new
+    about: 安全问题请私下告诉我，不要公开提 issue。
+  - name: LINUX DO 社区
+    url: https://linux.do
+    about: 闲聊、分享用法、讨论想法。
