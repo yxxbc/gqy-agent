@@ -242,6 +242,21 @@ impl PlatformAdapter for OneBotAdapter {
         })
     }
 
+    fn send_profile_like<'a>(&'a self, user_id: &'a str, times: u32) -> BoxFuture<'a, Result<()>> {
+        Box::pin(async move {
+            if user_id.trim().is_empty() || times == 0 {
+                bail!("user_id and a positive times are required");
+            }
+            self.connection()
+                .call_api(
+                    "send_like",
+                    json!({ "user_id": onebot_id_value(user_id), "times": times }),
+                )
+                .await?;
+            Ok(())
+        })
+    }
+
     fn message_info<'a>(
         &'a self,
         message_id: &'a str,

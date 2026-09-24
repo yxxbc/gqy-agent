@@ -2059,6 +2059,13 @@
         default: [],
       },
       {
+        path: "private_chats.like_whitelist",
+        label: "私聊点赞白名单",
+        hint: "这些 QQ 号在私聊里请她点赞时，她会给对方的资料卡点赞（每人每天最多 10 个）。留空 = 私聊不点赞",
+        kind: "id-list",
+        default: [],
+      },
+      {
         path: "private_chats.friend_requests_require_private_whitelist",
         label: "仅私聊白名单能加好友",
         kind: "toggle",
@@ -2089,6 +2096,13 @@
       {
         path: "group_chats.whitelist",
         label: "群聊白名单",
+        kind: "id-list",
+        default: [],
+      },
+      {
+        path: "group_chats.like_whitelist",
+        label: "群聊点赞白名单",
+        hint: "这些群里有人请她点赞时，她会给请求的人点（只给本人，每人每天最多 10 个）。留空 = 群里不点赞",
         kind: "id-list",
         default: [],
       },

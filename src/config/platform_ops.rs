@@ -84,6 +84,14 @@ impl AppConfig {
                 qq.private_chats.whitelist.as_slice(),
             ),
             ("group_chats.whitelist", qq.group_chats.whitelist.as_slice()),
+            (
+                "private_chats.like_whitelist",
+                qq.private_chats.like_whitelist.as_slice(),
+            ),
+            (
+                "group_chats.like_whitelist",
+                qq.group_chats.like_whitelist.as_slice(),
+            ),
         ] {
             let mut seen = HashSet::with_capacity(ids.len());
             if ids.iter().any(|id| *id <= 0 || !seen.insert(*id)) {

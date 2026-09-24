@@ -250,6 +250,10 @@ impl PlatformsConfig {
         self.qq.private_chats.whitelist.dedup();
         self.qq.group_chats.whitelist.sort_unstable();
         self.qq.group_chats.whitelist.dedup();
+        self.qq.private_chats.like_whitelist.sort_unstable();
+        self.qq.private_chats.like_whitelist.dedup();
+        self.qq.group_chats.like_whitelist.sort_unstable();
+        self.qq.group_chats.like_whitelist.dedup();
         let mut keywords = HashSet::with_capacity(self.qq.group_chats.trigger_keywords.len());
         self.qq.group_chats.trigger_keywords = self
             .qq
@@ -787,6 +791,9 @@ pub struct QqPrivateChatsConfig {
     pub allow_non_whitelist: bool,
     /// Per private conversation.
     pub non_whitelist_rate_limit: PlatformRateLimit,
+    /// 私聊里可以请她点资料卡赞的 QQ 号。空 = 私聊不点赞。
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub like_whitelist: Vec<i64>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub session_limits: Option<PlatformSessionLimits>,
     #[serde(default, rename = "non_whitelist_rate_per_minute", skip_serializing)]
@@ -806,6 +813,7 @@ impl Default for QqPrivateChatsConfig {
                 window_seconds: 300,
             },
             session_limits: None,
+            like_whitelist: Vec::new(),
             legacy_non_whitelist_rate_per_minute: None,
         }
     }
@@ -864,6 +872,9 @@ pub struct QqGroupChatsConfig {
     pub allow_non_whitelist: bool,
     /// Shared by all senders in one non-whitelisted group.
     pub non_whitelist_rate_limit: PlatformRateLimit,
+    /// 群里的人可以请她点资料卡赞的群号。空 = 群聊不点赞。
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub like_whitelist: Vec<i64>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub session_limits: Option<PlatformSessionLimits>,
     #[serde(default, rename = "whitelist_rate_per_minute", skip_serializing)]
@@ -889,6 +900,7 @@ impl Default for QqGroupChatsConfig {
                 window_seconds: 300,
             },
             session_limits: None,
+            like_whitelist: Vec::new(),
             legacy_whitelist_rate_per_minute: None,
             legacy_non_whitelist_rate_per_minute: None,
         }

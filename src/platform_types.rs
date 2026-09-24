@@ -441,6 +441,15 @@ pub(crate) trait PlatformAdapter: Send + Sync {
         Box::pin(async { anyhow::bail!("message reactions are not supported by this platform") })
     }
 
+    /// 给一位用户点资料卡赞。平台自己有每日上限，超了由平台报错。
+    fn send_profile_like<'a>(
+        &'a self,
+        _user_id: &'a str,
+        _times: u32,
+    ) -> BoxFuture<'a, Result<()>> {
+        Box::pin(async { anyhow::bail!("profile likes are not supported by this platform") })
+    }
+
     fn message_info<'a>(
         &'a self,
         _message_id: &'a str,
