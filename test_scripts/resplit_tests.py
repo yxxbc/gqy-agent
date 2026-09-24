@@ -4,7 +4,7 @@
 `split_tests.py` 是从 `mod tests` 里一次分完；这个用于事后发现某个主题文件还是
 太大，要再切一刀。新文件沿用原文件的导入块，并自动登记到 `tests/mod.rs`。
 
-    python3 scripts/resplit_tests.py tests/大文件.rs 新模块名 "说明" 名字1 名字2 ...
+    python3 test_scripts/resplit_tests.py tests/大文件.rs 新模块名 "说明" 名字1 名字2 ...
 """
 import re
 import subprocess

@@ -144,6 +144,11 @@ jobs:
             echo "::error::用例数从 ${before} 降到 ${now}。有意删测试时，同一提交里更新 test_scripts/.test-count"
             exit 1
           fi
+          # 基线只有本地跑 refactor-check.sh 才会上调；只推云端的话它会一直停在旧值，
+          # 新加的用例以后被删掉也不报警。涨了就提示，不阻塞。
+          if [ "$now" -gt "$before" ]; then
+            echo "::warning::用例数 ${now} 高于基线 ${before}，请在下一个提交里把 test_scripts/.test-count 更新为 ${now}"
+          fi
 
   # gqy-voice 默认不构建，这里只保证它能编过，不跑需要模型的 e2e
   voice:

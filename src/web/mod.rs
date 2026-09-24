@@ -296,7 +296,7 @@ static KATEX_FONTS: &[(&str, &[u8])] = &[
 // 解码是按像素数来的，原图会占掉 30 MiB GPU 纹理去画两个缩略图，还让二进制
 // 多背 7.2 MiB。降到 256×256 和 1280×720（2x DPR 仍有富余）后纹理 3.7 MiB。
 // 原图留在 `pics/` 不动：README、终端演示、外部链接还在引用。
-// 重新生成见 `scripts/gen_web_assets.py`。
+// 重新生成见 `test_scripts/gen_web_assets.py`。
 const GQY_LOGO: &[u8] = include_bytes!("../../web/assets/gqy-logo.png");
 const GQY_WALLPAPER: &[u8] = include_bytes!("../../web/assets/gqywallpaper.png");
 

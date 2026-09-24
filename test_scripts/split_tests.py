@@ -2,7 +2,7 @@
 """通用的 `mod tests` 拆分器：按测试名关键词分主题落到 <mod>/tests/ 下。
 
 用法：
-    python3 split_tests_generic.py 源文件 配置.json
+    python3 test_scripts/split_tests.py 源文件 配置.json
 
 配置是 {"shared": [...], "groups": [[名字, 说明, [关键词...]], ...]}，
 最后一组关键词留空作兜底。共用 fixture 落 shared.rs，各主题文件

@@ -26,8 +26,8 @@ content-type 都不变（所以格式必须还是 PNG）。
 
 ## 用法
 
-    python3 scripts/gen_web_assets.py            # 生成
-    python3 scripts/gen_web_assets.py --verify   # 只校验画质，不写文件
+    python3 test_scripts/gen_web_assets.py            # 生成
+    python3 test_scripts/gen_web_assets.py --verify   # 只校验画质，不写文件
 
 依赖 Pillow；`pngquant`、`oxipng` 有就用，没有就跳过（只影响文件大小，
 不影响显存——显存只看像素数）。

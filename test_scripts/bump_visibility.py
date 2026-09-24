@@ -4,7 +4,7 @@
 搬模块的必备步骤：原本同模块内随便访问的私有项，搬出去之后调用方成了外部，
 必须显式放开。纯可见性调整，不改行为。
 
-    python3 scripts/bump_visibility.py 文件 'pub(in crate::cli)'
+    python3 test_scripts/bump_visibility.py 文件 'pub(in crate::cli)'
 
 **trait impl 里的方法不加修饰**——`impl Default for X`、`impl Drop for X`
 里的 `fn` 带可见性是编译错误（E0449），方法的可见性由 trait 决定。这一条踩

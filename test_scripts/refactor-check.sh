@@ -36,7 +36,6 @@ before=$(git show HEAD:test_scripts/.test-count 2>/dev/null || echo 0)
 output=$(cargo test --no-fail-fast 2>&1 | tee /dev/stderr || true)
 now=$(printf '%s\n' "$output" | awk '/^test result:/ {sum += $4 + $6} END {print sum+0}')
 failed=$(printf '%s\n' "$output" | awk '/^test result:/ {sum += $6} END {print sum+0}')
-echo "$now" > test_scripts/.test-count
 if [ "$before" -gt 0 ] && [ "$now" -lt "$before" ]; then
   # 变量一律加花括号:中文 locale 下 bash 会把紧跟的全角字符当成变量名的一部分,
   # `set -u` 随即报「未绑定的变量」,门禁在测试全绿之后反而失败。
@@ -54,6 +53,9 @@ if [ "$failed" -gt 0 ]; then
   echo "✗ 有 $failed 个用例失败"
   exit 1
 fi
+# 基线只在全绿之后写：先写再判的话，编译失败数出 0、用例漏掉一个 mod，
+# 这些变小的数字都会留在工作区，一个 `git add -A` 就把基线降下去了。
+echo "$now" > test_scripts/.test-count
 echo "用例数 ${now}（基线 ${before}）"
 
 step "模型面语言"

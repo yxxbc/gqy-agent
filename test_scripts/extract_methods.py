@@ -5,7 +5,7 @@
 一个条目，要么全搬要么不搬。Rust 允许同一个类型有多个 `impl` 块（同 crate 内
 即可），所以按方法拆是合法的，语义完全不变。
 
-    python3 scripts/extract_methods.py 源文件 目标文件 impl头 方法1 方法2 ...
+    python3 test_scripts/extract_methods.py 源文件 目标文件 impl头 方法1 方法2 ...
 
 「impl头」是用来定位的前缀，比如 `impl Agent`。目标文件已存在时追加一个新的
 impl 块。方法找不到会报错退出，不静默漏掉。
