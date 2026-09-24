@@ -763,7 +763,10 @@ pub(in crate::cli) async fn run_remote_repl(
                     }
                 }
                 ReplSlashCommand::Config => {
-                    crate::config_tui::run(paths)?;
+                    if let Some(message) = open_config_ui(paths, command_args)? {
+                        repl_note(&mut live_repl, &format!("\x1b[2m{message}\x1b[0m\n"))?;
+                        continue;
+                    }
                     // 设置界面退出时画面原样留着、光标藏着：在一个同步块里把 REPL
                     // 整屏画回来，光标直接出现在输入框，中间不经过左上角。
                     if crate::cli::in_fullscreen() {

@@ -573,8 +573,12 @@ pub(in crate::cli) async fn run_direct_repl(
             println!();
             continue;
         }
-        if command.eq_ignore_ascii_case("/config") && command_args_empty {
-            crate::config_tui::run(paths)?;
+        if command.eq_ignore_ascii_case("/config") {
+            if let Some(message) = open_config_ui(paths, command_args)? {
+                println!("{message}");
+                println!();
+                continue;
+            }
             // 设置界面把画面留着、光标藏着：一个同步块里画回 REPL，光标直接落在输入框。
             if crate::cli::in_fullscreen() {
                 if let Some(live) = live_repl.as_mut() {

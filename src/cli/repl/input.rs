@@ -947,7 +947,15 @@ pub(in crate::cli) fn render_repl_input_with_footer(
             Print("  "),
             Print(format!(
                 "{}",
-                repl_command_suggestions_line(&view.names, Some(view.selected), suggestion_width)
+                repl_command_suggestions_line(
+                    &view
+                        .items
+                        .iter()
+                        .map(|item| item.text.as_str())
+                        .collect::<Vec<_>>(),
+                    Some(view.selected),
+                    suggestion_width
+                )
             ))
         )?;
         footer_row = None;

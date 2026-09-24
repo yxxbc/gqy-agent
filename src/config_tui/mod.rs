@@ -81,6 +81,57 @@ pub fn run_embedded(paths: &GqyPaths) -> Result<bool> {
     run_with(paths, false)
 }
 
+/// `/config <分组>`：直接打开一组全局设置，退出时有改动就问要不要保存。
+/// 分组 id 不认识时报错并列出可选的。
+pub fn run_settings_group(paths: &GqyPaths, id: &str) -> Result<bool> {
+    let Some(group) = settings_group(id) else {
+        let ids: Vec<&str> = SETTINGS_GROUPS.iter().map(|group| group.id).collect();
+        bail!(
+            "{}: {} ({})",
+            t("unknown settings group", "没有这个设置分组"),
+            id.trim(),
+            ids.join(" | ")
+        );
+    };
+    AppConfig::init_files(paths)?;
+    let mut config = AppConfig::load_or_default(paths)?;
+    let mut session = TerminalSession::start(!crate::cli::in_fullscreen())?;
+    let result = run_single_group(&mut session.stdout, paths, &mut config, group);
+    session.release();
+    result
+}
+
+/// 分组 id 与标题，给斜杠命令的参数候选用。
+pub fn settings_group_choices() -> Vec<(&'static str, &'static str)> {
+    SETTINGS_GROUPS
+        .iter()
+        .map(|group| (group.id, group.title()))
+        .collect()
+}
+
+fn run_single_group(
+    stdout: &mut io::Stdout,
+    paths: &GqyPaths,
+    config: &mut AppConfig,
+    group: &SettingsGroup,
+) -> Result<bool> {
+    let pristine = serde_json::to_string(&*config).ok();
+    loop {
+        if let Err(error) = edit_settings_group(stdout, config, group) {
+            // 解析失败只作废这一次输入：提示后回到表单重填，不丢别的改动。
+            show_tui_error(stdout, &error)?;
+            continue;
+        }
+        if serde_json::to_string(&*config).ok() == pristine || !confirm_save_on_exit(stdout)? {
+            return Ok(false);
+        }
+        match config.save(paths) {
+            Ok(()) => return Ok(true),
+            Err(error) => show_tui_error(stdout, &error)?,
+        }
+    }
+}
+
 fn run_with(paths: &GqyPaths, owns_alt_screen: bool) -> Result<bool> {
     AppConfig::init_files(paths)?;
     crate::models_cache::try_load(paths);

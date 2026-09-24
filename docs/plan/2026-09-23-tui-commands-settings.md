@@ -1,4 +1,4 @@
-# TUI 斜杠命令选择与设置补全（2026-09-23；第一节 09-24 已落地）
+# TUI 斜杠命令选择与设置补全（2026-09-23；两节均于 09-24 落地）
 
 来由：用户提出「输入斜杠时 TUI 会预览命令，但不能用方向键选择；原有命令不足以完整展示 gqy 的设置，建议都加，必要时可以调整文件树结构」。09-23 调研完成、方案经用户同意，但为了不干扰同期的 CHANGELOG/发版改造，本文只记方案，不施工。
 
@@ -77,6 +77,14 @@
 2. **直达**：`/config <分组>` 直接打开对应子页。`REPL_COMMAND_TABLE` 的 `/config` 的 `arg_hint` 写成 `[display|context|tools|cache|notifications|accounts]`，补全面板在打出 `/config ` 之后列出分组名（需要给补全加「参数候选」这一层，和第一节的选择状态共用）。
 3. **防再漏**：加一条测试，读 `web/settings-schema.js`（复用 `src/web/tests/settings_schema.rs` 的解析器），断言每个字段路径在终端配置器的字段注册表里都有，或列在显式豁免清单里（例如只在 WebUI 有意义的 QQ 平台细项）。这需要终端字段带上配置路径，顺手把 `Field::new(...)` 的绑定改成按路径声明。
 4. 前后端对照（AGENTS §8.1）：本项只补终端一侧，WebUI 已全。
+
+### 施工记录（09-24 已落地）
+
+- `config_tui/settings/` 按方案拆成六组，外加 `spec.rs`：`setting!(form, config, "English", "中文", a.b.c)` 按配置路径声明字段，显示与写回由字段类型决定（`SettingValue`：bool / 各种数字 / String / 一行一条的列表 / 留空为 None 的可选值），路径记进 `BoundFields::paths`。有换算的字段（界面语言、行数上限、加载模式）手写 `with_path`。
+- Skills 与 MCP 总开关并进「工具」组。记忆插件缺的 5 项补在 `plugins.rs` 的记忆表单里（不在 `plugin_settings.rs`，那个文件管的是别的插件）。
+- 列表字段一行一条（新增 `Field::line_list`）：命令黑名单里的 `:(){ :|:& };:` 带分号，按唤醒词的逗号/分号拆会拆坏。
+- `/config <分组>` 走 `config_tui::run_settings_group`，退出时有改动才问保存；不认识的分组不进界面，提示可选值。参数候选：`/config ` 之后列出「`/config`（完整菜单）+ 六个分组」，第一条默认选中，所以 `/config ` 直接回车仍是完整菜单。
+- 防漏测试 `config_tui/tests/settings_groups.rs` 双向对照（WebUI 有的终端都要有，终端声明的路径 WebUI 也得认识），另有原样写回不改配置、列表条目带逗号分号的用例。顺手发现 schema 解析器的 `fields_of` 一直漏掉折叠的 `advanced` 字段，补上后 WebUI 默认值对照测试也覆盖到了这 18 项。
 
 ### 影响面
 

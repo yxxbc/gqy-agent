@@ -148,7 +148,8 @@ pub(crate) const REPL_COMMAND_TABLE: &[ReplCommandSpec] = &[
     ReplCommandSpec {
         name: "/config",
         command: ReplSlashCommand::Config,
-        arg_hint: "",
+        // 与 `config_tui` 的 `SETTINGS_GROUPS` 一致（cli 的测试钉着）。
+        arg_hint: "[display|tools|context|cache|notifications|accounts]",
         help_en: "open configuration UI",
         help_zh: "打开配置界面",
         web: false,

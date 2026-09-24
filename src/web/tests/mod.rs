@@ -5,6 +5,6 @@ mod events_questions;
 mod http;
 mod ipc_bridge;
 mod session;
-mod settings_schema;
+pub(crate) mod settings_schema;
 mod shared;
 mod turn;

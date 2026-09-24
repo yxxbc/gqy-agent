@@ -212,7 +212,13 @@ pub(in crate::config_tui) fn run_form_from(
                 cursors[selected] = fields[selected].value.chars().count();
             }
             KeyCode::Enter if !editing && fields[selected].string_list => {
-                edit_string_list(stdout, fields[selected].label, &mut fields[selected].value)?;
+                let lines = fields[selected].line_items;
+                edit_string_list(
+                    stdout,
+                    fields[selected].label,
+                    &mut fields[selected].value,
+                    lines,
+                )?;
                 cursors[selected] = fields[selected].value.chars().count();
             }
             KeyCode::Enter if !editing && fields[selected].textarea => {
@@ -329,7 +335,13 @@ pub(in crate::config_tui) fn run_form_without_buttons(
             }
             // 短字符串列表(唤醒词):无按钮表单此前漏了这一臂,回车落到普通文本编辑。
             KeyCode::Enter if !editing && fields[selected].string_list => {
-                edit_string_list(stdout, fields[selected].label, &mut fields[selected].value)?;
+                let lines = fields[selected].line_items;
+                edit_string_list(
+                    stdout,
+                    fields[selected].label,
+                    &mut fields[selected].value,
+                    lines,
+                )?;
                 cursors[selected] = fields[selected].value.chars().count();
             }
             KeyCode::Enter if !editing && fields[selected].dialog_list => {
@@ -450,8 +462,13 @@ pub(in crate::config_tui) fn edit_string_list(
     stdout: &mut io::Stdout,
     title: &'static str,
     value: &mut String,
+    lines: bool,
 ) -> Result<()> {
-    let mut items: Vec<String> = crate::config::split_wake_keywords(value);
+    let mut items: Vec<String> = if lines {
+        split_line_items(value)
+    } else {
+        crate::config::split_wake_keywords(value)
+    };
     let mut selected = 0usize;
     loop {
         let mut options: Vec<String> = items.clone();
@@ -471,7 +488,7 @@ pub(in crate::config_tui) fn edit_string_list(
         )?;
         match read_key()? {
             KeyCode::Esc | KeyCode::Char('q') => {
-                *value = items.join(", ");
+                *value = items.join(if lines { "\n" } else { ", " });
                 return Ok(());
             }
             KeyCode::Up | KeyCode::Char('k') => selected = selected.saturating_sub(1),
@@ -498,6 +515,16 @@ pub(in crate::config_tui) fn edit_string_list(
             _ => {}
         }
     }
+}
+
+/// 按行分隔的列表值拆成条目（去空白、丢空行）。
+pub(in crate::config_tui) fn split_line_items(value: &str) -> Vec<String> {
+    value
+        .lines()
+        .map(str::trim)
+        .filter(|line| !line.is_empty())
+        .map(str::to_string)
+        .collect()
 }
 
 /// 弹一个单行输入表单;取消或留空返回 None。
@@ -716,6 +743,8 @@ pub(in crate::config_tui) fn field_display_value(field: &Field, reveal_sensitive
             Ok(value) => boolean_label(value).to_string(),
             Err(_) => field.value.clone(),
         }
+    } else if field.line_items {
+        truncate(&split_line_items(&field.value).join(" · "), 70)
     } else if field.modalities {
         parse_modalities(&field.value)
             .iter()
@@ -758,6 +787,9 @@ pub(in crate::config_tui) type ApplyField = fn(&mut AppConfig, &str) -> Result<(
 pub(in crate::config_tui) struct BoundFields {
     pub(in crate::config_tui) fields: Vec<Field>,
     applies: Vec<ApplyField>,
+    /// 用 `with_path` 声明过的配置路径（`context.trim_at_ratio`）。防漏测试
+    /// 拿它对照 WebUI 的字段表。
+    pub(in crate::config_tui) paths: Vec<&'static str>,
 }
 
 impl BoundFields {
@@ -765,6 +797,17 @@ impl BoundFields {
         self.fields.push(field);
         self.applies.push(apply);
         self
+    }
+
+    /// 同 `with`，并记下它写的是哪个配置路径。
+    pub(in crate::config_tui) fn with_path(
+        mut self,
+        path: &'static str,
+        field: Field,
+        apply: ApplyField,
+    ) -> Self {
+        self.paths.push(path);
+        self.with(field, apply)
     }
 
     /// 按字段顺序逐个写回;任一字段解析失败即返回错误。
@@ -793,6 +836,9 @@ pub(in crate::config_tui) struct Field {
     pub(in crate::config_tui) choices: Vec<String>,
     pub(in crate::config_tui) empty_choice_label: &'static str,
     pub(in crate::config_tui) raw_choice_labels: bool,
+    /// 列表按行分隔而不是逗号：条目里本身可能有逗号、分号（命令黑名单里的
+    /// fork 炸弹 `:(){ :|:& };:`、路径）。只和 `string_list` 一起用。
+    pub(in crate::config_tui) line_items: bool,
 }
 
 impl Field {
@@ -810,6 +856,7 @@ impl Field {
             choices: Vec::new(),
             empty_choice_label: t("Use current provider", "使用当前 Provider"),
             raw_choice_labels: false,
+            line_items: false,
         }
     }
 
@@ -827,6 +874,7 @@ impl Field {
             choices: Vec::new(),
             empty_choice_label: t("Use current provider", "使用当前 Provider"),
             raw_choice_labels: false,
+            line_items: false,
         }
     }
 
@@ -844,6 +892,7 @@ impl Field {
             choices: Vec::new(),
             empty_choice_label: t("Use current provider", "使用当前 Provider"),
             raw_choice_labels: false,
+            line_items: false,
         }
     }
 
@@ -851,6 +900,14 @@ impl Field {
         Self {
             string_list: true,
             ..Self::new(label, value)
+        }
+    }
+
+    /// 按行分隔的字符串列表（见 `line_items`）。
+    pub(in crate::config_tui) fn line_list(label: &'static str, value: String) -> Self {
+        Self {
+            line_items: true,
+            ..Self::string_list(label, value)
         }
     }
 
@@ -890,6 +947,7 @@ impl Field {
             choices: Vec::new(),
             empty_choice_label: t("Use current provider", "使用当前 Provider"),
             raw_choice_labels: false,
+            line_items: false,
         }
     }
 

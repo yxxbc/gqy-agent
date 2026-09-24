@@ -47,7 +47,7 @@ mod session_cmds;
 mod sessions;
 mod shared_files;
 #[cfg(test)]
-mod tests;
+pub(crate) mod tests;
 mod tty;
 mod turns;
 mod ui_prefs;

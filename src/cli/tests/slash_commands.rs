@@ -216,3 +216,18 @@ fn web_commands_are_a_subset_of_the_repl_table() {
         ]
     );
 }
+
+/// `/config` 的参数提示与设置分组一一对应：加了分组忘了改提示，`/help`
+/// 就会少列一个。
+#[test]
+fn config_arg_hint_lists_every_settings_group() {
+    let spec = REPL_COMMAND_TABLE
+        .iter()
+        .find(|spec| spec.name == "/config")
+        .unwrap();
+    let ids: Vec<&str> = crate::config_tui::settings_group_choices()
+        .into_iter()
+        .map(|(id, _)| id)
+        .collect();
+    assert_eq!(spec.arg_hint, format!("[{}]", ids.join("|")));
+}

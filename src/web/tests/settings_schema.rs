@@ -270,7 +270,7 @@ impl Reader {
 }
 
 /// 读出 `window.GqySettingsSchema = {...}` 的值。
-fn read_schema() -> Value {
+pub(crate) fn read_schema() -> Value {
     let mut reader = Reader {
         toks: tokenize(SCHEMA),
         globals: HashMap::new(),
@@ -391,9 +391,14 @@ const REPRESENTATION_DIFFERS: &[(&str, &str)] = &[(
     "Rust expands the default under $HOME; the schema shows it as ~/",
 )];
 
-/// 一个分区/插件定义里的全部字段:`fields` 加上分组的 `groups[].fields`。
-fn fields_of(definition: &Value) -> Vec<&Value> {
-    let direct = definition["fields"].as_array().into_iter().flatten();
+/// 一个分区/插件定义里的全部字段:`fields`、折叠起来的 `advanced`,加上分组的
+/// `groups[].fields`。
+pub(crate) fn fields_of(definition: &Value) -> Vec<&Value> {
+    let direct = definition["fields"]
+        .as_array()
+        .into_iter()
+        .flatten()
+        .chain(definition["advanced"].as_array().into_iter().flatten());
     let grouped = definition["groups"]
         .as_array()
         .into_iter()

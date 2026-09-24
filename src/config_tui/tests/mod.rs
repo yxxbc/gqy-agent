@@ -5,4 +5,5 @@ mod fields;
 mod plugins;
 mod pools;
 mod qq;
+mod settings_groups;
 mod shared;

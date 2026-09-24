@@ -1067,7 +1067,7 @@ fn arrow_keys_pick_slash_commands_instead_of_history() {
     assert_eq!(editor.input, "/", "↓ 不该翻历史");
     let view = editor.picker.view(&editor.input).unwrap();
     assert_eq!(view.selected, 1);
-    let picked = view.names[1];
+    let picked = view.items[1].text.clone();
     match editor
         .handle_event(key(KeyCode::Enter), &paths, false)
         .unwrap()

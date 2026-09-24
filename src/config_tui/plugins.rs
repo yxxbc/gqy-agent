@@ -1007,6 +1007,27 @@ fn plugin_fields(config: &AppConfig, plugin: TuiPlugin) -> BoundFields {
                 },
             )
             .with(
+                Field::new(
+                    t("Per-entry association limit (chars)", "单条联想正文上限"),
+                    memory.association_entry_chars.to_string(),
+                ),
+                |config, value| {
+                    config.plugins.memory.association_entry_chars =
+                        value.trim().parse::<usize>()?;
+                    Ok(())
+                },
+            )
+            .with(
+                Field::new(
+                    t("Memory snippet length (chars)", "记忆片段字数"),
+                    memory.snippet_chars.to_string(),
+                ),
+                |config, value| {
+                    config.plugins.memory.snippet_chars = value.trim().parse::<usize>()?;
+                    Ok(())
+                },
+            )
+            .with(
                 Field::boolean(
                     t("Enable forgetting", "遗忘启用"),
                     memory.forgetting_enabled,
@@ -1054,6 +1075,44 @@ fn plugin_fields(config: &AppConfig, plugin: TuiPlugin) -> BoundFields {
                 ),
                 |config, value| {
                     config.plugins.memory.association_dedup = parse_bool_field(value)?;
+                    Ok(())
+                },
+            )
+            .with(
+                Field::new(
+                    t("Forget after (days)", "遗忘期限(天)"),
+                    memory.forget_after_days.to_string(),
+                ),
+                |config, value| {
+                    config.plugins.memory.forget_after_days = value.trim().parse::<u64>()?;
+                    Ok(())
+                },
+            )
+            .with(
+                Field::new(
+                    t(
+                        "Minimum task length for learning (chars)",
+                        "学习任务最短字数",
+                    ),
+                    memory.learning_min_task_chars.to_string(),
+                ),
+                |config, value| {
+                    config.plugins.memory.learning_min_task_chars =
+                        value.trim().parse::<usize>()?;
+                    Ok(())
+                },
+            )
+            .with(
+                Field::new(
+                    t(
+                        "Minimum method length for learning (chars)",
+                        "学习方法最短字数",
+                    ),
+                    memory.learning_min_method_chars.to_string(),
+                ),
+                |config, value| {
+                    config.plugins.memory.learning_min_method_chars =
+                        value.trim().parse::<usize>()?;
                     Ok(())
                 },
             )

@@ -88,6 +88,27 @@ pub(in crate::cli) fn repl_help_text() -> String {
     out
 }
 
+/// `/config [分组]`：不带参数打开完整设置菜单，带分组直达那一组。分组不认识
+/// 就不进设置界面，返回给用户看的提示。
+pub(in crate::cli) fn open_config_ui(paths: &GqyPaths, args: &str) -> Result<Option<String>> {
+    let args = args.trim();
+    if args.is_empty() {
+        crate::config_tui::run(paths)?;
+        return Ok(None);
+    }
+    let choices = crate::config_tui::settings_group_choices();
+    if !choices.iter().any(|(id, _)| id.eq_ignore_ascii_case(args)) {
+        let ids: Vec<&str> = choices.iter().map(|(id, _)| *id).collect();
+        return Ok(Some(format!(
+            "{}: {args} ({})",
+            t("unknown settings group", "没有这个设置分组"),
+            ids.join(" | ")
+        )));
+    }
+    crate::config_tui::run_settings_group(paths, args)?;
+    Ok(None)
+}
+
 pub(in crate::cli) fn print_repl_help() {
     print!("{}", repl_help_text());
 }
@@ -101,21 +122,17 @@ pub(in crate::cli) fn command_hint_lines(view: &PickerView, cols: usize) -> Vec<
     use crate::render::style::{ACCENT, RESET};
     let width = cols.saturating_sub(10).max(20);
     let name_col = view
-        .names
+        .items
         .iter()
-        .map(|name| name.len())
+        .map(|item| item.text.len())
         .max()
         .unwrap_or(0)
-        .min(20);
-    let (start, end) = picker_window(view.names.len(), view.selected);
+        .min(24);
+    let (start, end) = picker_window(view.items.len(), view.selected);
     (start..end)
         .map(|index| {
-            let name = view.names[index];
-            let help = REPL_COMMAND_TABLE
-                .iter()
-                .find(|spec| spec.name == name)
-                .map(|spec| t(spec.help_en, spec.help_zh))
-                .unwrap_or("");
+            let name = view.items[index].text.as_str();
+            let help = view.items[index].help;
             let pad = " ".repeat(name_col.saturating_sub(name.len()));
             let line = if index == view.selected {
                 format!("\x1b[1m{ACCENT}▸ {name}{RESET}{pad}  \x1b[2m{help}\x1b[0m")
