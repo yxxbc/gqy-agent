@@ -28,12 +28,19 @@ fn usage_and_persona_are_repl_commands() {
 #[test]
 fn command_suggestions_are_prefixed_and_truncated() {
     let suggestions = repl_command_suggestions("/");
-    let line = repl_command_suggestions_line(&suggestions, 24);
+    let line = repl_command_suggestions_line(&suggestions, None, 24);
     assert!(line.starts_with("/new"));
     assert!(visible_width(&line) <= 24);
 
-    let line = repl_command_suggestions_line(&["/compact"], 40);
+    let line = repl_command_suggestions_line(&["/compact"], None, 40);
     assert_eq!(line, "/compact");
+
+    // 选中项在行宽之外：前面的丢掉，保证它看得见。
+    let last = suggestions.len() - 1;
+    let line = repl_command_suggestions_line(&suggestions, Some(last), 24);
+    let plain = strip_terminal_control_sequences(&line);
+    assert!(plain.contains(suggestions[last]), "{plain}");
+    assert!(visible_width(&line) <= 24);
 }
 
 #[test]

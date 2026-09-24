@@ -136,6 +136,7 @@ impl LiveReplTail {
             &self.editor.input,
             self.editor.raw_pasted_lines,
             false,
+            self.editor.picker.view(&self.editor.input).is_some(),
             usize::from(cols),
         );
         let mut queue_lines =
@@ -194,10 +195,9 @@ impl LiveReplTail {
         // 原来是 `paint` 之后才算的，于是它永远慢一帧：打一个 `/` 什么都不出，
         // 再补个空格（多一次按键 = 多一帧）才蹦出来——用户实测报的「我要打
         // `/` 空格才会出现」就是这个。
-        let hint_lines = if self.screen.is_some() {
-            command_hint_lines(&self.editor.input, usize::from(cols))
-        } else {
-            Vec::new()
+        let hint_lines = match (&self.screen, self.editor.picker.view(&self.editor.input)) {
+            (Some(_), Some(view)) => command_hint_lines(&view, usize::from(cols)),
+            _ => Vec::new(),
         };
         // 大厅里输入框的窄框:(左边距, 宽度)。None = 全宽贴左。
         let mut layout_box: Option<(u16, usize)> = None;
@@ -209,11 +209,7 @@ impl LiveReplTail {
             // 否则 paint 会以为外部输出还占着屏、直接跳过不画。
             screen.resume(!own);
             screen.resize(cols, terminal_rows);
-            screen.set_command_hint(if screen.command_hint_dismissed() {
-                Vec::new()
-            } else {
-                hint_lines
-            });
+            screen.set_command_hint(hint_lines);
             // `total_rows + 1`：活动区底下留一行空，和 inline 的观感一致。
             // 不留的话 footer 直接贴在屏幕最后一行上，挤得没有呼吸。
             // 空会话大厅:整屏交给 banner 画(星空 + 渐变字),输入框嵌在字下面的
@@ -340,6 +336,7 @@ impl LiveReplTail {
             self.editor.raw_pasted_lines,
             &self.footer,
             false,
+            self.editor.picker.view(&self.editor.input).as_ref(),
             layout_box,
         )?;
         self.footer_offset = footer_row.map(|abs| abs.saturating_sub(tail_start));
@@ -553,13 +550,6 @@ impl LiveReplTail {
             let _ = self.resume_at_own(cursor);
         }
         taken
-    }
-
-    /// 又打字了：候选面板可以重新弹出来。
-    pub(in crate::cli) fn allow_command_hint(&mut self) {
-        if let Some(screen) = &mut self.screen {
-            screen.allow_command_hint();
-        }
     }
 
     /// 面板开着时跟着内容刷新。后台任务的日志自己在长，没人碰键盘也得动。

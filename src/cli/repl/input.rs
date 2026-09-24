@@ -198,11 +198,6 @@ pub(in crate::cli) fn read_live_repl_input(
             if live.handle_screen_event(&event)? {
                 continue;
             }
-            // 又打字了：候选面板可以重新弹出来（Esc 只关「当时那一串」）。
-            if matches!(&event, Event::Key(KeyEvent { kind, .. }) if *kind != KeyEventKind::Release)
-            {
-                live.allow_command_hint();
-            }
             match live.editor.handle_event(event, paths, false)? {
                 LiveEditorAction::None => {}
                 LiveEditorAction::Redraw => {
@@ -317,6 +312,8 @@ pub(in crate::cli) fn read_repl_input(
     let mut raw_pasted_lines = 0usize;
     let mut pasted_images: Vec<Option<crate::clipboard::PastedImage>> = Vec::new();
     let mut pasted_texts: Vec<Option<PastedText>> = Vec::new();
+    // 渲染闭包只读它、按键循环要改它：放 RefCell 里，两边各借各的。
+    let picker = std::cell::RefCell::new(CommandPicker::default());
     // 1. 局部退出时统一恢复终端协议
     // 2. 避免多处 return 漏 Pop 键盘增强
     let restore_terminal = |stdout: &mut io::Stdout,
@@ -345,6 +342,7 @@ pub(in crate::cli) fn read_repl_input(
             raw_pasted_lines,
             footer,
             show_shortcut_hint,
+            picker.borrow().view(input).as_ref(),
             None,
         )
     };
@@ -364,6 +362,43 @@ pub(in crate::cli) fn read_repl_input(
                     insert_pasted_text_at_cursor(&mut input, &mut cursor, text, &mut pasted_texts);
                 history_clean_index = None;
                 raw_pasted_lines = raw_pasted_lines.saturating_add(raw_lines);
+                render_repl_input(
+                    &mut stdout,
+                    &mut input_row,
+                    &mut rendered_rows,
+                    mode,
+                    &input,
+                    cursor,
+                    raw_pasted_lines,
+                )?;
+            }
+            Event::Key(KeyEvent {
+                code, modifiers, ..
+            }) if picker_key(code, modifiers).is_some()
+                && picker.borrow().view(&input).is_some() =>
+            {
+                let outcome = picker_key(code, modifiers)
+                    .and_then(|key| picker.borrow_mut().handle(&input, key));
+                match outcome {
+                    Some(PickerOutcome::Fill(text)) => {
+                        input = text;
+                        cursor = input.chars().count();
+                        history_clean_index = None;
+                        raw_pasted_lines = 0;
+                    }
+                    Some(PickerOutcome::Submit(text)) => {
+                        replace_repl_input_with_user_echo(
+                            &mut stdout,
+                            input_row,
+                            rendered_rows,
+                            mode,
+                            &text,
+                        )?;
+                        restore_terminal(&mut stdout, &mut keyboard_enhancement)?;
+                        return Ok(Some((mode, text, pasted_images)));
+                    }
+                    _ => {}
+                }
                 render_repl_input(
                     &mut stdout,
                     &mut input_row,
@@ -825,11 +860,13 @@ pub(in crate::cli) fn render_repl_input_with_footer(
     raw_pasted_lines: usize,
     footer: &ReplFooterStatus,
     show_shortcut_hint: bool,
+    // 斜杠命令候选（开着才有）。全屏下它画在输入框上方的浮层里，这里只管
+    // inline 的那一行。
+    picker: Option<&PickerView>,
     // 全屏空会话的大厅:输入框不在屏底、也不全宽,而是嵌在 banner 下面的一个
     // 窄框里——(左边距, 宽度)。None = 老样子,从第 0 列画到终端右边。
     layout: Option<(u16, usize)>,
 ) -> Result<Option<u16>> {
-    let suggestions = repl_command_suggestions(input);
     let lines = repl_input_lines(input);
     // 输入框是圆角框（09-23 用户选定，`docs/plan/2026-09-23-tui-input-box.md`）：
     // 「上框线 / N 行输入 / 下框线 / 底栏」，行数和原来「空竖条 / N 行 / 空竖条 /
@@ -863,7 +900,7 @@ pub(in crate::cli) fn render_repl_input_with_footer(
         }
     }
     let input_rows = display_rows.len().max(1).min(u16::MAX as usize) as u16;
-    let show_hint = show_shortcut_hint && suggestions.is_empty();
+    let show_hint = show_shortcut_hint && picker.is_none();
     let current_rows = input_rows.saturating_add(if show_hint { 4 } else { 3 });
     let rows_to_clear = (*rendered_rows).max(current_rows).max(1);
     ensure_repl_space(stdout, input_row, rows_to_clear)?;
@@ -901,7 +938,7 @@ pub(in crate::cli) fn render_repl_input_with_footer(
     row_offset = row_offset.saturating_add(1);
     // 全屏下候选走输入框上方的浮层（`command_hint_lines`），footer 留着——
     // 挤掉 footer 的话打命令时连模型名和用量都看不见了。
-    if !suggestions.is_empty() && !crate::cli::in_fullscreen() {
+    if let Some(view) = picker.filter(|_| !crate::cli::in_fullscreen()) {
         // 候选在框下面，和底栏一样缩进两格。
         let suggestion_width = cols.saturating_sub(2).max(1);
         queue!(
@@ -909,8 +946,8 @@ pub(in crate::cli) fn render_repl_input_with_footer(
             MoveTo(x0, (*input_row).saturating_add(row_offset)),
             Print("  "),
             Print(format!(
-                "\x1b[2m{}\x1b[0m",
-                repl_command_suggestions_line(&suggestions, suggestion_width)
+                "{}",
+                repl_command_suggestions_line(&view.names, Some(view.selected), suggestion_width)
             ))
         )?;
         footer_row = None;

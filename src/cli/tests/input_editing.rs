@@ -1047,3 +1047,59 @@ fn pdf_placeholders_are_found_despite_shorter_prefix() {
     assert_eq!(idx(1), 2);
     assert_eq!(idx(2), 3);
 }
+
+/// 斜杠候选开着时 ↑↓ 在候选里移动而不是翻历史，Enter 执行选中的那条，
+/// Esc 关掉候选、再打字才重新弹出。
+#[test]
+fn arrow_keys_pick_slash_commands_instead_of_history() {
+    let temp = tempfile::tempdir().unwrap();
+    let paths = pop_test_paths(temp.path());
+    let key = |code| Event::Key(KeyEvent::new(code, KeyModifiers::NONE));
+    let history = vec![ReplHistoryEntry::plain("earlier message")];
+    let mut editor = LiveReplEditor::new(AgentMode::Normal, history);
+
+    editor
+        .handle_event(key(KeyCode::Char('/')), &paths, false)
+        .unwrap();
+    editor
+        .handle_event(key(KeyCode::Down), &paths, false)
+        .unwrap();
+    assert_eq!(editor.input, "/", "↓ 不该翻历史");
+    let view = editor.picker.view(&editor.input).unwrap();
+    assert_eq!(view.selected, 1);
+    let picked = view.names[1];
+    match editor
+        .handle_event(key(KeyCode::Enter), &paths, false)
+        .unwrap()
+    {
+        LiveEditorAction::Submit(submission) => assert_eq!(submission.content, picked),
+        _ => assert_eq!(
+            editor.input,
+            format!("{picked} "),
+            "必填参数的命令应当只填入"
+        ),
+    }
+
+    let mut editor = LiveReplEditor::new(
+        AgentMode::Normal,
+        vec![ReplHistoryEntry::plain("earlier message")],
+    );
+    editor
+        .handle_event(key(KeyCode::Char('/')), &paths, false)
+        .unwrap();
+    editor
+        .handle_event(key(KeyCode::Esc), &paths, false)
+        .unwrap();
+    assert!(editor.picker.view(&editor.input).is_none());
+    // 关掉之后 ↑ 回到原来的语义（输入框里有字就是挪光标），候选也不自己弹回来。
+    editor
+        .handle_event(key(KeyCode::Up), &paths, false)
+        .unwrap();
+    assert_eq!(editor.input, "/");
+    assert!(editor.picker.view(&editor.input).is_none());
+    // 再打一个字，候选回来。
+    editor
+        .handle_event(key(KeyCode::Char('c')), &paths, false)
+        .unwrap();
+    assert!(editor.picker.view(&editor.input).is_some());
+}

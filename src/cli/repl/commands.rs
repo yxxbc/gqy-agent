@@ -66,7 +66,10 @@ pub(in crate::cli) fn repl_help_text() -> String {
     let _ = writeln!(
         out,
         "  Up/Down     {}",
-        t("browse input history", "切换输入历史")
+        t(
+            "browse input history, or move through slash-command candidates",
+            "切换输入历史，或在斜杠命令候选里移动"
+        )
     );
     let _ = writeln!(
         out,
@@ -89,47 +92,75 @@ pub(in crate::cli) fn print_repl_help() {
     print!("{}", repl_help_text());
 }
 
-/// 斜杠命令候选面板的内容：每条一行「命令 + 它是干什么的」。
+/// 斜杠命令候选面板的内容：每条一行「命令 + 它是干什么的」，选中的那条
+/// 行首 `▸` 并上主色。
 ///
 /// inline 那边只能在 footer 位置塞一行挤在一起的命令名——全屏有地方，就把
-/// 说明也给上，省得记不住哪个是哪个。最多四条，再多就该 Tab 补全了。
-pub(in crate::cli) fn command_hint_lines(input: &str, cols: usize) -> Vec<String> {
-    let input = input.trim_start();
-    let suggestions = crate::slash_commands::repl_command_suggestions(input);
-    // 只剩一条且已经打全了就别挡着了。
-    if suggestions.is_empty() || (suggestions.len() == 1 && suggestions[0] == input) {
-        return Vec::new();
-    }
+/// 说明也给上，省得记不住哪个是哪个。最多四条，选中项往下走窗口跟着滚。
+pub(in crate::cli) fn command_hint_lines(view: &PickerView, cols: usize) -> Vec<String> {
+    use crate::render::style::{ACCENT, RESET};
     let width = cols.saturating_sub(10).max(20);
-    let name_col = suggestions
+    let name_col = view
+        .names
         .iter()
         .map(|name| name.len())
         .max()
         .unwrap_or(0)
         .min(20);
-    suggestions
-        .iter()
-        .take(4)
-        .map(|name| {
+    let (start, end) = picker_window(view.names.len(), view.selected);
+    (start..end)
+        .map(|index| {
+            let name = view.names[index];
             let help = REPL_COMMAND_TABLE
                 .iter()
-                .find(|spec| spec.name == *name)
+                .find(|spec| spec.name == name)
                 .map(|spec| t(spec.help_en, spec.help_zh))
                 .unwrap_or("");
             let pad = " ".repeat(name_col.saturating_sub(name.len()));
-            truncate_visible_width(&format!("{name}{pad}  \x1b[2m{help}\x1b[0m"), width)
+            let line = if index == view.selected {
+                format!("\x1b[1m{ACCENT}▸ {name}{RESET}{pad}  \x1b[2m{help}\x1b[0m")
+            } else {
+                format!("  {name}{pad}  \x1b[2m{help}\x1b[0m")
+            };
+            truncate_visible_width(&line, width)
         })
         .collect()
 }
 
+/// inline 的候选行：命令名挤成一行，选中的那条上主色、其余暗显。选中项在
+/// 行宽之外时，从前面丢掉几条，保证它看得见。
 pub(in crate::cli) fn repl_command_suggestions_line(
     suggestions: &[&str],
+    selected: Option<usize>,
     max_width: usize,
 ) -> String {
-    let line = if suggestions.len() == 1 {
-        suggestions[0].to_string()
-    } else {
-        suggestions.join("  ")
-    };
+    use crate::render::style::{ACCENT, RESET};
+    let mut start = 0;
+    if let Some(selected) = selected {
+        while start < selected {
+            let through: usize = suggestions[start..=selected]
+                .iter()
+                .map(|name| name.len() + 2)
+                .sum();
+            if through <= max_width + 2 {
+                break;
+            }
+            start += 1;
+        }
+    }
+    let line = suggestions[start..]
+        .iter()
+        .enumerate()
+        .map(|(offset, name)| {
+            if Some(start + offset) == selected {
+                format!("\x1b[1m{ACCENT}{name}{RESET}")
+            } else if selected.is_some() {
+                format!("\x1b[2m{name}\x1b[0m")
+            } else {
+                name.to_string()
+            }
+        })
+        .collect::<Vec<_>>()
+        .join("  ");
     truncate_visible_width(&line, max_width)
 }

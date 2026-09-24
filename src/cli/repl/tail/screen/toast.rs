@@ -140,30 +140,6 @@ impl Screen {
         true
     }
 
-    pub(in crate::cli) fn command_hint_open(&self) -> bool {
-        !self.command_hint.is_empty()
-    }
-
-    /// Esc：先关掉候选面板。关了就返回真。
-    pub(in crate::cli) fn dismiss_command_hint(&mut self) -> bool {
-        if self.command_hint.is_empty() {
-            return false;
-        }
-        self.command_hint.clear();
-        self.hint_dismissed = true;
-        self.invalidate();
-        true
-    }
-
-    /// 输入变了就重新允许弹面板——关掉只针对当时那一串。
-    pub(in crate::cli) fn allow_command_hint(&mut self) {
-        self.hint_dismissed = false;
-    }
-
-    pub(in crate::cli) fn command_hint_dismissed(&self) -> bool {
-        self.hint_dismissed
-    }
-
     /// 画候选面板。浮在输入框上方——和通知条（右上角）各占各的地方，不打架。
     pub(in crate::cli) fn paint_command_hint(
         &mut self,

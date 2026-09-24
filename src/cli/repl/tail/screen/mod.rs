@@ -164,8 +164,6 @@ pub(in crate::cli) struct Screen {
     row_keys: Vec<Option<(usize, u64, u64)>>,
     /// 斜杠命令候选（浮在输入框上方）。空 = 不显示。
     command_hint: Vec<String>,
-    /// 这一串输入的候选面板被 Esc 关过了，别再自己弹回来。
-    hint_dismissed: bool,
     /// 下一帧强制全量重画。
     ///
     /// 不能靠「清空 `painted`」来表达这件事：空行画出来就是空串，和清空后
@@ -234,7 +232,6 @@ impl Screen {
             floor: 0,
             row_keys: Vec::new(),
             command_hint: Vec::new(),
-            hint_dismissed: false,
             force: true,
             banner: None,
             float_anchor: None,
@@ -311,7 +308,6 @@ impl Screen {
             floor: 0,
             row_keys: Vec::new(),
             command_hint: Vec::new(),
-            hint_dismissed: false,
             force: true,
             banner: None,
             float_anchor: None,
@@ -1220,11 +1216,7 @@ impl super::LiveReplTail {
                     self.repaint_screen()?;
                     return Ok(true);
                 }
-                if self
-                    .screen
-                    .as_mut()
-                    .is_some_and(super::screen::Screen::dismiss_command_hint)
-                {
+                if self.editor.picker.dismiss(&self.editor.input) {
                     self.repaint_screen()?;
                     return Ok(true);
                 }

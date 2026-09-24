@@ -96,6 +96,8 @@ pub(in crate::cli) struct LiveReplEditor {
     /// leaves this pinned, and notifications stay quiet rather than firing on
     /// every turn.
     pub(in crate::cli) focused: bool,
+    /// 斜杠命令候选的选中项与「已关掉」。
+    pub(in crate::cli) picker: CommandPicker,
 }
 
 pub(in crate::cli) enum LiveEditorAction {
@@ -126,6 +128,7 @@ impl LiveReplEditor {
             pasted_texts: Vec::new(),
             escape_armed_until: None,
             focused: true,
+            picker: CommandPicker::default(),
         }
     }
 
@@ -221,6 +224,11 @@ impl LiveReplEditor {
                 self.history_clean_index = None;
                 self.raw_pasted_lines = self.raw_pasted_lines.saturating_add(raw_lines);
                 return Ok(LiveEditorAction::Redraw);
+            }
+            Event::Key(KeyEvent {
+                code, modifiers, ..
+            }) if self.picker_takes(code, modifiers) => {
+                return Ok(self.apply_picker(code));
             }
             Event::Key(KeyEvent {
                 code, modifiers, ..
@@ -426,6 +434,38 @@ impl LiveReplEditor {
         Ok(LiveEditorAction::Redraw)
     }
 
+    /// 候选开着时，↑↓ / Tab / Enter / Esc 归候选（带修饰键的不算）。
+    fn picker_takes(&self, code: KeyCode, modifiers: KeyModifiers) -> bool {
+        picker_key(code, modifiers).is_some() && self.picker.view(&self.input).is_some()
+    }
+
+    fn apply_picker(&mut self, code: KeyCode) -> LiveEditorAction {
+        let Some(key) = picker_key(code, KeyModifiers::NONE) else {
+            return LiveEditorAction::None;
+        };
+        match self.picker.handle(&self.input, key) {
+            None => LiveEditorAction::None,
+            Some(PickerOutcome::Moved | PickerOutcome::Dismissed) => LiveEditorAction::Redraw,
+            Some(PickerOutcome::Fill(text)) => {
+                self.set_input(text);
+                LiveEditorAction::Redraw
+            }
+            Some(PickerOutcome::Submit(text)) => {
+                self.set_input(text);
+                self.submit()
+                    .map(LiveEditorAction::Submit)
+                    .unwrap_or(LiveEditorAction::EmptySubmit)
+            }
+        }
+    }
+
+    fn set_input(&mut self, text: String) {
+        self.input = text;
+        self.cursor = self.input.chars().count();
+        self.history_clean_index = None;
+        self.raw_pasted_lines = 0;
+    }
+
     pub(in crate::cli) fn paste_clipboard(&mut self, paths: &GqyPaths) -> Result<()> {
         match crate::clipboard::read_clipboard() {
             Ok(crate::clipboard::ClipboardContent::Image(image)) => {
@@ -471,13 +511,29 @@ impl LiveReplEditor {
     }
 }
 
+/// 候选能接的键。带 Shift/Ctrl/Alt 的一律不接（Shift+Enter 是换行，
+/// Ctrl+↑↓ 是回翻）。
+pub(in crate::cli) fn picker_key(code: KeyCode, modifiers: KeyModifiers) -> Option<PickerKey> {
+    if !modifiers.is_empty() {
+        return None;
+    }
+    match code {
+        KeyCode::Up => Some(PickerKey::Up),
+        KeyCode::Down => Some(PickerKey::Down),
+        KeyCode::Tab => Some(PickerKey::Tab),
+        KeyCode::Enter => Some(PickerKey::Enter),
+        KeyCode::Esc => Some(PickerKey::Esc),
+        _ => None,
+    }
+}
+
 pub(in crate::cli) fn repl_input_rendered_rows(
     input: &str,
     raw_pasted_lines: usize,
     show_shortcut_hint: bool,
+    picker_open: bool,
     cols: usize,
 ) -> u16 {
-    let suggestions = repl_command_suggestions(input);
     let lines = repl_input_lines(input);
     let display_lines =
         repl_visible_input_lines("  ", &lines, REPL_MAX_VISIBLE_INPUT_ROWS, raw_pasted_lines);
@@ -485,7 +541,7 @@ pub(in crate::cli) fn repl_input_rendered_rows(
         .len()
         .max(1)
         .min(u16::MAX as usize) as u16;
-    input_rows.saturating_add(if show_shortcut_hint && suggestions.is_empty() {
+    input_rows.saturating_add(if show_shortcut_hint && !picker_open {
         4
     } else {
         3
