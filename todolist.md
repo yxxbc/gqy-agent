@@ -6,6 +6,8 @@ TUI 这一批（09-23 定，方案都在 `docs/plan/`）：
 - 待验收（09-24 已推送，本机已装无语音版）：打开方式 `-c`（`49e55909`）、圆角输入框（`d00ba353`）、开屏欢迎框与吉祥物（`a4826644`）、方向键选斜杠命令（`d157349d`）、`/config` 分组补全与直达（`e15dc60d`）。验收通过后 7–10 项写进 CHANGELOG `[Unreleased]`
 - `gqy --banner` 的说明文字过时：`src/cli/args.rs` 的参数注释（即 `gqy --help`）和 `src/cli/repl/banner/preview.rs` 开头注释还写着「星空 + 渐变 GQY」，现在画的是欢迎框 + 吉祥物。随验收后的 CHANGELOG 一起改
 
+- `/goal` 显示闪烁：新对话（空会话）里用 `/goal`，TUI 底部一直闪（09-24 用户手测报告，待复现定位，疑似空会话大厅 / 欢迎框与 goal 状态行的重画打架）
+
 - 聊后复盘开机补跑：复盘定时只在 daemon 内存里，15 分钟内关机或重启 daemon 就丢了，开机后不补，除非回到同一会话再说话。改法：daemon 启动时扫最近几天「最后一轮已过等待时长且没复盘过」的属主会话补排复盘（见 `docs/design/2026-09-19-daily-chat-reflection.md`）
 - 纠正记忆写入时处理冲突：现在纠正是直接插入，旧的错误说法原样保留、可能和纠正一起被召回，只能等整理器碰巧改写。改法：存纠正时用记忆去重的语义相似度找高度相似的旧记录，把真值标成「已否定」（召回和整理器都会跳过），门槛设高避免误伤
 - dev模式下，如果是claude、agy、codex，默认使用其原生工具，只使用gqy的anysearch工具，同时webui下显示其工作区项目，会话记录。webui输入框能显示选择客户端。供应商中的claude、codex、agy只能在人格模式下调用。参考：`https://github.com/makecindy/cindy/tree/main/packages/maker-core/src/agents`
