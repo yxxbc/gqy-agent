@@ -1,3 +1,8 @@
+/*
+ * 覆盖层：本文件的规则靠「排在后面」压过前面文件里同优先级的规则生效
+ * （test_scripts/css_move_check.mjs 逐条验证过，不能前移归并）。新规则可以加在这里，
+ * 但别把这里的规则挪到更靠前的文件，也别改文件名让它排到前面去。
+ */
 /* ── 批量选择(09-04):表情包选择模式、记忆/知识库勾选列、批量操作条 ── */
 .dash-bulk-bar { display: flex; align-items: center; flex-wrap: wrap; gap: 8px 10px; margin: 0 0 12px; padding: 8px 12px; border-radius: var(--radius); background: color-mix(in srgb, var(--accent) 14%, var(--surface-1)); box-shadow: var(--card-shadow); animation: dash-fade-up var(--motion-slow) ease-out both; }
 .dash-bulk-bar strong { flex: none; font-size: var(--fs-ui); }
