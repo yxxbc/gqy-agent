@@ -112,7 +112,7 @@ import urllib.request
 # Reddit 归档镜像,是这里唯一的数据源。
 ARCTIC_BASE = "https://arctic-shift.photon-reddit.com"
 
-USER_AGENT = "gqy-reddit-search/1.0 (https://github.com/SHORiN-KiWATA/Miyu)"
+USER_AGENT = "gqy-reddit-search/1.0 (https://github.com/yxxbc/gqy-agent)"
 HTTP_TIMEOUT = 25
 
 # 归档是「发帖那一刻」抓的,投票和评论数要约 36 小时后才回填。这段时间内

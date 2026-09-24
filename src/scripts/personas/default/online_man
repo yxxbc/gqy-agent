@@ -83,7 +83,7 @@ from html.parser import HTMLParser
 
 ARCH_BASE = "https://man.archlinux.org"
 MAN7_BASE = "https://man7.org/linux/man-pages"
-UA = "gqy-online-man/0.1 (+https://github.com/shorinkiwata/Miyu)"
+UA = "gqy-online-man/0.1 (+https://github.com/yxxbc/gqy-agent)"
 TIMEOUT = 15
 MAX_HTML_RESPONSE_BYTES = 5 * 1024 * 1024
 TEXT_WIDTH = 120

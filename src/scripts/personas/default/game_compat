@@ -85,7 +85,7 @@ MAX_AWACY_BYTES = 4 * 1024 * 1024
 DEFAULT_REPORTS = 8
 MAX_REPORTS = 40
 NOTE_CAP = 300
-UA = "gqy-game-compat/0.1 (+https://github.com/shorinkiwata/Miyu)"
+UA = "gqy-game-compat/0.1 (+https://github.com/yxxbc/gqy-agent)"
 
 MONTHS = ["jan", "feb", "mar", "apr", "may", "jun", "jul", "aug", "sep", "oct", "nov", "dec"]
 

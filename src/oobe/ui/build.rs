@@ -235,7 +235,7 @@ pub(super) fn build(app: &App, cx: &Cx) -> View {
             let base = body.len();
             let (lines, caret_row, caret_col) = cx.field(
                 &app.identity,
-                "比如：我叫 shorin，是你的 Master。可留空。",
+                "比如：叫我阿满，喜欢直接的建议，不要客套。可留空。",
                 app.focus == 0,
                 app.editing,
                 false,
