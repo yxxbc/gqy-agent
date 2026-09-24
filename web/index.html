@@ -10,6 +10,8 @@
   <link rel="stylesheet" href="/vendor/katex/katex.min.css">
   <!-- matugen 生成的 MD3 token 覆盖;app.js 依据「配色方案」切换 link.disabled -->
   <link rel="stylesheet" href="/theme.css" id="matugenThemeLink">
+  <!-- 公共层出口：旧脚本（window.GqyXxx）用的图标、请求、提示条。必须排在它们前面。 -->
+  <script type="module" src="/core/expose.js"></script>
   <script defer src="/vendor/katex/katex.min.js"></script>
   <!-- 语法高亮:data-manual 必须留着,否则 Prism 会自己扫全页并用 innerHTML 重写
        每个 code[class*=language-];我们只借它的分词器,DOM 由 highlight.js 亲手搭。 -->

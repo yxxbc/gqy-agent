@@ -9,39 +9,8 @@
  * 子集(同 shared.js 的做法)。
  */
 window.GqyDash = (() => {
-  const ICONS = {
-    "refresh-cw": [["path", { d: "M3 12a9 9 0 0 1 9-9 9.75 9.75 0 0 1 6.74 2.74L21 8" }], ["path", { d: "M21 3v5h-5" }], ["path", { d: "M21 12a9 9 0 0 1-9 9 9.75 9.75 0 0 1-6.74-2.74L3 16" }], ["path", { d: "M8 16H3v5" }]],
-    "trash-2": [["path", { d: "M3 6h18" }], ["path", { d: "M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6" }], ["path", { d: "M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2" }], ["line", { x1: "10", x2: "10", y1: "11", y2: "17" }], ["line", { x1: "14", x2: "14", y1: "11", y2: "17" }]],
-    search: [["circle", { cx: "11", cy: "11", r: "8" }], ["path", { d: "m21 21-4.3-4.3" }]],
-    x: [["path", { d: "M18 6 6 18" }], ["path", { d: "m6 6 12 12" }]],
-    "chevron-left": [["path", { d: "m15 18-6-6 6-6" }]],
-    "chevron-right": [["path", { d: "m9 18 6-6-6-6" }]],
-    // 展开态的箭头一直缺着:目录树折叠时画 chevron-right、展开时要 chevron-down,
-    // 表里没有就静默画出一个空 <svg>,于是展开之后箭头凭空消失(09-09 用户反馈)。
-    "chevron-down": [["path", { d: "m6 9 6 6 6-6" }]],
-    // 下面这批同样是「用到了但表里没有」——`icon()` 对不认识的名字静默返回一个
-    // 空 <svg>,按钮上于是什么都不画。09-09 顺着 chevron-down 一并补齐,并加了
-    // 一条测试遍历各面板实际用到的名字,以后漏一个会当场报红。
-    "search": [["circle", { cx: "11", cy: "11", r: "8" }], ["path", { d: "m21 21-4.3-4.3" }]],
-    "x": [["path", { d: "M18 6 6 18" }], ["path", { d: "m6 6 12 12" }]],
-    "check": [["path", { d: "M20 6 9 17l-5-5" }]],
-    "plus": [["path", { d: "M5 12h14" }], ["path", { d: "M12 5v14" }]],
-    "star": [["path", { d: "m12 2 3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01z" }]],
-    "pencil": [["path", { d: "M12 20h9" }], ["path", { d: "M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4z" }]],
-    "eraser": [["path", { d: "m7 21-4.3-4.3a2 2 0 0 1 0-2.8l9.6-9.6a2 2 0 0 1 2.8 0l5.6 5.6a2 2 0 0 1 0 2.8L13 21" }], ["path", { d: "M22 21H7" }], ["path", { d: "m5 11 9 9" }]],
-    "archive": [["rect", { x: "2", y: "3", width: "20", height: "5", rx: "1" }], ["path", { d: "M4 8v11a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8" }], ["path", { d: "M10 12h4" }]],
-    "sparkles": [["path", { d: "M9.937 15.5A2 2 0 0 0 8.5 14.063l-6.135-1.582a.5.5 0 0 1 0-.962L8.5 9.936A2 2 0 0 0 9.937 8.5l1.582-6.135a.5.5 0 0 1 .963 0L14.063 8.5A2 2 0 0 0 15.5 9.937l6.135 1.581a.5.5 0 0 1 0 .964L15.5 14.063a2 2 0 0 0-1.437 1.437l-1.582 6.135a.5.5 0 0 1-.963 0z" }], ["path", { d: "M20 3v4" }], ["path", { d: "M22 5h-4" }]],
-    brain: [["path", { d: "M12 5a3 3 0 1 0-5.997.125 4 4 0 0 0-2.526 5.77 4 4 0 0 0 .556 6.588A4 4 0 1 0 12 18Z" }], ["path", { d: "M12 5a3 3 0 1 1 5.997.125 4 4 0 0 1 2.526 5.77 4 4 0 0 1-.556 6.588A4 4 0 1 1 12 18Z" }], ["path", { d: "M15 13a4.5 4.5 0 0 1-3-4 4.5 4.5 0 0 1-3 4" }]],
-    plus: [["path", { d: "M5 12h14" }], ["path", { d: "M12 5v14" }]],
-    pencil: [["path", { d: "M21.174 6.812a1 1 0 0 0-3.986-3.987L3.842 16.174a2 2 0 0 0-.5.83l-1.321 4.352a.5.5 0 0 0 .623.622l4.353-1.32a2 2 0 0 0 .83-.497z" }], ["path", { d: "m15 5 4 4" }]],
-    history: [["path", { d: "M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8" }], ["path", { d: "M3 3v5h5" }], ["path", { d: "M12 7v5l4 2" }]],
-    archive: [["rect", { width: "20", height: "5", x: "2", y: "3", rx: "1" }], ["path", { d: "M4 8v11a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8" }], ["path", { d: "M10 12h4" }]],
-    eraser: [["path", { d: "m7 21-4.3-4.3c-1-1-1-2.5 0-3.4l9.6-9.6c1-1 2.5-1 3.4 0l5.6 5.6c1 1 1 2.5 0 3.4L13 21" }], ["path", { d: "M22 21H7" }], ["path", { d: "m5 11 9 9" }]],
-    "rotate-ccw": [["path", { d: "M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8" }], ["path", { d: "M3 3v5h5" }]],
-    check: [["path", { d: "M20 6 9 17l-5-5" }]],
-    "check-square": [["polyline", { points: "9 11 12 14 22 4" }], ["path", { d: "M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11" }]],
-    "external-link": [["path", { d: "M15 3h6v6" }], ["path", { d: "M10 14 21 3" }], ["path", { d: "M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6" }]]
-  };
+  // 图标表只有一份，在 core/icons.js（经 core/expose.js 挂到 window.GqyCore）。
+  const ICONS = window.GqyCore.ICONS;
   const SVG_NS = "http://www.w3.org/2000/svg";
 
   function icon(name) {
@@ -88,21 +57,18 @@ window.GqyDash = (() => {
   }
 
   /* 统一的 JSON 请求:非 2xx 抛出带服务端 message 的 Error。 */
+  /* 走 core 的请求层（登录过期跳登录页、错误信息同一套）；这里只保留看板的约定：
+     body 传对象、返回解析好的 JSON（空体为 null）、失败抛带 message 的错误。 */
   async function api(path, options = {}) {
-    const init = { method: options.method || "GET", headers: {} };
-    if (options.body !== undefined) {
-      init.headers["content-type"] = "application/json";
-      init.body = JSON.stringify(options.body);
-    }
-    const response = await fetch(path, init);
-    let payload = null;
+    const response = await window.GqyCore.apiRequest(path, {
+      method: options.method || "GET",
+      body: options.body !== undefined ? JSON.stringify(options.body) : undefined
+    });
     try {
-      payload = await response.json();
-    } catch (_) { /* 空体 */ }
-    if (!response.ok) {
-      throw new Error(payload?.error?.message || `HTTP ${response.status}`);
+      return await response.json();
+    } catch (_) {
+      return null; /* 空体 */
     }
-    return payload;
   }
 
   const reducedMotion = () => {
@@ -317,12 +283,9 @@ window.GqyDash = (() => {
   }
 
   /* 底部提示:成功/失败都走这里,3 秒消失。 */
-  let toastNode = null;
+  /* 提示条只有一个，在 core/toast.js。看板只用到「错误」和「普通」两种。 */
   function toast(message, kind) {
-    if (toastNode) toastNode.remove();
-    toastNode = el(`div.dash-toast${kind ? `.is-${kind}` : ""}`, { text: message, role: "status" });
-    document.body.appendChild(toastNode);
-    setTimeout(() => { toastNode?.remove(); toastNode = null; }, 3200);
+    window.GqyCore.showToast(message, kind === "error" ? "error" : "info");
   }
 
   /* 批量选择条:count 已选,total 可见总数;actions [{label, icon, danger, primary, onClick}]。 */

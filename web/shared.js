@@ -14,20 +14,8 @@ window.GqyShared = (() => {
    * lucide 图标子集。shared.js 先于 app.js 加载,拿不到那边的 createIcon,
    * 所以这里自带一份同风格的小表(path 数据同 lucide,24 viewBox / stroke 2)。
    */
-  const ICONS = {
-    music: [["path", { d: "M9 18V5l12-2v13" }], ["circle", { cx: "6", cy: "18", r: "3" }], ["circle", { cx: "18", cy: "16", r: "3" }]],
-    film: [["rect", { x: "3", y: "3", width: "18", height: "18", rx: "2" }], ["path", { d: "M7 3v18" }], ["path", { d: "M3 7.5h4" }], ["path", { d: "M3 12h18" }], ["path", { d: "M3 16.5h4" }], ["path", { d: "M17 3v18" }], ["path", { d: "M17 7.5h4" }], ["path", { d: "M17 16.5h4" }]],
-    image: [["rect", { x: "3", y: "3", width: "18", height: "18", rx: "2", ry: "2" }], ["circle", { cx: "9", cy: "9", r: "2" }], ["path", { d: "m21 15-3.086-3.086a2 2 0 0 0-2.828 0L6 21" }]],
-    file: [["path", { d: "M15 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7Z" }], ["path", { d: "M14 2v6h6" }]],
-    play: [["polygon", { points: "6 3 20 12 6 21 6 3", fill: "currentColor", stroke: "none" }]],
-    pause: [["rect", { x: "14", y: "4", width: "4", height: "16", rx: "1", fill: "currentColor", stroke: "none" }], ["rect", { x: "6", y: "4", width: "4", height: "16", rx: "1", fill: "currentColor", stroke: "none" }]],
-    download: [["path", { d: "M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" }], ["polyline", { points: "7 10 12 15 17 10" }], ["line", { x1: "12", x2: "12", y1: "15", y2: "3" }]],
-    "volume-2": [["path", { d: "M11 4.702a.705.705 0 0 0-1.203-.498L6.413 7.587A1.4 1.4 0 0 1 5.416 8H3a1 1 0 0 0-1 1v6a1 1 0 0 0 1 1h2.416a1.4 1.4 0 0 1 .997.413l3.383 3.384A.705.705 0 0 0 11 19.298z" }], ["path", { d: "M16 9a5 5 0 0 1 0 6" }], ["path", { d: "M19.364 18.364a9 9 0 0 0 0-12.728" }]],
-    "volume-x": [["path", { d: "M11 4.702a.705.705 0 0 0-1.203-.498L6.413 7.587A1.4 1.4 0 0 1 5.416 8H3a1 1 0 0 0-1 1v6a1 1 0 0 0 1 1h2.416a1.4 1.4 0 0 1 .997.413l3.383 3.384A.705.705 0 0 0 11 19.298z" }], ["line", { x1: "22", x2: "16", y1: "9", y2: "15" }], ["line", { x1: "16", x2: "22", y1: "9", y2: "15" }]],
-    "trash-2": [["path", { d: "M3 6h18" }], ["path", { d: "M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6" }], ["path", { d: "M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2" }], ["line", { x1: "10", x2: "10", y1: "11", y2: "17" }], ["line", { x1: "14", x2: "14", y1: "11", y2: "17" }]],
-    "check-square": [["polyline", { points: "9 11 12 14 22 4" }], ["path", { d: "M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11" }]],
-    upload: [["path", { d: "M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" }], ["polyline", { points: "17 8 12 3 7 8" }], ["line", { x1: "12", x2: "12", y1: "3", y2: "15" }]]
-  };
+  // 图标表只有一份，在 core/icons.js（经 core/expose.js 挂到 window.GqyCore）。播放器用实心的 play-solid / pause-solid。
+  const ICONS = window.GqyCore.ICONS;
   const KIND_ICON = { video: "film", audio: "music", image: "image", other: "file" };
   const MODE_LABEL = { reference: "引用", snapshot: "快照" };
   let panel = null;
@@ -130,7 +118,7 @@ window.GqyShared = (() => {
     playButton.className = "media-audio-play";
     playButton.title = "播放";
     playButton.setAttribute("aria-label", "播放");
-    playButton.appendChild(createIcon("play"));
+    playButton.appendChild(createIcon("play-solid"));
 
     const timeNow = document.createElement("span");
     timeNow.className = "media-audio-time";
@@ -181,7 +169,7 @@ window.GqyShared = (() => {
     /* ── 状态同步 ── */
     function syncPlayIcon() {
       const playing = !audio.paused && !audio.ended;
-      playButton.replaceChildren(createIcon(playing ? "pause" : "play"));
+      playButton.replaceChildren(createIcon(playing ? "pause-solid" : "play-solid"));
       playButton.title = playing ? "暂停" : "播放";
       playButton.setAttribute("aria-label", playing ? "暂停" : "播放");
       card.classList.toggle("is-playing", playing);
