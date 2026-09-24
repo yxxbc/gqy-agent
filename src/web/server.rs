@@ -175,6 +175,7 @@ pub async fn run(paths: GqyPaths, args: WebArgs) -> Result<()> {
     spawn_goal_round_driver(state.clone());
     // QQ 定时消息:常驻 tick 循环,每个 tick 现读配置,启停/改表无需重启。
     crate::platforms::plugins::scheduled_messages::spawn_scheduled_message_worker(state.clone());
+    crate::platforms::plugins::private_initiative::spawn_private_initiative_worker(state.clone());
     let app = router(state.clone());
     let urls = ipc::web_access_urls_for(bind_ip, port);
     // share_file 工具用这些地址把相对下载路径拼成局域网完整链接。

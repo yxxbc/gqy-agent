@@ -310,6 +310,12 @@ impl PlatformTurnContext {
     /// 平台生图豁免：管理员，或私聊白名单成员（静态配置 ∪ 动态授权）。
     /// 与 `allow_non_admin_host_tools` 解耦——那是宿主工具的开关，不管生图。
     pub(crate) fn image_generation_unlimited(&self) -> bool {
+        self.admin_or_private_whitelisted()
+    }
+
+    /// 管理员，或私聊白名单成员（静态配置 ∪ 动态授权）。群聊里只认管理员。
+    /// 生图豁免与私聊主动找人都按这条划线。
+    pub(crate) fn admin_or_private_whitelisted(&self) -> bool {
         if self.is_admin {
             return true;
         }

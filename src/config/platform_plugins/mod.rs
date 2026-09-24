@@ -32,6 +32,8 @@ pub const QQ_GROUP_JOIN_APPROVAL_PLUGIN_ID: &str = "qq_group_join_approval";
 
 pub const QQ_SCHEDULED_MESSAGES_PLUGIN_ID: &str = "qq_scheduled_messages";
 
+pub const QQ_PRIVATE_INITIATIVE_PLUGIN_ID: &str = "qq_private_initiative";
+
 pub(crate) const PLATFORM_PLUGIN_VALIDATORS: &[(&str, PlatformPluginConfigValidator)] = &[
     ("reply_processor", validate_reply_processor_plugin_config),
     (REAL_CONTEXT_PLUGIN_ID, validate_real_context_plugin_config),
@@ -54,6 +56,10 @@ pub(crate) const PLATFORM_PLUGIN_VALIDATORS: &[(&str, PlatformPluginConfigValida
     (
         QQ_GROUP_JOIN_APPROVAL_PLUGIN_ID,
         validate_qq_group_join_approval_plugin_config,
+    ),
+    (
+        QQ_PRIVATE_INITIATIVE_PLUGIN_ID,
+        validate_qq_private_initiative_plugin_config,
     ),
     (
         QQ_SCHEDULED_MESSAGES_PLUGIN_ID,

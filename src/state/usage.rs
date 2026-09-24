@@ -216,6 +216,8 @@ pub const USAGE_KIND_JUDGE: &str = "judge";
 pub const USAGE_KIND_AFFECTION: &str = "affection";
 /// 入群审批。
 pub const USAGE_KIND_GROUP_JOIN: &str = "group_join";
+/// 私聊主动找人：规划下次什么时候找。
+pub const USAGE_KIND_INITIATIVE: &str = "initiative";
 
 pub fn record_usage(path: &Path, usage: &Usage, meta: UsageMeta<'_>, aux: bool) -> Result<()> {
     record_usage_at(path, usage, meta, aux, chrono::Utc::now().timestamp())

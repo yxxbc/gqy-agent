@@ -26,6 +26,18 @@ pub(in crate::platforms::onebot) fn wake_sender_user_id(
         .unwrap_or(self_id)
 }
 
+/// 后台任务结束的唤醒说明（system 侧，每轮现组装、不化石）。
+const JOB_WAKE_NOTE: &str =
+    "This turn was triggered automatically by the system: a background job just finished, \
+     and its report and results are in this turn's message. This is not a message from any \
+     group member or user; deliver the results into the conversation naturally, in your own voice.";
+
+/// 私聊主动找人的唤醒说明。计划本身作为数据放在本轮消息里（`<initiative-plan>`）。
+const INITIATIVE_WAKE_NOTE: &str = "This turn was started by your own earlier plan to message this person first; \
+     they have not written since. The plan is in this turn's message and is not something they said. \
+     Open the conversation in your own voice with one short, natural message that fits your relationship. \
+     Do not mention that you planned or scheduled it.";
+
 /// Background-job completion wake: a self-initiated model turn in a bound
 /// QQ conversation. There is no inbound event — reply targeting, affection
 /// and trigger judging all no-op — the sender display name stays "System",
@@ -38,6 +50,52 @@ pub(crate) async fn wake_conversation_for_job(
     conversation_id: &str,
     initiator: Option<&str>,
     content: String,
+) -> Result<()> {
+    wake_conversation(
+        state,
+        account_id,
+        conversation_kind,
+        conversation_id,
+        initiator,
+        content,
+        JOB_WAKE_NOTE,
+    )
+    .await
+}
+
+/// 私聊主动找人插件到点：以对方为发起者开一个自发回合（身份照常判定，
+/// 主人/管理员/白名单的权限都按对方本人算）。`topic` 来自规划模型，
+/// 进提示词前按不可信文本转义。
+pub(crate) async fn wake_private_for_initiative(
+    state: &DaemonState,
+    account_id: &str,
+    user_id: &str,
+    topic: &str,
+) -> Result<()> {
+    let content = format!(
+        "<initiative-plan>{}</initiative-plan>",
+        crate::platforms::plugins::real_context::safe_prompt_field(topic)
+    );
+    wake_conversation(
+        state,
+        account_id,
+        "private",
+        user_id,
+        Some(user_id),
+        content,
+        INITIATIVE_WAKE_NOTE,
+    )
+    .await
+}
+
+async fn wake_conversation(
+    state: &DaemonState,
+    account_id: &str,
+    conversation_kind: &str,
+    conversation_id: &str,
+    initiator: Option<&str>,
+    content: String,
+    wake_note: &str,
 ) -> Result<()> {
     let self_id: i64 = account_id
         .parse()
@@ -81,12 +139,7 @@ pub(crate) async fn wake_conversation_for_job(
     // context blocks — the wake turn should see the conversation exactly
     // like an inbound turn would.
     let prepared = context.prepare_turn(content).await;
-    let mut turn_system_context = vec![
-        "This turn was triggered automatically by the system: a background job just finished, \
-         and its report and results are in this turn's message. This is not a message from any \
-         group member or user; deliver the results into the conversation naturally, in your own voice."
-            .to_string(),
-    ];
+    let mut turn_system_context = vec![wake_note.to_string()];
     turn_system_context.extend(prepared.turn_system_context);
     let profile = crate::platforms::TurnProfile {
         active_persona: Some(context.config.prompt.active_persona.clone()),

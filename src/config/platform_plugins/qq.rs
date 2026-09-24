@@ -223,6 +223,53 @@ pub(crate) fn validate_qq_group_management_plugin_config(
     Ok(())
 }
 
+/// 私聊主动找人（`qq_private_initiative`）。对象只限管理员与私聊白名单，
+/// 这条规则写在代码里，不做成设置。
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(default)]
+pub struct QqPrivateInitiativePluginSettings {
+    /// 私聊安静多少分钟后，才判断下次要不要、什么时候主动找对方。
+    pub quiet_minutes: u64,
+    /// 每人每天最多主动找几次。
+    pub max_per_day: u32,
+    /// 计划的时间最远能排到多少小时以后。
+    pub horizon_hours: u64,
+    /// 到点后多少分钟内还算准时；再晚就作废，不补发。
+    pub fire_window_minutes: u64,
+}
+
+impl Default for QqPrivateInitiativePluginSettings {
+    fn default() -> Self {
+        Self {
+            quiet_minutes: 30,
+            max_per_day: 1,
+            horizon_hours: 48,
+            fire_window_minutes: 15,
+        }
+    }
+}
+
+impl QqPrivateInitiativePluginSettings {
+    pub fn from_instance(instance: &PlatformPluginInstanceConfig) -> Result<Self> {
+        serde_json::from_value(serde_json::Value::Object(instance.settings.clone()))
+            .context("invalid qq_private_initiative plugin settings")
+    }
+}
+
+pub(crate) fn validate_qq_private_initiative_plugin_config(
+    instance: &PlatformPluginInstanceConfig,
+) -> Result<()> {
+    let settings = QqPrivateInitiativePluginSettings::from_instance(instance)?;
+    if !(5..=1440).contains(&settings.quiet_minutes)
+        || !(1..=5).contains(&settings.max_per_day)
+        || !(1..=168).contains(&settings.horizon_hours)
+        || !(1..=120).contains(&settings.fire_window_minutes)
+    {
+        bail!("invalid qq_private_initiative plugin limits");
+    }
+    Ok(())
+}
+
 pub(crate) fn validate_qq_message_recall_plugin_config(
     instance: &PlatformPluginInstanceConfig,
 ) -> Result<()> {

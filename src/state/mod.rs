@@ -50,7 +50,7 @@ pub use conversation_db::{
 };
 pub use usage::{
     UsageMeta, UsageRange, UsageSnapshot, UsageStats, USAGE_KIND_AFFECTION, USAGE_KIND_GROUP_JOIN,
-    USAGE_KIND_JUDGE,
+    USAGE_KIND_INITIATIVE, USAGE_KIND_JUDGE,
 };
 
 /// The only session kind users can list, name, switch to, or bind a platform

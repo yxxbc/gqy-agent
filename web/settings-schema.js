@@ -3521,6 +3521,27 @@
         },
       ],
     },
+    qq_private_initiative: {
+      title: "主动私聊",
+      description: "私聊安静下来后，她自己判断下次什么时候、想聊什么，到点主动找对方。只对管理员和私聊白名单",
+      enabledDefault: false,
+      fields: [
+        { key: "quiet_minutes", label: "安静多久后开始规划", kind: "number", integer: true, min: 5, max: 1440, unit: "分钟", default: 30 },
+        { key: "max_per_day", label: "每人每天最多主动几次", kind: "number", integer: true, min: 1, max: 5, unit: "次", default: 1 },
+        { key: "horizon_hours", label: "最远排到多久以后", kind: "number", integer: true, min: 1, max: 168, unit: "小时", default: 48 },
+        {
+          key: "fire_window_minutes",
+          label: "到点后多久内还发",
+          hint: "超过就作废、不补发（比如电脑睡着错过了时间）",
+          kind: "number",
+          integer: true,
+          min: 1,
+          max: 120,
+          unit: "分钟",
+          default: 15,
+        },
+      ],
+    },
     qq_scheduled_messages: {
       title: "定时消息",
       description: "按时间点向群/私聊发送固定内容",

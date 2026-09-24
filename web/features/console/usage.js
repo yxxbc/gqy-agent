@@ -63,6 +63,7 @@ export function usageKindName(kind) {
   if (kind === "judge") return "主动回复判断";
   if (kind === "affection") return "好感度更新";
   if (kind === "group_join") return "入群审批";
+  if (kind === "initiative") return "主动私聊规划";
   return kind;
 }
 
@@ -71,6 +72,7 @@ export function usageKindShortName(kind) {
   if (kind === "judge") return "判断";
   if (kind === "affection") return "好感度";
   if (kind === "group_join") return "入群";
+  if (kind === "initiative") return "主动";
   return usageKindName(kind);
 }
 

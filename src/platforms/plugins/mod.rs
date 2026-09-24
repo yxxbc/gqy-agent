@@ -59,6 +59,7 @@ pub(crate) mod group_management;
 mod meme_collector;
 pub(crate) mod message_history;
 mod message_recall;
+pub(crate) mod private_initiative;
 pub(crate) mod real_context;
 mod renderer;
 mod reply_processor;
@@ -447,6 +448,7 @@ impl PlatformPluginRegistry {
             Arc::new(Arc::new(group_management::GroupManagementPlugin::new())),
             Arc::new(reply_processor::ReplyProcessorPlugin::new()?),
             Arc::new(scheduled_messages::ScheduledMessagesPlugin::new()),
+            Arc::new(private_initiative::PrivateInitiativePlugin::new()),
         ]))
     }
 

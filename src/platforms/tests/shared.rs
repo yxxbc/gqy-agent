@@ -6,7 +6,7 @@ use futures_util::future::BoxFuture;
 use std::path::PathBuf;
 use std::sync::atomic::{AtomicUsize, Ordering as AtomicOrdering};
 
-pub(super) fn test_paths(root: &std::path::Path) -> GqyPaths {
+pub(crate) fn test_paths(root: &std::path::Path) -> GqyPaths {
     GqyPaths {
         root_dir: root.to_path_buf(),
         config_dir: root.join("config"),
