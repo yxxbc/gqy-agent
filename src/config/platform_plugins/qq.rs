@@ -270,6 +270,78 @@ pub(crate) fn validate_qq_private_initiative_plugin_config(
     Ok(())
 }
 
+/// 资料卡点赞（`qq_profile_like`）。主人号不受名单限制。
+#[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize)]
+#[serde(default)]
+pub struct QqProfileLikePluginSettings {
+    /// 私聊里可以请她点赞的 QQ 号。
+    pub private_whitelist: Vec<i64>,
+    /// 群里的人可以请她点赞的群号。
+    pub group_whitelist: Vec<i64>,
+}
+
+impl QqProfileLikePluginSettings {
+    pub fn from_instance(instance: &PlatformPluginInstanceConfig) -> Result<Self> {
+        serde_json::from_value(serde_json::Value::Object(instance.settings.clone()))
+            .context("invalid qq_profile_like plugin settings")
+    }
+}
+
+pub(crate) fn validate_qq_profile_like_plugin_config(
+    instance: &PlatformPluginInstanceConfig,
+) -> Result<()> {
+    let settings = QqProfileLikePluginSettings::from_instance(instance)?;
+    for (field, ids) in [
+        ("private_whitelist", &settings.private_whitelist),
+        ("group_whitelist", &settings.group_whitelist),
+    ] {
+        if ids.len() > 1000 || ids.iter().any(|id| *id <= 0) {
+            bail!("qq_profile_like.{field} must contain at most 1000 positive QQ ids");
+        }
+    }
+    Ok(())
+}
+
+/// 群里回复时贴常驻表情（`qq_reply_reaction`）。
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(default)]
+pub struct QqReplyReactionPluginSettings {
+    /// 每次回复贴不贴的概率；0 = 不贴。
+    pub probability: f64,
+    /// 从中随机挑一个。QQ 表情 ID：66 爱心、76 赞、124 OK。
+    pub emoji_ids: Vec<u32>,
+}
+
+impl Default for QqReplyReactionPluginSettings {
+    fn default() -> Self {
+        Self {
+            probability: 0.3,
+            emoji_ids: vec![66, 76, 124],
+        }
+    }
+}
+
+impl QqReplyReactionPluginSettings {
+    pub fn from_instance(instance: &PlatformPluginInstanceConfig) -> Result<Self> {
+        serde_json::from_value(serde_json::Value::Object(instance.settings.clone()))
+            .context("invalid qq_reply_reaction plugin settings")
+    }
+}
+
+pub(crate) fn validate_qq_reply_reaction_plugin_config(
+    instance: &PlatformPluginInstanceConfig,
+) -> Result<()> {
+    let settings = QqReplyReactionPluginSettings::from_instance(instance)?;
+    if !(0.0..=1.0).contains(&settings.probability)
+        || settings.emoji_ids.len() > 100
+        || settings.emoji_ids.contains(&0)
+        || settings.probability > 0.0 && settings.emoji_ids.is_empty()
+    {
+        bail!("qq_reply_reaction needs a probability in 0..=1 and 1-100 positive emoji ids");
+    }
+    Ok(())
+}
+
 pub(crate) fn validate_qq_message_recall_plugin_config(
     instance: &PlatformPluginInstanceConfig,
 ) -> Result<()> {

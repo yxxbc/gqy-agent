@@ -29,7 +29,6 @@ pub(crate) mod commands;
 pub(crate) mod file_reader;
 pub(crate) mod onebot;
 pub(crate) mod plugins;
-mod profile_like;
 mod sponsor_fx;
 mod sponsor_tool;
 mod tool;

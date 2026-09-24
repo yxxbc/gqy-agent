@@ -2059,13 +2059,6 @@
         default: [],
       },
       {
-        path: "private_chats.like_whitelist",
-        label: "私聊点赞白名单",
-        hint: "这些 QQ 号在私聊里请她点赞时，她会给对方的资料卡点赞（每人每天最多 10 个）。留空 = 私聊不点赞",
-        kind: "id-list",
-        default: [],
-      },
-      {
         path: "private_chats.friend_requests_require_private_whitelist",
         label: "仅私聊白名单能加好友",
         kind: "toggle",
@@ -2096,13 +2089,6 @@
       {
         path: "group_chats.whitelist",
         label: "群聊白名单",
-        kind: "id-list",
-        default: [],
-      },
-      {
-        path: "group_chats.like_whitelist",
-        label: "群聊点赞白名单",
-        hint: "这些群里有人请她点赞时，她会给请求的人点（只给本人，每人每天最多 10 个）。留空 = 群里不点赞",
         kind: "id-list",
         default: [],
       },
@@ -2648,14 +2634,6 @@
               max: 86400,
               unit: "秒",
               default: 600,
-            },
-            score01("reply_reaction_probability", "群里回复时贴表情的概率", 0.3, "正式回复一条群消息时，按这个概率在那条消息上贴一个常驻表情；0 = 不贴。和上面的「处理中」表情是两回事"),
-            {
-              key: "reply_reaction_emoji_ids",
-              label: "回复时贴的表情ID",
-              hint: "从中随机挑一个；默认 66 爱心、76 赞、124 OK。「处理中」用的表情会被排除",
-              kind: "u32-list",
-              default: [66, 76, 124],
             },
           ],
         },
@@ -3519,6 +3497,24 @@
           kind: "textarea",
           default: "",
         },
+      ],
+    },
+    qq_profile_like: {
+      title: "资料卡点赞",
+      description: "有人请她点赞时，给请求的人本人点（每人每天最多 10 个）。主人号在哪都能要，其他人看下面两份名单",
+      enabledDefault: true,
+      fields: [
+        { key: "private_whitelist", label: "私聊点赞名单", hint: "这些 QQ 号在私聊里可以请她点赞", kind: "id-list", default: [] },
+        { key: "group_whitelist", label: "群聊点赞名单", hint: "这些群里的人可以请她点赞（群号）", kind: "id-list", default: [] },
+      ],
+    },
+    qq_reply_reaction: {
+      title: "回复贴表情",
+      description: "群里她回复一条消息时，按概率在那条消息上贴一个常驻表情。和真实上下文插件那个会自动撤掉的「处理中」表情是两回事",
+      enabledDefault: true,
+      fields: [
+        score01("probability", "贴表情的概率", 0.3, "每次回复掷一次；0 = 不贴"),
+        { key: "emoji_ids", label: "表情 ID", hint: "从中随机挑一个；默认 66 爱心、76 赞、124 OK。「处理中」用的表情会被自动排除", kind: "u32-list", default: [66, 76, 124] },
       ],
     },
     qq_group_blacklist: {

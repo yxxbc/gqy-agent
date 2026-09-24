@@ -62,9 +62,11 @@ mod meme_collector;
 pub(crate) mod message_history;
 mod message_recall;
 pub(crate) mod private_initiative;
+mod profile_like;
 pub(crate) mod real_context;
 mod renderer;
 mod reply_processor;
+mod reply_reaction;
 pub(crate) mod scheduled_messages;
 
 pub(crate) use real_context::active_judgement_skip::{
@@ -452,6 +454,8 @@ impl PlatformPluginRegistry {
             Arc::new(scheduled_messages::ScheduledMessagesPlugin::new()),
             Arc::new(private_initiative::PrivateInitiativePlugin::new()),
             Arc::new(group_blacklist::GroupBlacklistPlugin::new()),
+            Arc::new(profile_like::ProfileLikePlugin::new()),
+            Arc::new(reply_reaction::ReplyReactionPlugin::new()),
         ]))
     }
 

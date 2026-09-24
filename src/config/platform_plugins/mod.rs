@@ -34,6 +34,10 @@ pub const QQ_SCHEDULED_MESSAGES_PLUGIN_ID: &str = "qq_scheduled_messages";
 
 pub const QQ_PRIVATE_INITIATIVE_PLUGIN_ID: &str = "qq_private_initiative";
 
+pub const QQ_PROFILE_LIKE_PLUGIN_ID: &str = "qq_profile_like";
+
+pub const QQ_REPLY_REACTION_PLUGIN_ID: &str = "qq_reply_reaction";
+
 pub(crate) const PLATFORM_PLUGIN_VALIDATORS: &[(&str, PlatformPluginConfigValidator)] = &[
     ("reply_processor", validate_reply_processor_plugin_config),
     (REAL_CONTEXT_PLUGIN_ID, validate_real_context_plugin_config),
@@ -60,6 +64,14 @@ pub(crate) const PLATFORM_PLUGIN_VALIDATORS: &[(&str, PlatformPluginConfigValida
     (
         QQ_PRIVATE_INITIATIVE_PLUGIN_ID,
         validate_qq_private_initiative_plugin_config,
+    ),
+    (
+        QQ_PROFILE_LIKE_PLUGIN_ID,
+        validate_qq_profile_like_plugin_config,
+    ),
+    (
+        QQ_REPLY_REACTION_PLUGIN_ID,
+        validate_qq_reply_reaction_plugin_config,
     ),
     (
         QQ_SCHEDULED_MESSAGES_PLUGIN_ID,

@@ -75,11 +75,6 @@ pub struct RealContextPluginSettings {
     pub active_reply_reaction_enable: bool,
     pub active_reply_reaction_emoji_ids: Vec<u32>,
     pub active_reply_reaction_timeout_seconds: u64,
-    /// 群里正式回复一条消息时，按这个概率给那条消息贴一个常驻表情（不撤）。
-    /// 和上面那个临时的「处理中」表情是两回事；0 = 不贴。
-    pub reply_reaction_probability: f64,
-    /// 常驻表情从这里随机挑。「处理中」用的那几个会被排除，免得被撤表情的逻辑一起撤掉。
-    pub reply_reaction_emoji_ids: Vec<u32>,
     pub reply_target_enable: bool,
     pub reply_target_quote_enable: bool,
     pub reply_target_quote_after_other_messages: u64,
@@ -187,9 +182,6 @@ impl Default for RealContextPluginSettings {
             active_reply_reaction_enable: true,
             active_reply_reaction_emoji_ids: vec![289],
             active_reply_reaction_timeout_seconds: 600,
-            reply_reaction_probability: 0.3,
-            // QQ 表情 ID：76 赞、66 爱心、124 OK。
-            reply_reaction_emoji_ids: vec![66, 76, 124],
             reply_target_enable: true,
             reply_target_quote_enable: true,
             reply_target_quote_after_other_messages: 4,
@@ -266,9 +258,6 @@ impl RealContextPluginSettings {
         self.active_reply_reaction_emoji_ids.retain(|id| *id > 0);
         self.active_reply_reaction_emoji_ids.sort_unstable();
         self.active_reply_reaction_emoji_ids.dedup();
-        self.reply_reaction_emoji_ids.retain(|id| *id > 0);
-        self.reply_reaction_emoji_ids.sort_unstable();
-        self.reply_reaction_emoji_ids.dedup();
         self.affection_unlimited_user_ids.retain(|id| *id > 0);
         self.affection_unlimited_user_ids.sort_unstable();
         self.affection_unlimited_user_ids.dedup();
@@ -450,16 +439,7 @@ impl RealContextPluginSettings {
         {
             bail!("platform plugin real_context.active_reply_reaction_emoji_ids must contain 1-100 positive ids");
         }
-        validate_real_context_probability(
-            "reply_reaction_probability",
-            self.reply_reaction_probability,
-        )?;
-        if self.reply_reaction_emoji_ids.len() > 100
-            || self.reply_reaction_probability > 0.0 && self.reply_reaction_emoji_ids.is_empty()
-            || self.reply_reaction_emoji_ids.contains(&0)
-        {
-            bail!("platform plugin real_context.reply_reaction_emoji_ids must contain 1-100 positive ids");
-        }
+
         validate_real_context_strings(
             "moderation_keywords",
             &self.moderation_keywords,
