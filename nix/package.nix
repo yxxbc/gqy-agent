@@ -53,6 +53,7 @@ rustPlatform.buildRustPackage {
     cp -R kb $share/default-kb/kb
 
     install -m 0644 LICENSE $licenses/LICENSE
+    install -m 0644 LICENSE-MIT $licenses/LICENSE-MIT
     install -m 0644 assets/fonts/NotoSansCJK.LICENSE $licenses/
     install -m 0644 assets/fonts/NotoColorEmoji.LICENSE $licenses/
     install -m 0644 assets/fonts/JetBrainsMono.LICENSE $licenses/
@@ -68,7 +69,7 @@ rustPlatform.buildRustPackage {
   meta = {
     description = cargoToml.package.description;
     homepage = cargoToml.package.repository;
-    license = lib.licenses.mit;
+    license = import ./license.nix;
     mainProgram = "gqy";
     platforms = lib.platforms.linux ++ lib.platforms.darwin;
   };

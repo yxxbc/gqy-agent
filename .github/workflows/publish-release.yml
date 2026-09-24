@@ -167,6 +167,7 @@ jobs:
           git rev-parse HEAD:kb > "$stage/share/gqy/default-kb/manifest/kb.tree"
 
           install -m 0644 LICENSE "$stage/share/licenses/gqy/LICENSE"
+          install -m 0644 LICENSE-MIT "$stage/share/licenses/gqy/LICENSE-MIT"
           install -m 0644 assets/fonts/NotoSansCJK.LICENSE "$stage/share/licenses/gqy/"
           install -m 0644 assets/fonts/NotoColorEmoji.LICENSE "$stage/share/licenses/gqy/"
           install -m 0644 assets/fonts/JetBrainsMono.LICENSE "$stage/share/licenses/gqy/"

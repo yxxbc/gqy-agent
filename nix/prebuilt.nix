@@ -52,7 +52,7 @@ stdenv.mkDerivation {
   meta = {
     description = "顾清影（gqy）命令行 AI 助手（预编译）";
     homepage = "https://github.com/yxxbc/gqy-agent";
-    license = lib.licenses.mit;
+    license = import ./license.nix;
     mainProgram = "gqy";
     platforms = builtins.attrNames release.platforms;
     sourceProvenance = [ lib.sourceTypes.binaryNativeCode ];

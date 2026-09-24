@@ -23,7 +23,15 @@
         "aarch64-linux"
         "aarch64-darwin"
       ];
-      forAllSystems = f: nixpkgs.lib.genAttrs systems (system: f nixpkgs.legacyPackages.${system});
+      # gqy 是 PolyForm Noncommercial（禁止商用，见 nix/license.nix），nixpkgs 会把它
+      # 当非自由软件拒绝求值。这里导入 nixpkgs 时只放行 gqy 自己，别的包照旧。
+      pkgsFor =
+        system:
+        import nixpkgs {
+          inherit system;
+          config.allowUnfreePredicate = pkg: nixpkgs.lib.getName pkg == "gqy";
+        };
+      forAllSystems = f: nixpkgs.lib.genAttrs systems (system: f (pkgsFor system));
     in
     {
       packages = forAllSystems (pkgs: {

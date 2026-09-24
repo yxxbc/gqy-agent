@@ -10,7 +10,7 @@
 
 <p align="center">
   <a href="https://github.com/yxxbc/gqy-agent/releases/latest"><img src="https://img.shields.io/badge/version-0.6.0-blue.svg?style=flat" alt="Version"></a>
-  <a href="LICENSE"><img src="https://img.shields.io/badge/license-MIT-green.svg?style=flat" alt="License"></a>
+  <a href="LICENSE"><img src="https://img.shields.io/badge/license-PolyForm%20NC%201.0.0-orange.svg?style=flat" alt="License: PolyForm Noncommercial 1.0.0"></a>
   <img src="https://img.shields.io/badge/platform-Linux%20%7C%20macOS-informational.svg?style=flat" alt="Platform">
 </p>
 
@@ -190,6 +190,11 @@ gqy import gqy-export-*.tar.gz  # 在新电脑上导入（先运行 gqy daemon s
 
 </details>
 
-## 📄 开源协议
+## 📄 协议
 
-[MIT License](LICENSE)
+[PolyForm Noncommercial 1.0.0](LICENSE)：个人使用、学习研究、非营利用途都可以自由使用、修改和分享，**禁止商用**。
+
+本项目源自 [miyu-agent](https://github.com/SHORiN-KiWATA/miyu-agent)，原作者的 MIT 协议声明保留在 [LICENSE-MIT](LICENSE-MIT)。0.6.0 及更早的版本仍按 MIT 发布。
+
+## 友情链接
+[linux.do](https://linux.do)

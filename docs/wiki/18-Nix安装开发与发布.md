@@ -28,6 +28,7 @@
 | `nix/release.json` | 当前发布的版本号和 4 个平台包的 sha256。**只用脚本生成，不要手改** |
 | `nix/update-release.py` | 根据 `SHA256SUMS` 生成 `release.json` |
 | `nix/migrate.sh` | 从 `install.sh` 装的版本换成 Nix 版 |
+| `nix/license.nix` | gqy 的许可证定义（PolyForm Noncommercial，nixpkgs 里没有）。它是非自由许可，`flake.nix` 导入 nixpkgs 时用 `allowUnfreePredicate` 只放行 gqy，用户不用改自己的 nixpkgs 配置。**别把 flake 改回 `nixpkgs.legacyPackages`**，那样 `nix profile install` 会报「unfree license」 |
 | `.github/workflows/publish-release.yml` | 云端编译、发布 Release、回写 `release.json` |
 | `install.sh` | 备用：没有 Nix 的用户用它装到 `~/.local` |
 
