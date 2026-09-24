@@ -2649,6 +2649,14 @@
               unit: "秒",
               default: 600,
             },
+            score01("reply_reaction_probability", "群里回复时贴表情的概率", 0.3, "正式回复一条群消息时，按这个概率在那条消息上贴一个常驻表情；0 = 不贴。和上面的「处理中」表情是两回事"),
+            {
+              key: "reply_reaction_emoji_ids",
+              label: "回复时贴的表情ID",
+              hint: "从中随机挑一个；默认 66 爱心、76 赞、124 OK。「处理中」用的表情会被排除",
+              kind: "u32-list",
+              default: [66, 76, 124],
+            },
           ],
         },
         {

@@ -2,6 +2,7 @@ mod decision_log;
 mod history;
 mod inject;
 mod pending;
+mod reply_reaction;
 mod runtime;
 mod targeting;
 use decision_log::*;
@@ -398,6 +399,7 @@ impl PlatformPlugin for RealContextPlugin {
                     trigger,
                     Some(TriggerKind::Direct | TriggerKind::Continuation | TriggerKind::Supersede)
                 );
+                reply_reaction::react_after_reply(context, &settings).await;
                 affection::touch_after_reply(context, &settings, direct_interaction)?;
                 let reply = message
                     .metadata
