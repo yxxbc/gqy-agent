@@ -2,6 +2,12 @@ import { visualPixelsToLayout } from "../../core/ui-scale.js";
 import { elements } from "../../state/elements.js";
 import { state } from "../../state/store.js";
 
+/// 只有本模块用的状态（从 state/store.js 分出来的私有分片）。
+const imageState = {
+  artifactPanX: 0,
+  artifactPanY: 0
+};
+
 export function artifactIconName(artifact) {
   if (artifact?.kind === "image" || artifact?.mime?.startsWith("image/")) return "image";
   if (artifact?.kind === "markdown") return "file-markdown";
@@ -25,15 +31,15 @@ export function artifactTypeLabel(artifact) {
 export const ARTIFACT_ZOOM_MAX = 4;
 
 export function artifactImageTransform() {
-  return `translate(${state.artifactPanX}px, ${state.artifactPanY}px) scale(${state.artifactZoom})`;
+  return `translate(${imageState.artifactPanX}px, ${imageState.artifactPanY}px) scale(${state.artifactZoom})`;
 }
 
 /// 缩放 / 平移归零,并作废 renderArtifactWorkspace 的「同一视图不重建」记号——
 /// 否则状态归零了、画面上的图还停在旧变换里。
 export function resetArtifactImageView() {
   state.artifactZoom = 1;
-  state.artifactPanX = 0;
-  state.artifactPanY = 0;
+  imageState.artifactPanX = 0;
+  imageState.artifactPanY = 0;
   delete elements.artifactView.dataset.renderKey;
 }
 
@@ -58,13 +64,13 @@ export function zoomArtifactImage(nextZoom, anchor = null) {
   const previous = state.artifactZoom || 1;
   const zoom = Math.min(ARTIFACT_ZOOM_MAX, Math.max(1, Number(nextZoom) || 1));
   if (zoom <= 1) {
-    state.artifactPanX = 0;
-    state.artifactPanY = 0;
+    imageState.artifactPanX = 0;
+    imageState.artifactPanY = 0;
   } else if (stage && image) {
     const point = anchor || { x: stage.clientWidth / 2, y: stage.clientHeight / 2 };
     const ratio = 1 - zoom / previous;
-    state.artifactPanX += (point.x - image.offsetLeft - state.artifactPanX) * ratio;
-    state.artifactPanY += (point.y - image.offsetTop - state.artifactPanY) * ratio;
+    imageState.artifactPanX += (point.x - image.offsetLeft - imageState.artifactPanX) * ratio;
+    imageState.artifactPanY += (point.y - image.offsetTop - imageState.artifactPanY) * ratio;
   }
   state.artifactZoom = zoom;
   if (image) {
@@ -105,8 +111,8 @@ export function renderArtifactImage(artifact) {
   const applyPan = () => {
     frame = 0;
     if (!pan) return;
-    state.artifactPanX = pan.originX + visualPixelsToLayout(pan.clientX - pan.startX);
-    state.artifactPanY = pan.originY + visualPixelsToLayout(pan.clientY - pan.startY);
+    imageState.artifactPanX = pan.originX + visualPixelsToLayout(pan.clientX - pan.startX);
+    imageState.artifactPanY = pan.originY + visualPixelsToLayout(pan.clientY - pan.startY);
     image.style.transform = artifactImageTransform();
   };
   stage.addEventListener("pointerdown", (event) => {
@@ -117,8 +123,8 @@ export function renderArtifactImage(artifact) {
     pan = {
       startX: event.clientX,
       startY: event.clientY,
-      originX: state.artifactPanX,
-      originY: state.artifactPanY,
+      originX: imageState.artifactPanX,
+      originY: imageState.artifactPanY,
       clientX: event.clientX,
       clientY: event.clientY
     };

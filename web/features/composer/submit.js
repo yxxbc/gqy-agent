@@ -18,6 +18,11 @@ import { elements } from "../../state/elements.js";
 import { state } from "../../state/store.js";
 import { clearInlineError, showInlineError } from "../../widgets/inline-error.js";
 
+/// 只有本模块用的状态（从 state/store.js 分出来的私有分片）。
+const submitState = {
+  commandRunning: false
+};
+
 export async function submitTurn() {
   if (state.adminBusy || state.submitting || state.blocked) return;
   if (hasPendingQuestion()) return;
@@ -35,8 +40,8 @@ export async function submitTurn() {
     window.GqyCommands.hide();
     // 同一条命令不能重入。命令往往要等服务端干完活（/reset 要清库、/compact
     // 要重算上下文），这期间用户看不出回车生效没有，很自然会再敲一次。
-    if (state.commandRunning) return;
-    state.commandRunning = true;
+    if (submitState.commandRunning) return;
+    submitState.commandRunning = true;
     // **先**清输入框，再去跑。原来是跑完才清，命令跑多久输入框就挂着原文
     // 多久——看着就像回车没反应，于是连按几次、连触发几次。
     elements.composerInput.value = "";
@@ -77,7 +82,7 @@ export async function submitTurn() {
         openPopPicker: () => openPopPicker(),
       });
     } finally {
-      state.commandRunning = false;
+      submitState.commandRunning = false;
       updateControlState();
     }
     if (handled) return;

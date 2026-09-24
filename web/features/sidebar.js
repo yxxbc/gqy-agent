@@ -4,6 +4,12 @@ import { artifactWidthPixels, syncArtifactLayout } from "./artifacts/model.js";
 import { elements } from "../state/elements.js";
 import { state } from "../state/store.js";
 
+/// 只有本模块用的状态（从 state/store.js 分出来的私有分片）。
+const sidebarState = {
+  sidebarCollapsed: false,
+  sidebarAutoCollapsed: false
+};
+
 export function closeSidebar() {
   elements.sidebar.classList.remove("open");
   elements.sidebarScrim.classList.remove("visible");
@@ -11,28 +17,28 @@ export function closeSidebar() {
 }
 
 export function setSidebarCollapsed(collapsed, { automatic = false } = {}) {
-  state.sidebarCollapsed = Boolean(collapsed);
-  state.sidebarAutoCollapsed = Boolean(automatic && collapsed);
-  elements.appShell?.classList.toggle("is-sidebar-collapsed", state.sidebarCollapsed);
-  if (elements.sidebarExpandButton) elements.sidebarExpandButton.hidden = !state.sidebarCollapsed;
-  if (elements.sidebarCollapseButton) elements.sidebarCollapseButton.hidden = state.sidebarCollapsed;
-  if (state.sidebarCollapsed) closeSidebar();
-  if (!automatic) safeStorageSet("gqy.web.sidebarCollapsed", String(state.sidebarCollapsed));
+  sidebarState.sidebarCollapsed = Boolean(collapsed);
+  sidebarState.sidebarAutoCollapsed = Boolean(automatic && collapsed);
+  elements.appShell?.classList.toggle("is-sidebar-collapsed", sidebarState.sidebarCollapsed);
+  if (elements.sidebarExpandButton) elements.sidebarExpandButton.hidden = !sidebarState.sidebarCollapsed;
+  if (elements.sidebarCollapseButton) elements.sidebarCollapseButton.hidden = sidebarState.sidebarCollapsed;
+  if (sidebarState.sidebarCollapsed) closeSidebar();
+  if (!automatic) safeStorageSet("gqy.web.sidebarCollapsed", String(sidebarState.sidebarCollapsed));
   syncArtifactLayout?.();
 }
 
 export function syncSidebarSpace() {
   if (layoutViewportWidth() <= 760) {
-    if (state.sidebarAutoCollapsed) setSidebarCollapsed(false, { automatic: true });
+    if (sidebarState.sidebarAutoCollapsed) setSidebarCollapsed(false, { automatic: true });
     return;
   }
   const shellWidth = elements.appShell.clientWidth;
   const sidebarWidth = Number.parseFloat(getComputedStyle(elements.appShell).getPropertyValue("--sidebar-width")) || 252;
   const artifactWidth = state.artifactOpen && !state.artifactMaximized ? artifactWidthPixels() + 26 : 0;
   const availableWhenExpanded = shellWidth - sidebarWidth - artifactWidth;
-  if (!state.sidebarCollapsed && availableWhenExpanded < 360) {
+  if (!sidebarState.sidebarCollapsed && availableWhenExpanded < 360) {
     setSidebarCollapsed(true, { automatic: true });
-  } else if (state.sidebarAutoCollapsed && availableWhenExpanded >= 420) {
+  } else if (sidebarState.sidebarAutoCollapsed && availableWhenExpanded >= 420) {
     setSidebarCollapsed(false, { automatic: true });
   }
 }

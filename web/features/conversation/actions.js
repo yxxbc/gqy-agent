@@ -10,6 +10,12 @@ import { trackRun } from "../sessions/runs.js";
 import { createLiveForRun, loadSessionView } from "../sessions/view.js";
 import { state } from "../../state/store.js";
 
+/// 只有本模块用的状态（从 state/store.js 分出来的私有分片）。
+const actionsState = {
+  revisionSubmitting: false,
+  revisionEditor: null
+};
+
 export async function copyText(text) {
   const value = String(text || "");
   if (!value) return false;
@@ -67,17 +73,17 @@ export function revisionEligible(candidate = state.redoCandidate) {
   // AI 输出中也允许改上一条 prompt(09-12 用户报):submitRedo 会先掐掉正在跑
   // 的那轮再重发,所以这里不再拿 conversationRunning() 挡着。
   return !state.blocked && !state.viewLoading && !state.resyncing
-    && !state.submitting && !state.revisionSubmitting
+    && !state.submitting && !actionsState.revisionSubmitting
     && !state.adminBusy && !state.sessionBusy && !hasPendingQuestion()
     && state.queuedPrompts.length === 0;
 }
 
 export function closeRevisionEditor({ restoreFocus = false } = {}) {
-  const editor = state.revisionEditor;
+  const editor = actionsState.revisionEditor;
   if (!editor) return;
   editor.form.remove();
   editor.bubble.hidden = editor.wasHidden;
-  state.revisionEditor = null;
+  actionsState.revisionEditor = null;
   if (restoreFocus) editor.opener?.focus();
 }
 
@@ -108,7 +114,7 @@ export function openRevisionEditor(article, bubble, content, candidate, opener) 
   const wasHidden = bubble.hidden;
   bubble.hidden = true;
   article.insertBefore(form, article.querySelector(".message-actions"));
-  state.revisionEditor = { form, textarea, error, submit, bubble, wasHidden, opener, candidate };
+  actionsState.revisionEditor = { form, textarea, error, submit, bubble, wasHidden, opener, candidate };
   cancel.addEventListener("click", () => closeRevisionEditor({ restoreFocus: true }));
   form.addEventListener("submit", async (event) => {
     event.preventDefault();
@@ -145,8 +151,8 @@ export async function submitRedo(candidate, editedContent = null) {
   if (!revisionEligible(candidate)) return;
   const sessionId = state.viewSessionId;
   if (!sessionId) return;
-  state.revisionSubmitting = true;
-  const editor = state.revisionEditor;
+  actionsState.revisionSubmitting = true;
+  const editor = actionsState.revisionEditor;
   if (editor) {
     editor.form.setAttribute("aria-busy", "true");
     editor.textarea.disabled = true;
@@ -191,15 +197,15 @@ export async function submitRedo(candidate, editedContent = null) {
     renderSessionList();
     updateConversationChrome();
   } catch (error) {
-    if (editor && state.revisionEditor === editor) {
+    if (editor && actionsState.revisionEditor === editor) {
       editor.error.textContent = error.status === 409 ? "会话已变化，请重新操作" : error.message;
       editor.error.hidden = false;
     }
     showToast(error.status === 409 ? "会话状态已更新" : error.message, "error");
     if (error.status === 409) await loadSessionView(sessionId, { quiet: true });
   } finally {
-    state.revisionSubmitting = false;
-    if (editor && state.revisionEditor === editor) {
+    actionsState.revisionSubmitting = false;
+    if (editor && actionsState.revisionEditor === editor) {
       editor.form.removeAttribute("aria-busy");
       editor.textarea.disabled = false;
       editor.submit.disabled = false;

@@ -2,8 +2,13 @@ import { asFiniteNumber, formatInteger, formatTokens } from "../core/format.js";
 import { elements } from "../state/elements.js";
 import { state } from "../state/store.js";
 
+/// 只有本模块用的状态（从 state/store.js 分出来的私有分片）。
+const statusState = {
+  connection: "connecting"
+};
+
 export function setConnectionStatus(status) {
-  state.connection = status;
+  statusState.connection = status;
   const definitions = {
     online: { sidebar: "在线", className: "" },
     connecting: { sidebar: "重连中", className: "is-connecting" },

@@ -34,6 +34,11 @@ import { closeSidebar, openSidebar, setSidebarCollapsed } from "./features/sideb
 import { elements } from "./state/elements.js";
 import { state } from "./state/store.js";
 
+/// 只有本模块用的状态（从 state/store.js 分出来的私有分片）。
+const appState = {
+  composing: false
+};
+
 function bindEvents() {
   bindConsoleEvents();
   elements.mobileMenuButton.addEventListener("click", (event) => openSidebar(event.currentTarget));
@@ -254,10 +259,10 @@ function bindEvents() {
     addComposerFiles(files);
   });
   elements.composerInput.addEventListener("compositionstart", () => {
-    state.composing = true;
+    appState.composing = true;
   });
   elements.composerInput.addEventListener("compositionend", () => {
-    state.composing = false;
+    appState.composing = false;
   });
   elements.composerInput.addEventListener("keydown", (event) => {
     // 菜单开着时它先吃掉上下键与 Tab/Enter：补全后再按一次回车才执行，
@@ -266,7 +271,7 @@ function bindEvents() {
       event.preventDefault();
       return;
     }
-    if (event.key === "Enter" && !event.shiftKey && !event.isComposing && !state.composing && event.keyCode !== 229) {
+    if (event.key === "Enter" && !event.shiftKey && !event.isComposing && !appState.composing && event.keyCode !== 229) {
       // 触屏设备上回车是换行:软键盘没有 Shift+Enter,回车即发送就没法
       // 打多行了。发送用按钮;Ctrl/Cmd+Enter 仍然发送。
       if (isTouchComposer() && !(event.ctrlKey || event.metaKey)) return;

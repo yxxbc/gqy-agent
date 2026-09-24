@@ -11,6 +11,11 @@ import { elements } from "../state/elements.js";
 import { state } from "../state/store.js";
 import { showInlineError } from "../widgets/inline-error.js";
 
+/// 只有本模块用的状态（从 state/store.js 分出来的私有分片）。
+const sessionModeState = {
+  modeChooserKeyHandler: null
+};
+
 export function hasHistory() {
   for (const live of state.liveRuns.values()) {
     if (live.userRendered) return true;
@@ -76,7 +81,7 @@ export function openModeChooser() {
       closeModeChooser();
     }
   };
-  state.modeChooserKeyHandler = onKey;
+  sessionModeState.modeChooserKeyHandler = onKey;
   document.addEventListener("keydown", onKey, true);
   window.requestAnimationFrame(() => panel.querySelector("button")?.focus());
 }
@@ -84,9 +89,9 @@ export function openModeChooser() {
 export function closeModeChooser() {
   if (!state.modeChooserOpen) return;
   state.modeChooserOpen = false;
-  if (state.modeChooserKeyHandler) {
-    document.removeEventListener("keydown", state.modeChooserKeyHandler, true);
-    state.modeChooserKeyHandler = null;
+  if (sessionModeState.modeChooserKeyHandler) {
+    document.removeEventListener("keydown", sessionModeState.modeChooserKeyHandler, true);
+    sessionModeState.modeChooserKeyHandler = null;
   }
   document.getElementById("modeChooserOverlay")?.remove();
   updateControlState();

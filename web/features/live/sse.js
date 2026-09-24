@@ -22,17 +22,23 @@ import { setConnectionStatus, updateContext } from "../status.js";
 import { clearPreparingTool, handleToolEvent } from "../tools/events.js";
 import { state } from "../../state/store.js";
 
+/// 只有本模块用的状态（从 state/store.js 分出来的私有分片）。
+const sseState = {
+  viewSyncTimer: null,
+  healthTimer: null
+};
+
 export function clearViewSyncTimer() {
-  if (!state.viewSyncTimer) return;
-  window.clearTimeout(state.viewSyncTimer);
-  state.viewSyncTimer = null;
+  if (!sseState.viewSyncTimer) return;
+  window.clearTimeout(sseState.viewSyncTimer);
+  sseState.viewSyncTimer = null;
 }
 
 export function scheduleViewSync() {
   clearViewSyncTimer();
   if (!state.viewRunningTurnId || state.blocked) return;
-  state.viewSyncTimer = window.setTimeout(() => {
-    state.viewSyncTimer = null;
+  sseState.viewSyncTimer = window.setTimeout(() => {
+    sseState.viewSyncTimer = null;
     refreshViewSnapshot();
   }, 1_000);
 }
@@ -356,9 +362,9 @@ export function closeEventSource() {
     state.eventSource.close();
     state.eventSource = null;
   }
-  if (state.healthTimer) {
-    window.clearTimeout(state.healthTimer);
-    state.healthTimer = null;
+  if (sseState.healthTimer) {
+    window.clearTimeout(sseState.healthTimer);
+    sseState.healthTimer = null;
   }
 }
 
@@ -381,14 +387,14 @@ export function connectEventSource(after) {
   source.onopen = () => {
     if (state.eventSource !== source) return;
     setConnectionStatus("online");
-    if (state.healthTimer) window.clearTimeout(state.healthTimer);
-    state.healthTimer = null;
+    if (sseState.healthTimer) window.clearTimeout(sseState.healthTimer);
+    sseState.healthTimer = null;
   };
   source.onerror = () => {
     if (state.eventSource !== source) return;
     setConnectionStatus("connecting");
-    if (state.healthTimer) window.clearTimeout(state.healthTimer);
-    state.healthTimer = window.setTimeout(() => refineConnectionHealth(source), 1200);
+    if (sseState.healthTimer) window.clearTimeout(sseState.healthTimer);
+    sseState.healthTimer = window.setTimeout(() => refineConnectionHealth(source), 1200);
   };
   for (const name of EVENT_NAMES) source.addEventListener(name, (event) => handleSseEvent(name, event));
 }

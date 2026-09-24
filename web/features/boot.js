@@ -21,6 +21,12 @@ import { elements } from "../state/elements.js";
 import { state } from "../state/store.js";
 import { clearInlineError } from "../widgets/inline-error.js";
 
+/// 只有本模块用的状态（从 state/store.js 分出来的私有分片）。
+const bootState = {
+  bootId: null,
+  version: null
+};
+
 export const VIEW_SESSION_KEY = "gqy.web.viewSession";
 
 /// 页面加载后该打开哪个会话。
@@ -52,7 +58,7 @@ export function applyBootstrap(snapshot) {
   document.body.classList.remove("is-login", "is-blocked");
   clearViewSyncTimer();
   disposeAllLiveRuns();
-  state.bootId = String(snapshot?.boot_id || "");
+  bootState.bootId = String(snapshot?.boot_id || "");
   state.latestEventId = Math.max(0, asFiniteNumber(snapshot?.latest_event_id));
   state.models = Array.isArray(snapshot?.models) ? snapshot.models : [];
   applyPersona(snapshot?.persona);
@@ -67,7 +73,7 @@ export function applyBootstrap(snapshot) {
   state.currentSessionId = typeof snapshot?.current_session_id === "string" && snapshot.current_session_id ? snapshot.current_session_id : null;
   state.sessionMenuFor = null;
   state.sessionRenaming = null;
-  state.version = snapshot?.version ?? null;
+  bootState.version = snapshot?.version ?? null;
   state.pendingSubmission = null;
   const allRuns = (Array.isArray(snapshot?.runs) ? snapshot.runs : []).filter((run) => run?.run_id && run?.session_id);
   state.runsBySession = new Map();
@@ -80,7 +86,7 @@ export function applyBootstrap(snapshot) {
   elements.loginError.textContent = "";
   elements.loginError.hidden = true;
   setLoginSubmitting(false);
-  elements.versionLabel.textContent = state.version ? `v${state.version}` : "--";
+  elements.versionLabel.textContent = bootState.version ? `v${bootState.version}` : "--";
   clearInlineError();
   renderModelMenu();
   updateCapabilities();

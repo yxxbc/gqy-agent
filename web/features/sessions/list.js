@@ -12,6 +12,12 @@ import { closeSidebar } from "../sidebar.js";
 import { elements } from "../../state/elements.js";
 import { state } from "../../state/store.js";
 
+/// 只有本模块用的状态（从 state/store.js 分出来的私有分片）。
+const listState = {
+  sessionDragId: null,
+  brailleFrame: 0
+};
+
 export function closeSessionMenu() {
   if (!state.sessionMenuFor) return;
   state.sessionMenuFor = null;
@@ -130,7 +136,7 @@ export function buildSessionItem(session) {
     const spinner = document.createElement("span");
     spinner.className = "session-run-spinner";
     spinner.title = "有回复正在运行";
-    spinner.textContent = BRAILLE_FRAMES[state.brailleFrame % BRAILLE_FRAMES.length];
+    spinner.textContent = BRAILLE_FRAMES[listState.brailleFrame % BRAILLE_FRAMES.length];
     lead.appendChild(spinner);
   } else if (state.unreadSessions.has(id)) {
     const dot = document.createElement("span");
@@ -290,8 +296,8 @@ export function startBrailleTicker() {
     if (document.hidden) return;
     const spinners = document.querySelectorAll(".session-run-spinner");
     if (!spinners.length) return;
-    state.brailleFrame = (state.brailleFrame + 1) % BRAILLE_FRAMES.length;
-    const glyph = BRAILLE_FRAMES[state.brailleFrame];
+    listState.brailleFrame = (listState.brailleFrame + 1) % BRAILLE_FRAMES.length;
+    const glyph = BRAILLE_FRAMES[listState.brailleFrame];
     for (const spinner of spinners) spinner.textContent = glyph;
   }, 90);
 }
@@ -306,18 +312,18 @@ export function clearSessionDropMarkers() {
 export function attachSessionDrag(item, session, id) {
   item.draggable = true;
   item.addEventListener("dragstart", (event) => {
-    state.sessionDragId = id;
+    listState.sessionDragId = id;
     item.classList.add("is-dragging");
     event.dataTransfer.effectAllowed = "move";
     try { event.dataTransfer.setData("text/plain", id); } catch (_) { /* 老内核 */ }
   });
   item.addEventListener("dragend", () => {
-    state.sessionDragId = null;
+    listState.sessionDragId = null;
     item.classList.remove("is-dragging");
     clearSessionDropMarkers();
   });
   item.addEventListener("dragover", (event) => {
-    const dragId = state.sessionDragId;
+    const dragId = listState.sessionDragId;
     if (!dragId || dragId === id) return;
     // 只在同一分组(普通/dev)内排序,跨组语义(改会话模式)不存在。
     const dragging = findSession(dragId);
@@ -334,12 +340,12 @@ export function attachSessionDrag(item, session, id) {
     item.classList.remove("drop-before", "drop-after");
   });
   item.addEventListener("drop", (event) => {
-    const dragId = state.sessionDragId;
+    const dragId = listState.sessionDragId;
     if (!dragId || dragId === id) return;
     event.preventDefault();
     const before = item.classList.contains("drop-before");
     clearSessionDropMarkers();
-    state.sessionDragId = null;
+    listState.sessionDragId = null;
     commitSessionReorder(dragId, id, before);
   });
 }

@@ -6,6 +6,13 @@ import { procLineSetOpen } from "./conversation/proc-rail.js";
 import { elements } from "../state/elements.js";
 import { state } from "../state/store.js";
 
+/// 只有本模块用的状态（从 state/store.js 分出来的私有分片）。
+const appearanceState = {
+  colorScheme: null,
+  uiPrefs: {},
+  matugenAvailable: null
+};
+
 /*
  * 外观偏好存在 daemon 那边。localStorage 按 **origin** 隔离:
  * http://127.0.0.1:8300 和 http://192.168.1.7:8300 是两个源,同一台 顾清影 换个
@@ -18,8 +25,8 @@ export const UI_PREF_KEYS = ["theme", "colorScheme", "chatFontSize", "reasoningE
 
 export function saveUiPref(key, value) {
   if (!UI_PREF_KEYS.includes(key)) return;
-  if (state.uiPrefs[key] === value) return;
-  state.uiPrefs[key] = value;
+  if (appearanceState.uiPrefs[key] === value) return;
+  appearanceState.uiPrefs[key] = value;
   apiRequest("/api/ui-prefs", { method: "PUT", body: JSON.stringify({ [key]: value }) }).catch(() => {});
 }
 
@@ -33,7 +40,7 @@ export async function syncUiPrefs() {
   }
   if (!prefs || typeof prefs !== "object") return;
   // 先记下服务端的值:下面几个 setter 会走 saveUiPref,记过就不会再发回去。
-  state.uiPrefs = { ...prefs };
+  appearanceState.uiPrefs = { ...prefs };
   if (prefs.theme) setTheme(prefs.theme);
   if (prefs.colorScheme) setColorScheme(prefs.colorScheme);
   if (prefs.chatFontSize) setChatFontSize(prefs.chatFontSize);
@@ -72,8 +79,8 @@ export function setTheme(theme, persist = true) {
  */
 export function setColorScheme(scheme, persist = true) {
   const requested = scheme === "madobe" ? "madobe" : "matugen";
-  const selected = requested === "matugen" && state.matugenAvailable === false ? "madobe" : requested;
-  state.colorScheme = selected;
+  const selected = requested === "matugen" && appearanceState.matugenAvailable === false ? "madobe" : requested;
+  appearanceState.colorScheme = selected;
   elements.body.dataset.colorScheme = selected;
   if (elements.matugenThemeLink) elements.matugenThemeLink.disabled = selected !== "matugen";
   document.querySelectorAll("[data-scheme-choice]").forEach((button) => {
@@ -81,7 +88,7 @@ export function setColorScheme(scheme, persist = true) {
     button.classList.toggle("selected", active);
     button.setAttribute("aria-pressed", String(active));
     // 探测不到 matugen 输出时,「壁纸取色」整个选项不显示。
-    if (button.dataset.schemeChoice === "matugen") button.hidden = state.matugenAvailable !== true;
+    if (button.dataset.schemeChoice === "matugen") button.hidden = appearanceState.matugenAvailable !== true;
   });
   if (persist) {
     safeStorageSet("gqy.web.colorScheme", requested);
@@ -92,12 +99,12 @@ export function setColorScheme(scheme, persist = true) {
 export async function probeMatugenTheme() {
   try {
     const response = await fetch("/theme.css", { method: "HEAD", cache: "no-store" });
-    state.matugenAvailable = response.ok;
+    appearanceState.matugenAvailable = response.ok;
   } catch (_) {
-    state.matugenAvailable = false;
+    appearanceState.matugenAvailable = false;
   }
   // 无持久化记录时:matugen 可用则维持现状(matugen),否则窗边。默认值不写入存储。
-  setColorScheme(safeStorageGet("gqy.web.colorScheme") || (state.matugenAvailable ? "matugen" : "madobe"), false);
+  setColorScheme(safeStorageGet("gqy.web.colorScheme") || (appearanceState.matugenAvailable ? "matugen" : "madobe"), false);
 }
 
 /* 仅 WebUI 的本地显示偏好(localStorage,不写入 config) */

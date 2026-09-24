@@ -6,6 +6,20 @@ import { syncSidebarSpace } from "../sidebar.js";
 import { elements } from "../../state/elements.js";
 import { state } from "../../state/store.js";
 
+/// 只有本模块用的状态（从 state/store.js 分出来的私有分片）。
+const modelState = {
+  // artifact 列表有两个来源：回合产出的 `turn.artifacts`（每次同步重建），
+  // 和用户手动送进来的（气泡上点「在预览工作区打开」）。后者不在任何回合的
+  // artifacts 里，光靠重建会在下一个回合到达时被整体覆盖掉——图片刚打开就
+  // 没了。所以手动那批单独留一份，同步时并进去。
+  //
+  // 两份都按会话分。回合产出的天然分会话（同步喂进来的就是当前会话的
+  // turns），这两份要是全局的，A 会话置顶的图会出现在 B 会话的列表里，
+  // 在 A 里删掉的也会连累 B。
+  pinnedArtifacts: new Map(),
+  dismissedArtifactIds: new Map()
+};
+
 export function safeAssetUrl(value) {
   const raw = String(value || "").trim();
   if (!raw) return null;
@@ -130,20 +144,20 @@ export function artifactScope() {
 
 export function pinnedArtifactsForScope() {
   const scope = artifactScope();
-  let pinned = state.pinnedArtifacts.get(scope);
+  let pinned = modelState.pinnedArtifacts.get(scope);
   if (!pinned) {
     pinned = new Map();
-    state.pinnedArtifacts.set(scope, pinned);
+    modelState.pinnedArtifacts.set(scope, pinned);
   }
   return pinned;
 }
 
 export function dismissedArtifactsForScope() {
   const scope = artifactScope();
-  let dismissed = state.dismissedArtifactIds.get(scope);
+  let dismissed = modelState.dismissedArtifactIds.get(scope);
   if (!dismissed) {
     dismissed = new Set();
-    state.dismissedArtifactIds.set(scope, dismissed);
+    modelState.dismissedArtifactIds.set(scope, dismissed);
   }
   return dismissed;
 }

@@ -26,6 +26,11 @@ import { isSubagentTool } from "../tools/format.js";
 import { elements } from "../../state/elements.js";
 import { state } from "../../state/store.js";
 
+/// 只有本模块用的状态（从 state/store.js 分出来的私有分片）。
+const viewState = {
+  viewLoadGeneration: 0
+};
+
 export async function refreshSessions() {
   try {
     const response = await apiRequest("/api/sessions");
@@ -82,7 +87,7 @@ export async function loadSessionView(sessionId, { quiet = false, userInitiated 
   // 命令回执是会话内的临时记录，换会话就清掉——否则会串到别的会话里。
   // 回执按会话记账（commands.js），切走再切回来仍在原位，这里不再清空。
   if (state.unreadSessions.delete(sessionId)) renderSessionList();
-  const generation = ++state.viewLoadGeneration;
+  const generation = ++viewState.viewLoadGeneration;
   state.viewLoading = true;
   // 先切后加载:用户点标签的一刻立刻高亮目标会话、收起侧栏、给对话区铺一层
   // 加载动画,大会话拉取期间不再像卡在旧会话上(09-12 用户报)。真正的视图
@@ -96,11 +101,11 @@ export async function loadSessionView(sessionId, { quiet = false, userInitiated 
   try {
     const response = await apiRequest(`/api/sessions/${encodeURIComponent(sessionId)}/turns`);
     const payload = await response.json();
-    if (generation !== state.viewLoadGeneration) return;
+    if (generation !== viewState.viewLoadGeneration) return;
     applySessionView(payload);
     if (!quiet) closeSidebar();
   } catch (error) {
-    if (generation !== state.viewLoadGeneration) return;
+    if (generation !== viewState.viewLoadGeneration) return;
     if (error.status === 401) showBlockedState(true);
     else if (error.status === 404) {
       showToast("会话不存在", "error");
@@ -108,7 +113,7 @@ export async function loadSessionView(sessionId, { quiet = false, userInitiated 
       if (sessionId === state.viewSessionId) window.setTimeout(() => openFallbackSessionView(sessionId), 0);
     } else showToast(error.message || "载入会话失败", "error");
   } finally {
-    if (generation === state.viewLoadGeneration) {
+    if (generation === viewState.viewLoadGeneration) {
       state.viewLoading = false;
       state.switchingToSessionId = "";
       elements.conversationStage?.classList.remove("is-switching");

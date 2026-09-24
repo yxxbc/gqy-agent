@@ -12,6 +12,14 @@ import { loadSessionView } from "./sessions/view.js";
 import { elements } from "../state/elements.js";
 import { state } from "../state/store.js";
 
+/// 只有本模块用的状态（从 state/store.js 分出来的私有分片）。
+const jobsState = {
+  jobsStripOpen: localStorage.getItem("gqy.web.jobsStripOpen") === "1",
+  commandLogs: new Map(),
+  commandPeekLine: new Map(),
+  commandPeekTimers: new Map()
+};
+
 export function jobStatusDisplay(status) {
   const value = String(status || "");
   if (value === "stopped") return "已中断";
@@ -53,7 +61,7 @@ export function makeJobSpinner() {
 // 后台命令没有实时进度流,展开那行时拉日志尾巴看输出(09-12 用户报「命令无法
 // 点击展开看输出」);运行中每 1.5s 轮询一次,退出即停。
 export function commandLogPanel(jobId) {
-  let entry = state.commandLogs.get(jobId);
+  let entry = jobsState.commandLogs.get(jobId);
   if (!entry) {
     const panel = document.createElement("div");
     panel.className = "job-stream-panel job-log-panel";
@@ -62,13 +70,13 @@ export function commandLogPanel(jobId) {
     pre.textContent = "…";
     panel.appendChild(pre);
     entry = { panel, pre, timer: null };
-    state.commandLogs.set(jobId, entry);
+    jobsState.commandLogs.set(jobId, entry);
   }
   return entry;
 }
 
 export async function refreshCommandLog(jobId) {
-  const entry = state.commandLogs.get(jobId);
+  const entry = jobsState.commandLogs.get(jobId);
   if (!entry) return;
   try {
     // apiRequest 返回的是 Response,得再 .json()(09-12 #8a 命令永远「暂无输出」
@@ -91,7 +99,7 @@ export async function refreshCommandLog(jobId) {
 // 进度流,但输出全在日志里,尾行就是「它现在在干嘛」。行会随任务条重建而换元素,
 // 所以 timer 里每次都从当前 DOM 找回该 job 的窥视 span。
 export function trackCommandPeek(jobId) {
-  if (state.commandPeekTimers.has(jobId)) return;
+  if (jobsState.commandPeekTimers.has(jobId)) return;
   const tick = async () => {
     const job = state.backgroundJobs.get(jobId);
     const running = job && job.running;
@@ -101,7 +109,7 @@ export function trackCommandPeek(jobId) {
       const lines = String(data?.log || "").split("\n").map((l) => l.trimEnd()).filter(Boolean);
       const last = lines.length ? lines[lines.length - 1] : "";
       if (last) {
-        state.commandPeekLine.set(jobId, last);
+        jobsState.commandPeekLine.set(jobId, last);
         const el = elements.jobsStrip?.querySelector(`.job-chip[data-job-id="${CSS.escape(jobId)}"] .job-chip-peek > span`);
         if (el) setReasoningPeek(el, last);
       }
@@ -110,12 +118,12 @@ export function trackCommandPeek(jobId) {
     if (!running) stop();
   };
   const stop = () => {
-    const t = state.commandPeekTimers.get(jobId);
+    const t = jobsState.commandPeekTimers.get(jobId);
     if (t) clearInterval(t);
-    state.commandPeekTimers.delete(jobId);
+    jobsState.commandPeekTimers.delete(jobId);
   };
   tick();
-  state.commandPeekTimers.set(jobId, setInterval(tick, 1500));
+  jobsState.commandPeekTimers.set(jobId, setInterval(tick, 1500));
 }
 
 export function renderJobsStrip() {
@@ -126,7 +134,7 @@ export function renderJobsStrip() {
   // 从 <3 跨到 ≥3 的那一刻强制收起(刷新时 prev=0 也算跨越),之后用户手动展开保留。
   const prevJobCount = state.prevJobCount || 0;
   state.prevJobCount = jobs.length;
-  if (jobs.length >= 3 && prevJobCount < 3) state.jobsStripOpen = false;
+  if (jobs.length >= 3 && prevJobCount < 3) jobsState.jobsStripOpen = false;
   if (!jobs.length) {
     strip.hidden = true;
     strip.replaceChildren();
@@ -139,29 +147,29 @@ export function renderJobsStrip() {
     // 合并行做成和单行一样的 job-chip 外观(09-12 用户报):braille spinner +
     // 「后台任务 ×N」+ 展开箭头,不再是另一种带 ▸ 前缀的按钮。
     const toggle = document.createElement("div");
-    toggle.className = state.jobsStripOpen ? "job-chip is-toggle is-open" : "job-chip is-toggle";
+    toggle.className = jobsState.jobsStripOpen ? "job-chip is-toggle is-open" : "job-chip is-toggle";
     toggle.setAttribute("role", "button");
-    toggle.setAttribute("aria-expanded", String(state.jobsStripOpen));
+    toggle.setAttribute("aria-expanded", String(jobsState.jobsStripOpen));
     const label = document.createElement("span");
     label.className = "job-chip-label";
     label.textContent = `后台任务 ×${jobs.length}`;
     toggle.append(makeJobSpinner(), label);
     toggle.addEventListener("click", () => {
-      state.jobsStripOpen = !state.jobsStripOpen;
+      jobsState.jobsStripOpen = !jobsState.jobsStripOpen;
       // 收起「后台任务 ×N」合并行时,把里面所有已展开的状态行 + 思考/工具卡
       // 一并收起(09-12 #15),不留展开残留。
-      if (!state.jobsStripOpen) {
+      if (!jobsState.jobsStripOpen) {
         state.expandedJobs.clear();
         for (const sink of state.jobStreamSinks.values()) {
           sink.panel?.querySelectorAll("details[open]").forEach((d) => { d.open = false; });
         }
       }
-      localStorage.setItem("gqy.web.jobsStripOpen", state.jobsStripOpen ? "1" : "0");
+      localStorage.setItem("gqy.web.jobsStripOpen", jobsState.jobsStripOpen ? "1" : "0");
       renderJobsStrip();
     });
     fragment.appendChild(toggle);
   }
-  const showRows = !collapsible || state.jobsStripOpen;
+  const showRows = !collapsible || jobsState.jobsStripOpen;
   for (const job of showRows ? jobs : []) {
     const jid = String(job.job_id);
     const isSubagent = job.kind === "subagent";
@@ -220,7 +228,7 @@ export function renderJobsStrip() {
     } else {
       // 后台命令没有进度流,但有输出日志(#120):把日志尾行当窥视,轮询刷新;
       // 先用已缓存的尾行填上(重建行时不闪)。
-      if (state.commandPeekLine?.has(jid)) setReasoningPeek(peek, state.commandPeekLine.get(jid));
+      if (jobsState.commandPeekLine?.has(jid)) setReasoningPeek(peek, jobsState.commandPeekLine.get(jid));
       if (job.running) trackCommandPeek(jid, peek);
     }
 
@@ -258,7 +266,7 @@ export function renderJobsStrip() {
         }
       }
     } else if (!isSubagent) {
-      const entry = state.commandLogs.get(jid);
+      const entry = jobsState.commandLogs.get(jid);
       if (entry?.timer) {
         clearInterval(entry.timer);
         entry.timer = null;
@@ -348,7 +356,7 @@ export function start() {
       const seconds = Math.max(0, Math.round(job.runtime_seconds + (Date.now() - job.receivedAt) / 1000));
       time.textContent = formatJobDuration(seconds);
     }
-    if (missing && (state.jobsStripOpen || visible.length < 3)) renderJobsStrip();
+    if (missing && (jobsState.jobsStripOpen || visible.length < 3)) renderJobsStrip();
   }, 1000);
 
   setTimeout(seedJobsStrip, 800);

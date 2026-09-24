@@ -1,14 +1,11 @@
 import { DEFAULT_BOARD_SUBTITLE, DEFAULT_BOARD_TITLE, DEFAULT_STARTER_PROMPTS, defaultComposerPlaceholder } from "../core/constants.js";
 
+/// 跨模块共享的状态：这里只留两个以上模块（或 settings.js 这类旧脚本经 ctx.state）
+/// 都要读写的键。只有一个模块用的状态放在那个模块自己的 `xxxState` 里（P5 分片）。
 export const state = {
   backgroundJobs: new Map(),
-  jobsStripOpen: localStorage.getItem("gqy.web.jobsStripOpen") === "1",
   expandedJobs: new Set(),
   jobStreamSinks: new Map(),
-  commandLogs: new Map(),
-  commandPeekLine: new Map(),
-  commandPeekTimers: new Map(),
-  bootId: null,
   latestEventId: 0,
   lastEventId: 0,
   replayRunIds: null,
@@ -35,8 +32,6 @@ export const state = {
   // 正在切往的会话:点击标签的瞬间就高亮它、并铺一层加载动画,等 turns 拉回来
   // 再真正应用视图(09-12 用户报「先加载后切换、点大会话像卡住」)。
   switchingToSessionId: "",
-  viewLoadGeneration: 0,
-  viewSyncTimer: null,
   runsBySession: new Map(),
   // 跑完了、但用户还没切进去看过的会话。
   // 「完成」不是能持续的状态（否则每个会话都会永远挂着「已完成」），
@@ -49,10 +44,8 @@ export const state = {
   liveSubagentTokens: new Map(),
   sessionMenuFor: null,
   sessionRenaming: null,
-  sessionDragId: null,
   lastReorderIds: "",
   modeChooserOpen: false,
-  modeChooserKeyHandler: null,
   sessionBusy: false,
   display: {
     reasoning: "summary",
@@ -67,30 +60,13 @@ export const state = {
   capabilities: {},
   /// 登录者(阶段 5 多用户):{account_id, username, display_name, admin}。
   account: null,
-  version: null,
   eventSource: null,
-  connection: "connecting",
   blocked: false,
   adminBusy: false,
-  loginSubmitting: false,
-  modelSelectionSubmitting: false,
-  stagedModelKeys: null,
-  stagedFollowGlobal: false,
-  stagedVariants: null,
-  stageTodos: null,
-  goal: null,
-  goalGeneration: 0,
-  stageTodosGeneration: 0,
-  expandedLevelKey: null,
-  modelMenuTouched: false,
-  modelMenuError: "",
   sessionModelOverride: null,
   sessionModelOverrideFor: "",
-  sessionModelOverrideToken: 0,
   submitting: false,
-  revisionSubmitting: false,
   redoCandidate: null,
-  revisionEditor: null,
   pendingSubmission: null,
   composerAttachments: [],
   artifacts: [],
@@ -98,25 +74,10 @@ export const state = {
   artifactOpen: false,
   artifactRenderToken: 0,
   artifactZoom: 1,
-  artifactPanX: 0,
-  artifactPanY: 0,
   artifactMode: "preview",
   artifactMaximized: false,
   artifactWidthRatio: 0.5,
   artifactSourceCache: new Map(),
-  // artifact 列表有两个来源：回合产出的 `turn.artifacts`（每次同步重建），
-  // 和用户手动送进来的（气泡上点「在预览工作区打开」）。后者不在任何回合的
-  // artifacts 里，光靠重建会在下一个回合到达时被整体覆盖掉——图片刚打开就
-  // 没了。所以手动那批单独留一份，同步时并进去。
-  //
-  // 两份都按会话分。回合产出的天然分会话（同步喂进来的就是当前会话的
-  // turns），这两份要是全局的，A 会话置顶的图会出现在 B 会话的列表里，
-  // 在 A 里删掉的也会连累 B。
-  pinnedArtifacts: new Map(),
-  dismissedArtifactIds: new Map(),
-  colorScheme: null,
-  uiPrefs: {},
-  matugenAvailable: null,
   reasoningExpanded: false,
   toolExpanded: false,
   // 过程自动收起:她一开口,前面那串思考+工具收成一行总结。默认开。
@@ -127,31 +88,16 @@ export const state = {
   nearBottom: true,
   followOutput: true,
   programmaticScroll: false,
-  settingsOpener: null,
   consolePanel: "usage",
-  commandRunning: false,
-  brailleFrame: 0,
   sidebarOpener: null,
-  sidebarCollapsed: false,
-  sidebarAutoCollapsed: false,
-  modeAnimationTimer: null,
-  healthTimer: null,
   terminalRunIds: new Set(),
   thinkingVariantModels: [],
-  thinkingVariantLoading: false,
-  thinkingVariantLoadGeneration: 0,
-  thinkingVariantError: "",
-  composing: false,
   settingsView: "interface",
   platformView: { platform: "qq", tab: "settings" },
   configLoaded: false,
   configLoading: false,
-  configSaving: false,
-  configDirty: false,
   configDraft: null,
-  configOriginal: null,
   promptDraft: null,
-  promptOriginal: null,
   secretStates: {},
   secretChanges: {},
   providerSecretStates: [],

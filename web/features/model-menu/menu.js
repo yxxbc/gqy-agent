@@ -10,6 +10,18 @@ import { elements } from "../../state/elements.js";
 import { state } from "../../state/store.js";
 import { clearInlineError, showInlineError } from "../../widgets/inline-error.js";
 
+/// 只有本模块用的状态（从 state/store.js 分出来的私有分片）。
+const menuState = {
+  modelSelectionSubmitting: false,
+  stagedModelKeys: null,
+  stagedFollowGlobal: false,
+  stagedVariants: null,
+  expandedLevelKey: null,
+  modelMenuTouched: false,
+  modelMenuError: "",
+  sessionModelOverrideToken: 0
+};
+
 export function openModelMenu() {
   if (elements.modelButton.disabled || state.models.length === 0) return;
   resetModelMenuStaging();
@@ -49,10 +61,10 @@ export function closeModelMenu({ restoreFocus = false, discard = true } = {}) {
   elements.modelMenu.hidden = true;
   elements.modelButton.setAttribute("aria-expanded", "false");
   if (discard) {
-    state.stagedModelKeys = null;
-    state.stagedFollowGlobal = false;
-    state.modelMenuTouched = false;
-    state.modelMenuError = "";
+    menuState.stagedModelKeys = null;
+    menuState.stagedFollowGlobal = false;
+    menuState.modelMenuTouched = false;
+    menuState.modelMenuError = "";
   }
   if (restoreFocus) elements.modelButton.focus();
 }
@@ -84,15 +96,15 @@ export function setSessionModelOverride(sessionId, override) {
   state.sessionModelOverrideFor = String(sessionId || "");
   state.sessionModelOverride = normalizeModelOverride(override);
   updateCurrentModelDisplay();
-  if (elements.modelMenu.hidden || state.modelSelectionSubmitting) return;
+  if (elements.modelMenu.hidden || menuState.modelSelectionSubmitting) return;
   // 菜单开着且用户尚未改动暂存选择时，同步为最新覆盖状态。
-  if (!state.modelMenuTouched && state.stagedModelKeys instanceof Set) {
+  if (!menuState.modelMenuTouched && menuState.stagedModelKeys instanceof Set) {
     const fresh = viewSessionModelOverride();
     const freshFollow = !fresh;
     const freshKeys = new Set((fresh || []).map(modelKey));
-    const unchanged = state.stagedFollowGlobal === freshFollow
-      && state.stagedModelKeys.size === freshKeys.size
-      && [...freshKeys].every((key) => state.stagedModelKeys.has(key));
+    const unchanged = menuState.stagedFollowGlobal === freshFollow
+      && menuState.stagedModelKeys.size === freshKeys.size
+      && [...freshKeys].every((key) => menuState.stagedModelKeys.has(key));
     if (!unchanged) {
       const hadFocus = elements.modelMenu.contains(document.activeElement);
       resetModelMenuStaging();
@@ -110,7 +122,7 @@ export function setSessionModelOverride(sessionId, override) {
 
 export async function refreshSessionModelOverride(sessionId = state.viewSessionId) {
   const target = String(sessionId || "");
-  const token = ++state.sessionModelOverrideToken;
+  const token = ++menuState.sessionModelOverrideToken;
   if (!target) {
     setSessionModelOverride("", null);
     return;
@@ -118,7 +130,7 @@ export async function refreshSessionModelOverride(sessionId = state.viewSessionI
   try {
     const response = await apiRequest(`/api/sessions/${encodeURIComponent(target)}/models`);
     const payload = await response.json();
-    if (token !== state.sessionModelOverrideToken || state.viewSessionId !== target) return;
+    if (token !== menuState.sessionModelOverrideToken || state.viewSessionId !== target) return;
     setSessionModelOverride(target, payload?.model_override);
   } catch (_) {
     // 静默失败：顶栏回退显示全局池，下次打开菜单会再次刷新。
@@ -175,17 +187,17 @@ export function refreshLiveEndpointVisibility() {
 
 export function resetModelMenuStaging() {
   const override = viewSessionModelOverride();
-  state.stagedFollowGlobal = !override;
-  state.stagedModelKeys = new Set((override || []).map(modelKey));
+  menuState.stagedFollowGlobal = !override;
+  menuState.stagedModelKeys = new Set((override || []).map(modelKey));
   // 思考档位以前是另一个按钮、另一个浮层,即点即写。现在它和模型选择合成
   // 一个面板,就得跟模型选择一样先暂存,由同一个「确认」一起提交——否则同一
   // 个面板里一半改动立刻生效、一半要按确认,「取消」也说不清取消的是什么。
-  state.stagedVariants = new Map(
+  menuState.stagedVariants = new Map(
     state.thinkingVariantModels.map((model) => [modelKey(model), model.selected ?? null])
   );
-  state.expandedLevelKey = null;
-  state.modelMenuTouched = false;
-  state.modelMenuError = "";
+  menuState.expandedLevelKey = null;
+  menuState.modelMenuTouched = false;
+  menuState.modelMenuError = "";
 }
 
 /// 某个模型可选的档位;没有可配置档位的模型返回空数组(那一行就不长小片)。
@@ -195,16 +207,16 @@ export function variantOptionsFor(key) {
 }
 
 export function stagedVariantFor(key) {
-  if (state.stagedVariants instanceof Map && state.stagedVariants.has(key)) {
-    return state.stagedVariants.get(key);
+  if (menuState.stagedVariants instanceof Map && menuState.stagedVariants.has(key)) {
+    return menuState.stagedVariants.get(key);
   }
   const entry = state.thinkingVariantModels.find((model) => modelKey(model) === key);
   return entry ? entry.selected ?? null : null;
 }
 
 export function modelMenuStaging() {
-  if (state.stagedModelKeys instanceof Set) {
-    return { follow: state.stagedFollowGlobal, keys: state.stagedModelKeys };
+  if (menuState.stagedModelKeys instanceof Set) {
+    return { follow: menuState.stagedFollowGlobal, keys: menuState.stagedModelKeys };
   }
   const override = viewSessionModelOverride();
   return { follow: !override, keys: new Set((override || []).map(modelKey)) };
@@ -283,14 +295,14 @@ export function renderModelMenu() {
     const chip = document.createElement("button");
     chip.type = "button";
     chip.className = "model-level-chip";
-    chip.setAttribute("aria-expanded", String(state.expandedLevelKey === key));
+    chip.setAttribute("aria-expanded", String(menuState.expandedLevelKey === key));
     chip.title = `思考程度：${thinkingVariantLabel(stagedVariantFor(key))}`;
     const chipText = document.createElement("span");
     chipText.textContent = thinkingVariantLabel(stagedVariantFor(key), true);
     chip.append(chipText, makeIconSlot("chevron-down"));
     chip.addEventListener("click", (event) => {
       event.stopPropagation();
-      if (state.expandedLevelKey === key) closeLevelMenu();
+      if (menuState.expandedLevelKey === key) closeLevelMenu();
       else openLevelMenu(key, chip, model.model);
     });
     row.append(button, chip);
@@ -339,32 +351,32 @@ export function updateModelMenuState() {
     button.classList.toggle("selected", checked && (isFollowItem || !staging.follow));
     button.classList.toggle("from-global", !isFollowItem && checked && staging.follow);
     button.setAttribute("aria-checked", String(checked));
-    button.disabled = state.blocked || state.modelSelectionSubmitting;
+    button.disabled = state.blocked || menuState.modelSelectionSubmitting;
     const check = button.querySelector(".check-slot");
     if (check) check.replaceChildren(...(checked ? [createIcon("check")] : []));
   });
   const feedback = elements.modelMenu.querySelector(".model-menu-feedback");
   if (feedback) {
     const following = staging.follow || staging.keys.size === 0;
-    feedback.textContent = state.modelMenuError
+    feedback.textContent = menuState.modelMenuError
       || (following ? "跟随全局激活模型池" : `已选择 ${formatInteger(staging.keys.size)} 个模型（仅本会话）`);
-    feedback.classList.toggle("is-error", Boolean(state.modelMenuError));
+    feedback.classList.toggle("is-error", Boolean(menuState.modelMenuError));
   }
   const confirm = elements.modelMenu.querySelector(".model-confirm");
   if (confirm) {
-    confirm.textContent = state.modelSelectionSubmitting ? "正在应用" : "确认";
-    confirm.disabled = state.modelSelectionSubmitting || state.blocked;
+    confirm.textContent = menuState.modelSelectionSubmitting ? "正在应用" : "确认";
+    confirm.disabled = menuState.modelSelectionSubmitting || state.blocked;
   }
   const cancel = elements.modelMenu.querySelector(".model-cancel");
-  if (cancel) cancel.disabled = state.modelSelectionSubmitting;
+  if (cancel) cancel.disabled = menuState.modelSelectionSubmitting;
 }
 
 export function chooseFollowGlobal() {
-  if (!(state.stagedModelKeys instanceof Set) || state.modelSelectionSubmitting) return;
-  state.stagedFollowGlobal = true;
-  state.stagedModelKeys = new Set();
-  state.modelMenuTouched = true;
-  state.modelMenuError = "";
+  if (!(menuState.stagedModelKeys instanceof Set) || menuState.modelSelectionSubmitting) return;
+  menuState.stagedFollowGlobal = true;
+  menuState.stagedModelKeys = new Set();
+  menuState.modelMenuTouched = true;
+  menuState.modelMenuError = "";
   updateModelMenuState();
 }
 
@@ -376,7 +388,7 @@ export function chooseFollowGlobal() {
 export function openLevelMenu(key, chip, modelName) {
   const variants = variantOptionsFor(key);
   if (!variants.length) return;
-  state.expandedLevelKey = key;
+  menuState.expandedLevelKey = key;
   const menu = elements.modelLevelMenu;
   menu.replaceChildren();
   menu.setAttribute("aria-label", `${modelName} 的思考程度`);
@@ -425,32 +437,32 @@ export function positionLevelMenu(chip) {
 export function closeLevelMenu() {
   if (elements.modelLevelMenu.hidden) return;
   elements.modelLevelMenu.hidden = true;
-  state.expandedLevelKey = null;
+  menuState.expandedLevelKey = null;
   elements.modelMenu
     .querySelectorAll('.model-level-chip[aria-expanded="true"]')
     .forEach((chip) => chip.setAttribute("aria-expanded", "false"));
 }
 
 export function stageVariant(key, variant) {
-  if (!(state.stagedVariants instanceof Map) || state.modelSelectionSubmitting) return;
-  state.stagedVariants.set(key, variant);
+  if (!(menuState.stagedVariants instanceof Map) || menuState.modelSelectionSubmitting) return;
+  menuState.stagedVariants.set(key, variant);
   closeLevelMenu();
-  state.modelMenuTouched = true;
-  state.modelMenuError = "";
+  menuState.modelMenuTouched = true;
+  menuState.modelMenuError = "";
   renderModelMenu();
 }
 
 export function toggleStagedModel(key) {
-  if (!(state.stagedModelKeys instanceof Set) || state.modelSelectionSubmitting) return;
-  if (state.stagedFollowGlobal) {
+  if (!(menuState.stagedModelKeys instanceof Set) || menuState.modelSelectionSubmitting) return;
+  if (menuState.stagedFollowGlobal) {
     // 退出跟随模式：以当前显示的全局激活池为起点继续多选。
-    state.stagedFollowGlobal = false;
-    state.stagedModelKeys = new Set(activeModels().map(modelKey));
+    menuState.stagedFollowGlobal = false;
+    menuState.stagedModelKeys = new Set(activeModels().map(modelKey));
   }
-  if (state.stagedModelKeys.has(key)) state.stagedModelKeys.delete(key);
-  else state.stagedModelKeys.add(key);
-  state.modelMenuTouched = true;
-  state.modelMenuError = "";
+  if (menuState.stagedModelKeys.has(key)) menuState.stagedModelKeys.delete(key);
+  else menuState.stagedModelKeys.add(key);
+  menuState.modelMenuTouched = true;
+  menuState.modelMenuError = "";
   updateModelMenuState();
 }
 
@@ -458,12 +470,12 @@ export function toggleStagedModel(key) {
 /// 的模型选择不是一个作用域,所以是两次请求;这里先写档位——它失败了就整个
 /// 确认中止,不会出现「模型换了但档位没跟上」的半套状态。
 export async function commitStagedVariants() {
-  if (!(state.stagedVariants instanceof Map)) return;
+  if (!(menuState.stagedVariants instanceof Map)) return;
   const updates = [];
   for (const model of state.thinkingVariantModels) {
     const key = modelKey(model);
-    if (!state.stagedVariants.has(key)) continue;
-    const desired = state.stagedVariants.get(key);
+    if (!menuState.stagedVariants.has(key)) continue;
+    const desired = menuState.stagedVariants.get(key);
     if (desired === (model.selected ?? null)) continue;
     updates.push({ provider_id: model.provider_id, model: model.model, selected: desired });
   }
@@ -477,22 +489,22 @@ export async function commitStagedVariants() {
 }
 
 export async function confirmModelSelection() {
-  if (!(state.stagedModelKeys instanceof Set) || state.modelSelectionSubmitting) return;
+  if (!(menuState.stagedModelKeys instanceof Set) || menuState.modelSelectionSubmitting) return;
   const sessionId = String(state.viewSessionId || state.currentSessionId || "");
   if (!sessionId) {
-    state.modelMenuError = "当前视图没有可设置的会话";
+    menuState.modelMenuError = "当前视图没有可设置的会话";
     updateModelMenuState();
     return;
   }
-  const follow = state.stagedFollowGlobal || state.stagedModelKeys.size === 0;
-  const selected = follow ? [] : state.models.filter((model) => state.stagedModelKeys.has(modelKey(model)));
+  const follow = menuState.stagedFollowGlobal || menuState.stagedModelKeys.size === 0;
+  const selected = follow ? [] : state.models.filter((model) => menuState.stagedModelKeys.has(modelKey(model)));
   if (!follow && selected.length === 0) {
-    state.modelMenuError = "所选模型已不可用，请重新选择";
+    menuState.modelMenuError = "所选模型已不可用，请重新选择";
     updateModelMenuState();
     return;
   }
-  state.modelSelectionSubmitting = true;
-  state.modelMenuError = "";
+  menuState.modelSelectionSubmitting = true;
+  menuState.modelMenuError = "";
   clearInlineError();
   updateModelMenuState();
   let applied = false;
@@ -509,18 +521,18 @@ export async function confirmModelSelection() {
     });
     const payload = await response.json();
     applied = true;
-    state.modelSelectionSubmitting = false;
+    menuState.modelSelectionSubmitting = false;
     closeModelMenu();
     setSessionModelOverride(sessionId, payload?.model_override);
     // 换了模型池,窗口大小也跟着换;不拉的话上下文条要到跑完一轮才纠正。
     refreshSessionContext(sessionId);
     showToast(follow ? "本会话已恢复跟随全局" : "本会话模型已更新（下一轮生效）");
   } catch (error) {
-    state.modelMenuError = error.message || "模型设置未保存";
+    menuState.modelMenuError = error.message || "模型设置未保存";
     showInlineError(error.message);
     showToast(error.message, "error");
   } finally {
-    state.modelSelectionSubmitting = false;
+    menuState.modelSelectionSubmitting = false;
     updateControlState();
     if (applied) window.requestAnimationFrame(() => elements.modelButton.focus());
     else {

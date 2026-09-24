@@ -4,6 +4,13 @@ import { updateControlState } from "../composer/input.js";
 import { updateCurrentModelDisplay } from "./menu.js";
 import { state } from "../../state/store.js";
 
+/// 只有本模块用的状态（从 state/store.js 分出来的私有分片）。
+const variantsState = {
+  thinkingVariantLoading: false,
+  thinkingVariantLoadGeneration: 0,
+  thinkingVariantError: ""
+};
+
 export function thinkingVariantLabel(variant, short = false) {
   if (variant == null) return short ? THINKING_VARIANT_DEFAULT_LABEL : "模型默认";
   return String(variant);
@@ -28,22 +35,22 @@ export function normalizeThinkingVariantModels(value) {
 }
 
 export async function loadThinkingVariants() {
-  const generation = ++state.thinkingVariantLoadGeneration;
-  state.thinkingVariantLoading = true;
-  state.thinkingVariantError = "";
+  const generation = ++variantsState.thinkingVariantLoadGeneration;
+  variantsState.thinkingVariantLoading = true;
+  variantsState.thinkingVariantError = "";
   updateControlState();
   try {
     const response = await apiRequest("/api/models/thinking-variants", { cache: "no-store" });
     const payload = await response.json();
-    if (generation !== state.thinkingVariantLoadGeneration) return;
+    if (generation !== variantsState.thinkingVariantLoadGeneration) return;
     state.thinkingVariantModels = normalizeThinkingVariantModels(payload?.options);
     updateCurrentModelDisplay();
   } catch (error) {
-    if (generation !== state.thinkingVariantLoadGeneration) return;
-    state.thinkingVariantError = error.message || "无法载入思考档位";
+    if (generation !== variantsState.thinkingVariantLoadGeneration) return;
+    variantsState.thinkingVariantError = error.message || "无法载入思考档位";
   } finally {
-    if (generation === state.thinkingVariantLoadGeneration) {
-      state.thinkingVariantLoading = false;
+    if (generation === variantsState.thinkingVariantLoadGeneration) {
+      variantsState.thinkingVariantLoading = false;
       updateControlState();
     }
   }

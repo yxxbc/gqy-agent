@@ -8,16 +8,24 @@ import { updateContext } from "./status.js";
 import { elements } from "../state/elements.js";
 import { state } from "../state/store.js";
 
+/// 只有本模块用的状态（从 state/store.js 分出来的私有分片）。
+const goalState = {
+  stageTodos: null,
+  goal: null,
+  goalGeneration: 0,
+  stageTodosGeneration: 0
+};
+
 /// 常驻任务面板：当前会话的待办。
 ///
 /// 两条更新路径。进会话/刷新走 `GET /api/sessions/{id}/todos`——工具事件
 /// 只在 `todowrite` 跑的那一刻发生一次,不问一次就只有空面板；回合里 AI
 /// 改了待办则直接吃 `tool.finished` 的输出,不必再往返一趟。
 export function renderStageTodos(todos) {
-  state.stageTodos = todos?.length ? todos : null;
+  goalState.stageTodos = todos?.length ? todos : null;
   const panel = elements.stageTodos;
   panel.replaceChildren();
-  const card = state.stageTodos ? window.GqyTodos?.renderList(state.stageTodos) : null;
+  const card = goalState.stageTodos ? window.GqyTodos?.renderList(goalState.stageTodos) : null;
   if (!card) {
     panel.hidden = true;
     return;
@@ -40,7 +48,7 @@ export const GOAL_PHASE_LABELS = Object.freeze({
 export function renderGoalBar() {
   const bar = elements.goalBar;
   bar.replaceChildren();
-  const goal = state.goal;
+  const goal = goalState.goal;
   // 完成的目标不再占位：那一行的作用是「它还在做这件事」，做完了就该让开。
   // 想回顾结果，AI 的结案陈词就在对话流里。
   if (!goal || goal.phase === "complete") {
@@ -278,19 +286,19 @@ export async function refreshSessionContext(sessionId) {
 export async function loadGoal(sessionId) {
   const scope = String(sessionId || "");
   if (!scope) {
-    state.goal = null;
+    goalState.goal = null;
     renderGoalBar();
     return;
   }
-  const generation = ++state.goalGeneration;
+  const generation = ++goalState.goalGeneration;
   try {
     const response = await apiRequest(`/api/sessions/${encodeURIComponent(scope)}/goal`);
     const payload = await response.json();
-    if (generation !== state.goalGeneration) return;
-    state.goal = payload?.goal || null;
+    if (generation !== goalState.goalGeneration) return;
+    goalState.goal = payload?.goal || null;
   } catch (_) {
-    if (generation !== state.goalGeneration) return;
-    state.goal = null;
+    if (generation !== goalState.goalGeneration) return;
+    goalState.goal = null;
   }
   renderGoalBar();
 }
@@ -301,15 +309,15 @@ export async function loadStageTodos(sessionId) {
     renderStageTodos(null);
     return;
   }
-  const generation = ++state.stageTodosGeneration;
+  const generation = ++goalState.stageTodosGeneration;
   try {
     const response = await apiRequest(`/api/sessions/${encodeURIComponent(scope)}/todos`);
     const payload = await response.json();
-    if (generation !== state.stageTodosGeneration) return;
+    if (generation !== goalState.stageTodosGeneration) return;
     renderStageTodos(window.GqyTodos?.normalize(payload?.todos) || null);
   } catch (_) {
     // 面板是附带信息,拿不到就空着,不打扰对话。
-    if (generation === state.stageTodosGeneration) renderStageTodos(null);
+    if (generation === goalState.stageTodosGeneration) renderStageTodos(null);
   }
 }
 

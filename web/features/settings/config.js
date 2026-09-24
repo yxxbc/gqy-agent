@@ -12,6 +12,14 @@ import { updateContext } from "../status.js";
 import { elements } from "../../state/elements.js";
 import { state } from "../../state/store.js";
 
+/// 只有本模块用的状态（从 state/store.js 分出来的私有分片）。
+const configState = {
+  configSaving: false,
+  configDirty: false,
+  configOriginal: null,
+  promptOriginal: null
+};
+
 export function setSettingsView(view) {
   const selected = ["interface", "prompts", "providers", "models", "general", "mcp", "plugins", "advanced"].includes(view) ? view : "interface";
   state.settingsView = selected;
@@ -49,7 +57,7 @@ export function setConfigValue(path, value) {
 }
 
 export function markConfigDirty() {
-  state.configDirty = true;
+  configState.configDirty = true;
   updateSettingsControls();
 }
 
@@ -69,17 +77,17 @@ export function refreshProviderSecretStates() {
 }
 
 export function updateSettingsControls() {
-  const busy = state.configLoading || state.configSaving;
+  const busy = state.configLoading || configState.configSaving;
   elements.reloadConfigButton.disabled = busy;
-  elements.saveConfigButton.disabled = busy || !state.configLoaded || !state.configDirty || state.invalidConfigFields.size > 0 || conversationRunning();
-  elements.settingsFooter?.classList.toggle("is-dirty", Boolean(state.configLoaded && state.configDirty));
+  elements.saveConfigButton.disabled = busy || !state.configLoaded || !configState.configDirty || state.invalidConfigFields.size > 0 || conversationRunning();
+  elements.settingsFooter?.classList.toggle("is-dirty", Boolean(state.configLoaded && configState.configDirty));
   elements.settingsFooter?.classList.toggle("is-invalid", state.invalidConfigFields.size > 0);
   if (state.configLoading) elements.settingsStatus.textContent = "正在载入配置";
-  else if (state.configSaving) elements.settingsStatus.textContent = "正在验证并保存";
+  else if (configState.configSaving) elements.settingsStatus.textContent = "正在验证并保存";
   else if (!state.configLoaded) elements.settingsStatus.textContent = "尚未载入配置";
   else if (state.invalidConfigFields.size) elements.settingsStatus.textContent = "请修正表单中的错误";
-  else if (conversationRunning() && state.configDirty) elements.settingsStatus.textContent = "回复完成后才能保存";
-  else elements.settingsStatus.textContent = state.configDirty ? "有未保存的修改" : "配置已同步";
+  else if (conversationRunning() && configState.configDirty) elements.settingsStatus.textContent = "回复完成后才能保存";
+  else elements.settingsStatus.textContent = configState.configDirty ? "有未保存的修改" : "配置已同步";
 }
 
 export function updateAdvancedConfigEditor() {
@@ -144,12 +152,12 @@ export function ensurePlatformDefaults(draft) {
 export function applyConfigPayload(payload) {
   state.configDraft = deepClone(payload?.config || {});
   ensurePlatformDefaults(state.configDraft);
-  state.configOriginal = deepClone(payload?.config || {});
+  configState.configOriginal = deepClone(payload?.config || {});
   state.promptDraft = deepClone(payload?.prompts || { personas: [], identities: [] });
-  state.promptOriginal = deepClone(payload?.prompts || { personas: [], identities: [] });
+  configState.promptOriginal = deepClone(payload?.prompts || { personas: [], identities: [] });
   state.secretChanges = {};
   mapServerSecretStates(payload?.secret_states || {});
-  state.configDirty = false;
+  configState.configDirty = false;
   state.configLoaded = true;
   state.invalidConfigFields.clear();
   if (Array.isArray(payload?.models)) state.models = payload.models;
@@ -176,8 +184,8 @@ export function applyConfigPayload(payload) {
 }
 
 export async function loadConfigDraft() {
-  if (state.configLoading || state.configSaving) return;
-  if (state.configDirty && !window.confirm("放弃尚未保存的配置修改并重新载入？")) return;
+  if (state.configLoading || configState.configSaving) return;
+  if (configState.configDirty && !window.confirm("放弃尚未保存的配置修改并重新载入？")) return;
   state.configLoading = true;
   updateSettingsControls();
   try {
@@ -193,10 +201,10 @@ export async function loadConfigDraft() {
 }
 
 export function promptStateChanged() {
-  if (!state.configOriginal || !state.promptOriginal) return false;
+  if (!configState.configOriginal || !configState.promptOriginal) return false;
   const promptKeys = ["prompt", "system_prompt_file", "system_prompt"];
   const current = Object.fromEntries(promptKeys.map((key) => [key, state.configDraft?.[key]]));
-  const original = Object.fromEntries(promptKeys.map((key) => [key, state.configOriginal?.[key]]));
+  const original = Object.fromEntries(promptKeys.map((key) => [key, configState.configOriginal?.[key]]));
   const withoutPersonaMetadata = (documents) => Object.fromEntries(
     Object.entries(documents || {}).map(([kind, items]) => [
       kind,
@@ -212,7 +220,7 @@ export function promptStateChanged() {
     ])
   );
   return JSON.stringify(current) !== JSON.stringify(original)
-    || JSON.stringify(withoutPersonaMetadata(state.promptDraft)) !== JSON.stringify(withoutPersonaMetadata(state.promptOriginal));
+    || JSON.stringify(withoutPersonaMetadata(state.promptDraft)) !== JSON.stringify(withoutPersonaMetadata(configState.promptOriginal));
 }
 
 export function buildSecretMutations() {
@@ -220,10 +228,10 @@ export function buildSecretMutations() {
 }
 
 export async function saveConfigDraft() {
-  if (!state.configLoaded || state.configSaving || state.configLoading || conversationRunning() || state.invalidConfigFields.size) return;
+  if (!state.configLoaded || configState.configSaving || state.configLoading || conversationRunning() || state.invalidConfigFields.size) return;
   const personaChanged = String(state.configDraft?.prompt?.active_persona || "")
-    !== String(state.configOriginal?.prompt?.active_persona || "");
-  state.configSaving = true;
+    !== String(configState.configOriginal?.prompt?.active_persona || "");
+  configState.configSaving = true;
   state.adminBusy = true;
   updateSettingsControls();
   updateControlState();
@@ -244,7 +252,7 @@ export async function saveConfigDraft() {
     showToast(error.message || "配置保存失败", "error");
     elements.settingsStatus.textContent = error.message || "配置保存失败";
   } finally {
-    state.configSaving = false;
+    configState.configSaving = false;
     state.adminBusy = false;
     updateSettingsControls();
     updateControlState();

@@ -10,6 +10,11 @@ import { setConnectionStatus } from "./status.js";
 import { elements } from "../state/elements.js";
 import { state } from "../state/store.js";
 
+/// 只有本模块用的状态（从 state/store.js 分出来的私有分片）。
+const authState = {
+  loginSubmitting: false
+};
+
 export function showBlockedState(unauthorized, message = "", { expired = false } = {}) {
   state.blocked = true;
   document.body.classList.toggle("is-login", Boolean(unauthorized));
@@ -193,18 +198,18 @@ export async function logout() {
 }
 
 export function setLoginSubmitting(submitting) {
-  state.loginSubmitting = Boolean(submitting);
-  elements.loginUsername.disabled = state.loginSubmitting;
-  elements.loginPassword.disabled = state.loginSubmitting;
-  elements.loginSubmit.disabled = state.loginSubmitting;
-  elements.loginSubmit.classList.toggle("is-loading", state.loginSubmitting);
-  elements.loginSubmitLabel.textContent = state.loginSubmitting ? "正在登录" : "登录";
+  authState.loginSubmitting = Boolean(submitting);
+  elements.loginUsername.disabled = authState.loginSubmitting;
+  elements.loginPassword.disabled = authState.loginSubmitting;
+  elements.loginSubmit.disabled = authState.loginSubmitting;
+  elements.loginSubmit.classList.toggle("is-loading", authState.loginSubmitting);
+  elements.loginSubmitLabel.textContent = authState.loginSubmitting ? "正在登录" : "登录";
   const icon = elements.loginSubmit.querySelector(".icon-slot");
-  if (icon) icon.replaceChildren(createIcon(state.loginSubmitting ? "loader-circle" : "log-in"));
+  if (icon) icon.replaceChildren(createIcon(authState.loginSubmitting ? "loader-circle" : "log-in"));
 }
 
 export async function submitLogin() {
-  if (state.loginSubmitting) return;
+  if (authState.loginSubmitting) return;
   const username = elements.loginUsername.value.trim();
   const password = elements.loginPassword.value;
   if (!username) {
