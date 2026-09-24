@@ -1838,10 +1838,17 @@
         },
         {
           key: "gqy_tools_eager",
-          label: "桥工具 eager 注册",
-          hint: "原生名直调;关掉走懒加载省 token 但多一跳",
+          label: "常用桥工具 eager 注册",
+          hint: "只有常用的内置工具常驻(原生名直调),其余走懒加载;关掉则全部懒加载",
           kind: "toggle",
           default: true,
+        },
+        {
+          key: "gqy_tools_eager_extra",
+          label: "额外常驻的桥工具",
+          hint: "工具名,比如自己装的脚本或 MCP 工具;内置常用工具已默认常驻",
+          kind: "string-list",
+          default: [],
         },
         {
           key: "idle_timeout_seconds",

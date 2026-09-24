@@ -90,6 +90,7 @@ fn antigravity_client(
         native_tools: native.to_string(),
         gqy_tools: gqy.to_string(),
         gqy_tools_eager: true,
+        gqy_tools_eager_extra: Vec::new(),
         idle_timeout: Duration::from_secs(30),
         print_timeout: Duration::from_secs(600),
         warm_idle: Duration::ZERO,
@@ -481,4 +482,21 @@ async fn auxiliary_scope_has_no_tools_and_no_resume() {
     let (result, _) = run(&client, messages, vec![tool("use_meme")]).await;
     result.unwrap();
     assert!(!read(dir.path(), "args.txt").contains("--conversation"));
+}
+
+/// 只有内置常用名单与用户额外名单里的工具 eager 常驻，其余留给 agy 懒加载
+/// （09-24：原来全部 eager，每次模型调用背约 1.8 万 token 的完整说明）。
+#[test]
+fn only_common_and_extra_bridge_tools_are_eager() {
+    use crate::llm::openai_compatible::antigravity::eager_bridge_tools;
+    let names = [
+        "github",
+        "hotel_deals",
+        "use_meme",
+        "blender_model",
+        "xhs_search",
+    ];
+    let eager = eager_bridge_tools(names.into_iter(), &["blender_model".to_string()], false);
+    assert_eq!(eager, ["github", "use_meme", "blender_model"]);
+    assert!(eager_bridge_tools(["hotel_deals"].into_iter(), &[], false).is_empty());
 }

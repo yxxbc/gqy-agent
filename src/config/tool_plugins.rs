@@ -112,6 +112,10 @@ pub struct AntigravityPluginConfig {
     /// `call_mcp_tool` 调用,省 token 但每件工具多一跳)。
     #[serde(default = "default_true")]
     pub gqy_tools_eager: bool,
+    /// 除内置常用工具外，额外按 eager 常驻的桥工具名（用户自己装的脚本、MCP
+    /// 工具等）。内置名单见 `antigravity::EAGER_BRIDGE_TOOLS`。
+    #[serde(default)]
+    pub gqy_tools_eager_extra: Vec<String>,
     /// 流空闲看门狗(秒):这么久没有任何输出就杀进程。
     #[serde(default = "default_antigravity_idle_timeout_seconds")]
     pub idle_timeout_seconds: u64,
@@ -132,6 +136,7 @@ impl Default for AntigravityPluginConfig {
             native_tools: default_antigravity_native_tools(),
             gqy_tools: default_antigravity_gqy_tools(),
             gqy_tools_eager: true,
+            gqy_tools_eager_extra: Vec::new(),
             idle_timeout_seconds: default_antigravity_idle_timeout_seconds(),
             print_timeout_seconds: default_antigravity_print_timeout_seconds(),
             warm_idle_seconds: default_antigravity_warm_idle_seconds(),

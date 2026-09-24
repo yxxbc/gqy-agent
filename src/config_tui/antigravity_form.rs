@@ -46,6 +46,13 @@ pub(in crate::config_tui) fn edit_antigravity_provider_form(
         )
         .choices(&["true", "false"]),
         Field::new(
+            t(
+                "Extra eager bridge tools (comma-separated)",
+                "额外常驻的桥工具(逗号分隔)",
+            ),
+            plugin.gqy_tools_eager_extra.join(","),
+        ),
+        Field::new(
             t("Stream idle watchdog (seconds)", "流空闲看门狗(秒)"),
             plugin.idle_timeout_seconds.to_string(),
         ),
@@ -87,9 +94,15 @@ pub(in crate::config_tui) fn edit_antigravity_provider_form(
         plugin.native_tools = normalize_scope(&fields[3].value);
         plugin.gqy_tools = normalize_scope(&fields[4].value);
         plugin.gqy_tools_eager = eager;
-        plugin.idle_timeout_seconds = fields[6].value.trim().parse().unwrap_or(300);
-        plugin.print_timeout_seconds = fields[7].value.trim().parse().unwrap_or(24 * 60 * 60);
-        plugin.warm_idle_seconds = fields[8].value.trim().parse().unwrap_or(300);
+        plugin.gqy_tools_eager_extra = fields[6]
+            .value
+            .split(',')
+            .map(|name| name.trim().to_string())
+            .filter(|name| !name.is_empty())
+            .collect();
+        plugin.idle_timeout_seconds = fields[7].value.trim().parse().unwrap_or(300);
+        plugin.print_timeout_seconds = fields[8].value.trim().parse().unwrap_or(24 * 60 * 60);
+        plugin.warm_idle_seconds = fields[9].value.trim().parse().unwrap_or(300);
         if !enabled {
             // 关掉即清理 agy 侧落盘物:代理目录与全局 mcp_config 的桥条目,
             // 否则用户交互式开 agy 还会一直挂着一个指向旧二进制的 gqy 服务器。

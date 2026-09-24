@@ -55,7 +55,7 @@ TUI 这一批（09-23 定，方案都在 `docs/plan/`）：
 
 沙盒和webui文件分享、附件、上传功能的兼容性
 
-agy 桥接工具瘦身：gqy_tools_eager=true 时全部工具定义被全量注入 MCP 条目，每轮固定吃约 9k input token 且随会话累积。改法：默认改走按需加载，gqy_tools 支持白名单数组，另给 MCP 出站 schema 加空 enum 兜底净化
+agy 桥接工具瘦身：09-24 已做常用工具白名单（内置约 22 个常驻，其余懒加载，用户可加 `gqy_tools_eager_extra`）与用量口径修正（按每次调用求和）。实测原来每次模型调用约背 1.7–1.8 万 token 的完整说明。剩下：给 MCP 出站 schema 加空 enum 兜底净化；等用量口径修好后跑几天，拿 cache-usage 前后对比实际省了多少
 
 拆分 `src/render/stream/timeline.rs`（2400 行，唯一越过 2000 行红线的文件，AGENTS §6.2）：目前体验没问题、近期改动也很少碰它，暂不排期；等下次要改它时顺手拆
 

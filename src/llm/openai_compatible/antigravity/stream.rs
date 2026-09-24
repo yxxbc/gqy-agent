@@ -124,6 +124,10 @@ struct StreamState {
     response_step: Option<u64>,
     /// 最后一次模型调用的用量(上下文表读它)。
     per_call_usage: Option<Usage>,
+    /// 本轮每次模型调用(DONE 步)的用量之和,记账与 cache-usage 用它。
+    turn_usage: Option<Usage>,
+    /// 本轮发起了几次模型调用。
+    model_calls: u32,
     /// 已发过 started 的工具步。
     started_tools: HashSet<u64>,
     /// `error_message` 步的正文,静默失败时并进报错。
@@ -344,7 +348,9 @@ where
             stderr_text
         );
     }
-    let usage = total_usage.or_else(|| per_call_usage.clone());
+    tracing::debug!(model_calls = state.model_calls, "agy turn finished");
+    let usage =
+        turn_usage(state.turn_usage.clone(), total_usage).or_else(|| per_call_usage.clone());
     let mut result = finalize_stream_result(content, String::new(), usage, Vec::new(), false)?;
     result.finish_reason = Some("stop".to_string());
     result.last_request_usage = per_call_usage;
@@ -395,6 +401,8 @@ where
             }
             if step_state == "DONE" {
                 if let Some(usage) = step.get("usage").and_then(usage_from_agy) {
+                    state.model_calls += 1;
+                    state.turn_usage = Some(add_usage(state.turn_usage.take(), &usage));
                     state.per_call_usage = Some(usage);
                 }
             }
@@ -496,6 +504,28 @@ fn normalize_native_arguments(parameters: Option<Value>) -> Value {
     Value::Object(out)
 }
 
+/// 本轮用量：本轮每次模型调用（DONE 步）的用量之和，一次都没拿到才退回结束帧。
+///
+/// 结束帧的 usage 是**整个 agy 会话**的累计：续传的会话跨轮一直涨（09-24 实测
+/// 同一会话连续几轮 358,500 → 361,555 → 372,191 → 378,505，换会话才归零）。
+/// 拿它记账会把前面几轮反复算进来——cache-usage 里 agy 每轮 prompt 中位数
+/// 63 万、底栏 Σ 虚高都出在这。每次调用的 usage 才是这一轮真花掉的。
+fn turn_usage(summed: Option<Usage>, frame_total: Option<Usage>) -> Option<Usage> {
+    summed.or(frame_total)
+}
+
+/// 两份用量相加。缓存命中是否可信按合计重新判断（命中不能等于或超过输入）。
+fn add_usage(acc: Option<Usage>, next: &Usage) -> Usage {
+    let mut sum = acc.unwrap_or_default();
+    sum.prompt_tokens += next.prompt_tokens;
+    sum.completion_tokens += next.completion_tokens;
+    sum.total_tokens += next.total_tokens;
+    sum.cache_read_tokens += next.cache_read_tokens;
+    sum.reasoning_tokens += next.reasoning_tokens;
+    sum.cache_reported = sum.cache_read_tokens > 0 && sum.cache_read_tokens < sum.prompt_tokens;
+    sum
+}
+
 /// agy 的 usage 对象 → 顾清影 口径。`input_tokens` 已含缓存命中部分(cache_read
 /// 是它的子集)。**agy 的 `cache_read_tokens` 不可全信**:09-03 真机六轮里五轮
 /// 它等于整个 input(9355/9355、45486/45486…),而本轮新输入的用户消息不可能
@@ -579,6 +609,31 @@ mod tests {
             Some(401)
         );
         assert!(classify_agy_failure("model output error").is_none());
+    }
+
+    /// 记账用本轮各次调用之和，不用结束帧里的会话累计（09-24 修）。结束帧给
+    /// 一个远大于本轮之和的累计值，改前取的就是它。
+    #[test]
+    fn turn_usage_sums_calls_instead_of_the_session_total() {
+        let call = |input: u64, output: u64, cache: u64| {
+            usage_from_agy(&json!({
+                "input_tokens": input, "output_tokens": output,
+                "cache_read_tokens": cache, "total_tokens": input + output
+            }))
+            .unwrap()
+        };
+        let summed = add_usage(Some(call(40, 2, 10)), &call(60, 3, 0));
+        let session_total = call(378_505, 900, 0);
+        let usage = turn_usage(Some(summed), Some(session_total)).unwrap();
+        assert_eq!(usage.prompt_tokens, 100);
+        assert_eq!(usage.completion_tokens, 5);
+        assert_eq!(usage.cache_read_tokens, 10);
+        assert!(usage.cache_reported);
+        // 一次调用都没拿到 usage 时才退回结束帧。
+        assert_eq!(
+            turn_usage(None, Some(call(7, 1, 0))).unwrap().prompt_tokens,
+            7
+        );
     }
 
     #[test]

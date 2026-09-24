@@ -33,6 +33,57 @@ pub(crate) fn remove_relay_files_now() {
     setup::remove_relay_files(&setup::default_config_dir());
 }
 
+/// 桥上按 eager 常驻的内置工具：以 `mcp_gqy_<名>` 原生名直接可调，完整说明
+/// 进 agy 的系统提示词。其余工具仍挂在桥上，走 agy 的懒加载（先读 schema 再
+/// `call_mcp_tool`），不再每次模型调用都背着完整说明。
+///
+/// 09-24 实测：原来全部工具 eager，84 个工具的完整说明约 78 KB（估计 1.7–1.8
+/// 万 token），agy 每轮平均发起 7 次模型调用、每次都带着它；172 份 agy 记录里
+/// 调用过 3 次以上的桥工具只有约 20 个，只占这些字节的 27%。名单按实测频次，
+/// 外加「用到时必须马上有」的交互类工具（提问、后台任务、子代理）。
+///
+/// **名单是常量**：按频次动态生成会让请求前缀随统计漂移（AGENTS §1.1）。用户
+/// 自己的脚本 / MCP 工具走配置 `plugins.antigravity.gqy_tools_eager_extra`。
+/// 名单里在本轮工具面上不存在的名字自然匹配不到，不会出错。
+pub(in crate::llm::openai_compatible) const EAGER_BRIDGE_TOOLS: &[&str] = &[
+    "github",
+    "generate_image",
+    "use_meme",
+    "manage_meme",
+    "recall_memories",
+    "remember_fact",
+    "todowrite",
+    "trash_path",
+    "read_clipboard",
+    "vision_analyze",
+    "album",
+    "map_search",
+    "get_weather",
+    "job",
+    "subagent",
+    "ask_question",
+    "alarm",
+    "manage_script",
+    "print_image",
+    "kb",
+    "search_knowledge_base",
+    "load_skill",
+];
+
+/// 本轮要 eager 注册的桥工具：内置常用名单 + 用户额外名单，保持工具面原有
+/// 顺序；agy 原生工具开着时剔掉与原生重复的几件。
+pub(in crate::llm::openai_compatible) fn eager_bridge_tools<'a>(
+    tool_names: impl Iterator<Item = &'a str>,
+    extra: &[String],
+    native_on: bool,
+) -> Vec<String> {
+    tool_names
+        .filter(|name| EAGER_BRIDGE_TOOLS.contains(name) || extra.iter().any(|e| e == name))
+        .filter(|name| !native_on || !BRIDGE_DUPLICATE_TOOLS.contains(name))
+        .map(str::to_string)
+        .collect()
+}
+
 /// 客户端构造期解析好的运行时参数,端点间共享。
 pub(in crate::llm::openai_compatible) struct AntigravityRuntime {
     pub(in crate::llm::openai_compatible) binary: PathBuf,
@@ -42,6 +93,8 @@ pub(in crate::llm::openai_compatible) struct AntigravityRuntime {
     pub(in crate::llm::openai_compatible) gqy_tools: String,
     /// 桥工具按 eager 注册(原生名直调)还是走 agy 的懒加载。
     pub(in crate::llm::openai_compatible) gqy_tools_eager: bool,
+    /// 内置常用名单之外，用户额外要常驻的桥工具名。
+    pub(in crate::llm::openai_compatible) gqy_tools_eager_extra: Vec<String>,
     pub(in crate::llm::openai_compatible) idle_timeout: Duration,
     pub(in crate::llm::openai_compatible) print_timeout: Duration,
     /// 预热进程晾多久没人领就收摊;零 = 不预热。
@@ -64,6 +117,12 @@ impl AntigravityRuntime {
             native_tools: plugin.native_tools.clone(),
             gqy_tools: plugin.gqy_tools.clone(),
             gqy_tools_eager: plugin.gqy_tools_eager,
+            gqy_tools_eager_extra: plugin
+                .gqy_tools_eager_extra
+                .iter()
+                .map(|name| name.trim().to_string())
+                .filter(|name| !name.is_empty())
+                .collect(),
             idle_timeout: Duration::from_secs(plugin.idle_timeout_seconds.max(30)),
             print_timeout: Duration::from_secs(plugin.print_timeout_seconds.max(60)),
             warm_idle: Duration::from_secs(plugin.warm_idle_seconds),
@@ -186,14 +245,12 @@ impl OpenAiCompatibleClient {
             setup::ensure_agent_file(&runtime.config_dir, &agent_prompt, scopes.native_on)?;
         let bridge_on = scopes.gqy_on && gqy_session.is_some();
         if bridge_on {
-            let eager_tools: Vec<String> = if runtime.gqy_tools_eager {
-                tools
-                    .iter()
-                    .map(|tool| tool.function.name.clone())
-                    .filter(|name| {
-                        !scopes.native_on || !BRIDGE_DUPLICATE_TOOLS.contains(&name.as_str())
-                    })
-                    .collect()
+            let eager_tools = if runtime.gqy_tools_eager {
+                eager_bridge_tools(
+                    tools.iter().map(|tool| tool.function.name.as_str()),
+                    &runtime.gqy_tools_eager_extra,
+                    scopes.native_on,
+                )
             } else {
                 Vec::new()
             };
