@@ -167,7 +167,8 @@ export const elements = {
   composerState: document.getElementById("composerState"),
   characterCount: document.getElementById("characterCount"),
   sendButton: document.getElementById("sendButton"),
-  settingsNav: document.querySelector(".settings-nav"),
+  // 按 id 取：平台页的导航也带 settings-nav 类（借样式），按类名取会拿到它。
+  settingsNav: document.getElementById("settingsNav"),
   settingsPanels: Array.from(document.querySelectorAll("[data-settings-panel]")),
   settingsModelMark: document.getElementById("settingsModelMark"),
   settingsModelName: document.getElementById("settingsModelName"),
