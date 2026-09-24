@@ -6,6 +6,6 @@ contact_links:
   - name: 安全漏洞（私密报告）
     url: https://github.com/yxxbc/gqy-agent/security/advisories/new
     about: 安全问题请私下告诉我，不要公开提 issue。
-  - name: LINUX DO 社区
-    url: https://linux.do
+  - name: LINUX DO 讨论帖
+    url: https://linux.do/t/topic/2947308
     about: 闲聊、分享用法、讨论想法。
