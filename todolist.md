@@ -4,7 +4,6 @@ TUI 这一批（09-23 定，方案都在 `docs/plan/`）：
 
 - 待验收：TUI 配色（`6f7f4c03` 等，09-24 `147c5a6a` 起 Linux/macOS 全绿，等用户手测）；CHANGELOG 与一键发版（`41591af3`，下次发版首次实跑）
 - 待验收（09-24 已推送，本机已装无语音版）：打开方式 `-c`（`49e55909`）、圆角输入框（`d00ba353`）、开屏欢迎框与吉祥物（`a4826644`）、方向键选斜杠命令（`d157349d`）、`/config` 分组补全与直达（`e15dc60d`）。验收通过后 7–10 项写进 CHANGELOG `[Unreleased]`
-- `gqy --banner` 说明文字过时（`args.rs`、`banner/preview.rs` 还写着星空），随 CHANGELOG 一起改
 - TUI 验收问题 10 条，详情见 `docs/plan/2026-09-24-tui-acceptance-issues.md`：
   1. 空会话 `/goal` 底栏左右闪跳
   2. `/goal` 输出不留历史
