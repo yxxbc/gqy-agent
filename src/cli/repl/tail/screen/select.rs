@@ -31,13 +31,15 @@ impl Selection {
 
 /// 这一行左边有多少列是装饰。
 ///
-/// 用户消息和输入区都由 `┃ ` 开头（`layout.rs` 的 `input_prompt_bar`），
-/// 那两列是画给人看的，不该进剪贴板。
+/// 输入框每行由 `│ ❯ ` / `│   ` 开头（4 列），你发出的消息由 `❯ ` 开头（2 列），
+/// 旧的 `┃ ` 竖条还留在 inline 模型选择器里（2 列）。这些是画给人看的，
+/// 不该进剪贴板。
 fn decoration_width(spans: &[AnsiSpan]) -> u16 {
-    if spans
-        .first()
-        .is_some_and(|first| first.text.starts_with('┃'))
-    {
+    let text = spans_text(spans);
+    if text.starts_with('│') {
+        return 4;
+    }
+    if text.starts_with('❯') || text.starts_with('┃') {
         return 2;
     }
     // 左边那两格是**页边距**（正文、时间线共用的装订边），不是内容。

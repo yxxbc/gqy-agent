@@ -356,17 +356,16 @@ impl LiveReplTail {
         self.input_cursor = if self.screen.is_some() {
             // 全屏下不问终端（那会吞掉正在打的字），按布局算——反正输入区
             // 是我们自己摆的，算得出来。
-            let prefix = input_prompt_bar(self.editor.mode);
             let width = layout_box
                 .map(|(_, width)| width)
                 .unwrap_or(usize::from(cols));
             let (col, row_offset) = repl_cursor_position_for_cols(
-                &prefix,
+                INPUT_BOX_TEXT_INDENT,
                 &self.editor.input,
                 self.editor.cursor,
-                width,
+                input_box_wrap_cols(width),
             );
-            // `input_row` 是输入区**顶上那根空竖条**的行，正文从它下一行才开始，
+            // `input_row` 是输入框**上框线**那一行，正文从它下一行才开始，
             // 所以要 +1。少这一行的表现是输入法的预编辑框浮在文字上一行。
             (
                 col.saturating_add(box_left),

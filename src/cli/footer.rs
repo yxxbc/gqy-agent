@@ -212,7 +212,8 @@ pub(in crate::cli) fn repl_footer_line(
     cols: usize,
 ) -> String {
     let cols = cols.max(1);
-    let bar = input_prompt_bar(mode);
+    // 底栏在输入框下面，缩进两格和框里的文字大致对齐（原来是左竖条 `┃ `）。
+    let bar = "  ".to_string();
     let bar_width = visible_width(&bar);
     // The footer carries only the two standing gauges — how much context is
     // left, and what the session has cost. The per-turn figure is transient and

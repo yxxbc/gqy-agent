@@ -98,6 +98,10 @@ mod swatches {
     pub(super) const INSERT_FG: Swatch = swatch((0xaf, 0xff, 0xaf), (0x1d, 0x6b, 0x2f), "32");
     pub(super) const INSERT_BG: Swatch = swatch((32, 52, 67), (0xe2, 0xf2, 0xe5), "");
 
+    /// 你发出的消息在对话记录里的整行底色（`❯ 消息`）。比展开区浅一档，
+    /// 只为把「你说的」和她的回复分开，不抢眼。
+    pub(super) const ECHO_BG: Swatch = swatch((0x26, 0x28, 0x31), (0xee, 0xef, 0xf3), "");
+
     /// 全屏 TUI 展开区的底色。比终端背景深（浅底下是略暗的米白）一档，看得出
     /// 层次，又不至于像另开了一个控件。深底值即原来的 256 色 236。
     pub(super) const EXPANSION_BG: Swatch = swatch((0x30, 0x30, 0x30), (0xec, 0xec, 0xe8), "");
@@ -191,6 +195,7 @@ pub(crate) struct Palette {
     code_comment: String,
     patch_delete: String,
     patch_insert: String,
+    echo_bg: String,
     expansion_bg: ratatui::style::Color,
 }
 
@@ -224,6 +229,7 @@ impl Palette {
             code_comment: fg(sw::CODE_COMMENT),
             patch_delete: format!("{}{}", target.bg(sw::DELETE_BG), fg(sw::DELETE_FG)),
             patch_insert: format!("{}{}", target.bg(sw::INSERT_BG), fg(sw::INSERT_FG)),
+            echo_bg: target.bg(sw::ECHO_BG),
             expansion_bg: target.ratatui_bg(sw::EXPANSION_BG),
         }
     }
@@ -304,6 +310,8 @@ styles!(
     CODE_COMMENT_STYLE => code_comment,
     PATCH_DELETE_STYLE => patch_delete,
     PATCH_INSERT_STYLE => patch_insert,
+    /// 你发出的消息那几行的底色（只有底色，16 色以下为空）。
+    ECHO_BG_STYLE => echo_bg,
 );
 
 /// 全屏 TUI 展开区（工具输出、思考正文）的底色。

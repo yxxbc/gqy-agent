@@ -82,14 +82,14 @@ fn replayed_job_wake_turns_are_not_drawn_as_user_prompts() {
     let frame = session_replay_frame(&[wake], AgentMode::Normal, &config, 80).unwrap();
     let frame = String::from_utf8_lossy(&frame);
     // Dim ⚙ notice with the bracketed prefix stripped, exactly like the
-    // live path — never the user bubble's bar.
+    // live path — never the user message's `❯` echo.
     assert!(frame.contains("⚙ 子代理完成 82bea3 · 后台测试A"));
     assert!(!frame.contains("[后台任务完成]"));
-    assert!(!frame.contains(&submitted_echo_bar(AgentMode::Normal)));
+    assert!(!frame.contains(&submitted_echo_marker(AgentMode::Normal)));
 
     let frame = session_replay_frame(&[typed], AgentMode::Normal, &config, 80).unwrap();
     let frame = String::from_utf8_lossy(&frame);
-    assert!(frame.contains(&submitted_echo_bar(AgentMode::Normal)));
+    assert!(frame.contains(&submitted_echo_marker(AgentMode::Normal)));
     assert!(!frame.contains('⚙'));
 }
 
@@ -340,18 +340,44 @@ fn mixed_footer_uses_dim_provider_and_hides_global_variant() {
     assert!(!line.contains(&primary_footer_text("mixed")));
 }
 
+/// 圆角输入框：框线和每一行的显示宽度都正好等于给定宽度，右框线才对得齐。
+/// 中文是双宽字符，补空格要按显示宽度算，不能按字符数。
+#[test]
+fn input_box_rows_line_up_with_the_border() {
+    for cols in [20usize, 41, 80] {
+        for top in [true, false] {
+            let edge = strip_terminal_control_sequences(&input_box_edge(cols, top));
+            assert_eq!(visible_width(&edge), cols, "框线 cols={cols}");
+        }
+        for text in ["", "hello", "你好，世界"] {
+            for first in [true, false] {
+                let row = strip_terminal_control_sequences(&input_box_row(
+                    AgentMode::Normal,
+                    first,
+                    text,
+                    cols,
+                ));
+                assert_eq!(visible_width(&row), cols, "cols={cols} text={text:?}");
+                assert!(row.starts_with('│') && row.ends_with('│'), "{row:?}");
+                assert_eq!(row.contains('❯'), first, "{row:?}");
+            }
+        }
+    }
+}
+
 #[test]
 fn committed_user_message_keeps_one_blank_line_before_output() {
     let output = committed_user_messages_text(&[("hello", AgentMode::Normal)], true, 80);
 
-    assert_eq!(
-        strip_terminal_control_sequences(&output),
-        "\n┃\n┃ hello\n┃\n\n"
-    );
+    // 回显是 `❯ 消息` 加整行底色（底色补到行尾，所以比对前去掉行尾空格），
+    // 上下各空一行，和原来竖条版的行数一致。
+    let text = strip_terminal_control_sequences(&output);
+    let lines: Vec<&str> = text.split('\n').map(str::trim_end).collect();
+    assert_eq!(lines, ["", "", "❯ hello", "", "", ""]);
 }
 
 #[test]
-fn queued_message_uses_full_height_bar_and_primary_status() {
+fn queued_message_echo_uses_mode_marker_and_primary_status() {
     let prompt = QueuedPrompt {
         prompt_id: "q1".to_string(),
         seq: 1,
@@ -366,15 +392,13 @@ fn queued_message_uses_full_height_bar_and_primary_status() {
     let chat = queued_prompt_lines(&[prompt], AgentMode::Dev, 80);
 
     assert_eq!(normal.len(), 4);
-    assert_eq!(normal[0], submitted_echo_bar(AgentMode::Normal));
-    assert_eq!(normal[2], submitted_echo_bar(AgentMode::Normal));
-    assert!(normal[3].starts_with(&submitted_echo_bar(AgentMode::Normal)));
+    assert!(normal[0].is_empty() && normal[2].is_empty());
+    assert!(normal[1].contains(&submitted_echo_marker(AgentMode::Normal)));
+    assert!(normal[3].starts_with("  "));
     assert!(normal[3].contains(&primary_footer_text(t("Queued", "排队中"))));
-    assert!(chat
-        .iter()
-        .filter(|line| !line.is_empty())
-        .all(|line| line.starts_with(&submitted_echo_bar(AgentMode::Dev))));
-    assert_ne!(normal[0], chat[0]);
+    // `❯` 跟模式主色走：普通蓝、dev 酒红。
+    assert!(chat[1].contains(&submitted_echo_marker(AgentMode::Dev)));
+    assert_ne!(normal[1], chat[1]);
 }
 
 #[test]

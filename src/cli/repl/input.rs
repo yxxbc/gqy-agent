@@ -5,7 +5,6 @@
 
 // 输入层还用着一批留在 cli::mod 的辅助，以及编辑器与宽度计算。
 use crate::cli::repl::editor::*;
-use crate::cli::repl::width::*;
 use crate::cli::*;
 use crate::render::style::DANGER;
 
@@ -832,18 +831,22 @@ pub(in crate::cli) fn render_repl_input_with_footer(
 ) -> Result<Option<u16>> {
     let suggestions = repl_command_suggestions(input);
     let lines = repl_input_lines(input);
-    let prompt_prefix = input_prompt_bar(mode);
-    let plain_prefix = "  ";
+    // 输入框是圆角框（09-23 用户选定，`docs/plan/2026-09-23-tui-input-box.md`）：
+    // 「上框线 / N 行输入 / 下框线 / 底栏」，行数和原来「空竖条 / N 行 / 空竖条 /
+    // 底栏」一一对应，所以占位、底栏行号、腾空间的算法都不用动。框内每行前面
+    // 是 4 列装饰（`│ ❯ `），右边留 2 列给 ` │`：折行与光标都按这个算。
+    let text_indent = INPUT_BOX_TEXT_INDENT;
     let cols = layout.map(|(_, width)| width).unwrap_or_else(terminal_cols);
+    let wrap_cols = input_box_wrap_cols(cols);
     let x0 = layout.map(|(left, _)| left).unwrap_or(0);
     let blank = layout.map(|(_, width)| " ".repeat(width));
     let display_lines = repl_visible_input_lines(
-        &plain_prefix,
+        text_indent,
         &lines,
         REPL_MAX_VISIBLE_INPUT_ROWS,
         raw_pasted_lines,
     );
-    let display_rows = repl_wrapped_input_rows_for_cols(&plain_prefix, &display_lines, cols);
+    let display_rows = repl_wrapped_input_rows_for_cols(text_indent, &display_lines, wrap_cols);
     let mut display_rows: Vec<String> = display_rows
         .iter()
         .map(|line| colorize_repl_placeholders(line))
@@ -851,7 +854,7 @@ pub(in crate::cli) fn render_repl_input_with_footer(
     // 选区按 `drawn` 取字，空白提示不算输入框里的字，记没加提示的那份。
     let plain_rows = display_rows.clone();
     if input.is_empty() {
-        let room = cols.saturating_sub(visible_width(&prompt_prefix) + visible_width(plain_prefix));
+        let room = input_box_text_width(cols);
         if let (Some(first), Some(hint)) = (
             display_rows.first_mut(),
             crate::cli::repl::composer_hint::styled(mode, room),
@@ -874,30 +877,37 @@ pub(in crate::cli) fn render_repl_input_with_footer(
     }
     let mut row_offset = 0u16;
     let footer_row;
-    queue!(stdout, MoveTo(x0, *input_row), Print(&prompt_prefix))?;
+    queue!(
+        stdout,
+        MoveTo(x0, *input_row),
+        Print(input_box_edge(cols, true))
+    )?;
     row_offset = row_offset.saturating_add(1);
     let pad = " ".repeat(usize::from(x0));
-    for (line, plain) in display_rows.iter().zip(&plain_rows) {
+    for (index, (line, plain)) in display_rows.iter().zip(&plain_rows).enumerate() {
         let row = (*input_row).saturating_add(row_offset);
         queue!(stdout, MoveTo(x0, row))?;
-        queue!(stdout, Print(&prompt_prefix), Print(line))?;
-        drawn.push((row, format!("{pad}{prompt_prefix}{plain}")));
+        queue!(stdout, Print(input_box_row(mode, index == 0, line, cols)))?;
+        // 选区按 `drawn` 取字：记「│ ❯ 」+ 正文，不带右框线，复制出来只有字。
+        let lead = if index == 0 { "│ ❯ " } else { "│   " };
+        drawn.push((row, format!("{pad}{lead}{plain}")));
         row_offset = row_offset.saturating_add(1);
     }
     queue!(
         stdout,
         MoveTo(x0, (*input_row).saturating_add(row_offset)),
-        Print(&prompt_prefix)
+        Print(input_box_edge(cols, false))
     )?;
     row_offset = row_offset.saturating_add(1);
     // 全屏下候选走输入框上方的浮层（`command_hint_lines`），footer 留着——
     // 挤掉 footer 的话打命令时连模型名和用量都看不见了。
     if !suggestions.is_empty() && !crate::cli::in_fullscreen() {
-        let suggestion_width = cols.saturating_sub(visible_width(&prompt_prefix)).max(1);
+        // 候选在框下面，和底栏一样缩进两格。
+        let suggestion_width = cols.saturating_sub(2).max(1);
         queue!(
             stdout,
             MoveTo(x0, (*input_row).saturating_add(row_offset)),
-            Print(&prompt_prefix),
+            Print("  "),
             Print(format!(
                 "\x1b[2m{}\x1b[0m",
                 repl_command_suggestions_line(&suggestions, suggestion_width)
@@ -921,18 +931,18 @@ pub(in crate::cli) fn render_repl_input_with_footer(
         }
     }
     let (cursor_col, cursor_row_offset) = if display_lines.len() == lines.len() {
-        repl_cursor_position(&plain_prefix, input, cursor)
+        repl_cursor_position_for_cols(text_indent, input, cursor, wrap_cols)
     } else {
         let last_line = display_lines.last().map(String::as_str).unwrap_or_default();
         let (col, _) = repl_cursor_position_for_line_for_cols(
-            &plain_prefix,
+            text_indent,
             last_line,
             last_line.chars().count(),
-            cols,
+            wrap_cols,
         );
         (
             col,
-            repl_prompt_rows(&plain_prefix, &display_lines).saturating_sub(1),
+            repl_prompt_rows_for_cols(text_indent, &display_lines, wrap_cols).saturating_sub(1),
         )
     };
     queue!(

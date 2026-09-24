@@ -98,40 +98,109 @@ pub(in crate::cli) fn ensure_repl_space(
     Ok(())
 }
 
+/// 你发出的消息在对话记录里的样子：`❯ 消息`，整行淡底色，上下各空一行。
+///
+/// 09-23 用户选定（`docs/plan/2026-09-23-tui-input-box.md`），取代原来的左竖条
+/// `┃`。首行是模式主色的 `❯`，续行缩进两格对齐正文。底色铺到行尾，消息里
+/// 占位符自带的复位（`\x1b[0m`）之后要把底色补回来，否则一行被截成两截。
 pub(in crate::cli) fn submitted_echo_lines(
     mode: AgentMode,
     input: &str,
     cols: usize,
 ) -> Vec<String> {
-    let max_text_width = cols.saturating_sub(3).max(1);
-    let bar = submitted_echo_bar(mode);
-    let mut output = Vec::new();
-    output.push(bar.clone());
+    use crate::render::style::{ECHO_BG_STYLE, RESET};
+    let row_width = cols.saturating_sub(1).max(3);
+    let max_text_width = row_width.saturating_sub(2).max(1);
+    let marker = submitted_echo_marker(mode);
+    let bg = ECHO_BG_STYLE.as_str();
+    let mut output = vec![String::new()];
+    let mut first = true;
     for line in input.split('\n') {
         let mut chunks = wrap_visible_width(line, max_text_width);
         if chunks.is_empty() {
             chunks.push(String::new());
         }
         for chunk in chunks {
-            output.push(format!("{bar} {}", colorize_repl_placeholders(&chunk)));
+            let lead = if first {
+                format!("{marker}{bg} ")
+            } else {
+                "  ".to_string()
+            };
+            first = false;
+            let text = colorize_repl_placeholders(&chunk).replace(RESET, &format!("{RESET}{bg}"));
+            let pad = max_text_width.saturating_sub(visible_width(&chunk));
+            output.push(format!("{bg}{lead}{text}{}{RESET}", " ".repeat(pad)));
         }
     }
-    output.push(bar);
+    output.push(String::new());
     output
 }
 
+/// 回显与排队消息行首的 `❯`：模式主色（普通蓝 / dev 酒红）加粗。
+pub(in crate::cli) fn submitted_echo_marker(mode: AgentMode) -> String {
+    let accent = crate::render::style::mode_accent(mode == AgentMode::Dev);
+    format!("\x1b[1m{accent}❯\x1b[0m")
+}
+
+/// 旧的左竖条，现在只剩 inline 模型选择器还用它当行首。
 pub(in crate::cli) fn submitted_echo_bar(mode: AgentMode) -> String {
-    // 与 footer 模式标签同色:普通主色 / dev 酒红,整条视觉一致。
     let accent = crate::render::style::mode_accent(mode == AgentMode::Dev);
     format!("\x1b[1m{accent}┃\x1b[0m")
+}
+
+/// 输入框（09-23 起是圆角框）里文字前面的装饰宽度：`│ ❯ `，续行 `│   `。
+/// 折行、光标定位都按这个宽度算，所以给一个等宽的纯空格串。
+pub(in crate::cli) const INPUT_BOX_TEXT_INDENT: &str = "    ";
+/// 右边框占的列数：空格 + `│`。
+pub(in crate::cli) const INPUT_BOX_RIGHT: usize = 2;
+
+/// 输入框里文字折行用的总宽度（去掉右边框）。
+pub(in crate::cli) fn input_box_wrap_cols(cols: usize) -> usize {
+    cols.saturating_sub(INPUT_BOX_RIGHT)
+        .max(INPUT_BOX_TEXT_INDENT.len() + 1)
+}
+
+/// 输入框里一行文字能占的宽度。
+pub(in crate::cli) fn input_box_text_width(cols: usize) -> usize {
+    input_box_wrap_cols(cols).saturating_sub(INPUT_BOX_TEXT_INDENT.len())
+}
+
+/// 输入框的上框线（`top`）或下框线，淡灰色，宽 `cols` 列。
+pub(in crate::cli) fn input_box_edge(cols: usize, top: bool) -> String {
+    use crate::render::style::{FAINT, RESET};
+    let (left, right) = if top { ('╭', '╮') } else { ('╰', '╯') };
+    let inner = cols.saturating_sub(2).max(1);
+    format!("{FAINT}{left}{}{right}{RESET}", "─".repeat(inner))
+}
+
+/// 输入框里的一行：`│ ❯ 文字…… │`（`first` 为假时是续行 `│   `）。
+/// `text` 是已经着色好的文字，按显示宽度补空格让右框线对齐。
+pub(in crate::cli) fn input_box_row(
+    mode: AgentMode,
+    first: bool,
+    text: &str,
+    cols: usize,
+) -> String {
+    use crate::render::style::{FAINT, RESET};
+    let lead = if first {
+        format!("{} ", submitted_echo_marker(mode))
+    } else {
+        "  ".to_string()
+    };
+    let pad = input_box_text_width(cols).saturating_sub(visible_width(text));
+    format!(
+        "{FAINT}│{RESET} {lead}{text}{}{FAINT} │{RESET}",
+        " ".repeat(pad)
+    )
 }
 
 pub(in crate::cli) fn input_prompt_bar(mode: AgentMode) -> String {
     format!("{} ", submitted_echo_bar(mode))
 }
 
-pub(in crate::cli) fn repl_shortcut_hint_line(mode: AgentMode, cols: usize) -> String {
-    let bar = input_prompt_bar(mode);
+pub(in crate::cli) fn repl_shortcut_hint_line(_mode: AgentMode, cols: usize) -> String {
+    // 提示行在输入框下面，和底栏一样缩进两格。
+    let bar = "  ";
     let text = t(
         "Shift+Enter newline; Ctrl+J newline; Ctrl+V paste clipboard",
         "Shift+Enter 换行；Ctrl+J 换行；Ctrl+V 粘贴剪贴板",

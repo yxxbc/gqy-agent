@@ -869,11 +869,7 @@ fn queued_prompt_lines(prompts: &[QueuedPrompt], mode: AgentMode, cols: usize) -
             lines.push(String::new());
         }
         lines.extend(submitted_echo_lines(mode, &prompt.display_content, cols));
-        lines.push(format!(
-            "{} {}",
-            submitted_echo_bar(mode),
-            primary_footer_text(t("Queued", "排队中"))
-        ));
+        lines.push(format!("  {}", primary_footer_text(t("Queued", "排队中"))));
     }
     lines
 }
