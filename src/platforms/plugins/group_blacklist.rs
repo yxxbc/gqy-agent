@@ -179,7 +179,7 @@ fn protected(context: &PlatformTurnContext, user: &str) -> bool {
     user == account
         || user
             .parse::<i64>()
-            .is_ok_and(|id| context.config.platforms.qq.admin_users.contains(&id))
+            .is_ok_and(|id| context.config.platforms.qq.is_static_admin(id))
         || has_dynamic_access(
             &context.state_store,
             account,

@@ -657,10 +657,11 @@ pub struct OneBotConfig {
     /// Empty tokens are accepted only from a loopback peer.
     pub access_token: String,
     pub admin_users: Vec<i64>,
-    /// 主人本人的 QQ 号。只在**私聊**里生效：与终端 / WebUI 共享同一份记忆（读全部、
-    /// 写入算主人自己的），并带上用户资料。必须同时列在 `admin_users` 里。
-    /// 群聊里不生效——群里的回复所有人都看得见。和管理员分开设：管理员可以在
-    /// 聊天里临时授予，主人身份只能在配置文件里写。
+    /// 主人本人的 QQ 号，权限最高：自动算管理员（不必再写进 `admin_users`），
+    /// 不能被拉黑，点赞等白名单功能不受名单限制。私聊里还与终端 / WebUI 共享
+    /// 同一份记忆（读全部、写入算主人自己的）并带上用户资料；群聊里记忆照常按
+    /// 管理员处理——群里的回复所有人都看得见。主人身份只能在配置文件里写，不能
+    /// 在聊天里授予。
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub owner_users: Vec<i64>,
     /// 管理员别名(键 = QQ 号字符串):终端发消息工具的 `to` 选项用它列出
@@ -964,6 +965,16 @@ impl OneBotConfig {
     /// 配置里的睡眠时段;没配或写错都当没睡(写错在加载校验时已经拦下)。
     pub fn sleep_window(&self) -> Option<SleepWindow> {
         parse_sleep_hours(&self.sleep_hours).ok().flatten()
+    }
+
+    /// 静态配置里的管理员：`admin_users` 或主人号 `owner_users`。主人权限最高，
+    /// 自动算管理员，不需要再写进 `admin_users`。动态授予的管理员另查授权表。
+    pub fn is_static_admin(&self, user_id: i64) -> bool {
+        self.admin_users.contains(&user_id) || self.owner_users.contains(&user_id)
+    }
+
+    pub fn is_owner(&self, user_id: i64) -> bool {
+        self.owner_users.contains(&user_id)
     }
 
     /// 此刻(本机时区)是否在睡眠时间内。

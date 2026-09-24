@@ -214,7 +214,7 @@ pub(in crate::platforms::onebot) fn platform_turn_context_with_activity(
         );
     }
     let sender_display_name = event_sender_display_name(event);
-    let is_admin = config.platforms.qq.admin_users.contains(&user_id)
+    let is_admin = config.platforms.qq.is_static_admin(user_id)
         || has_dynamic_access(
             &state.state_store,
             &conversation.account_id,

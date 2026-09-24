@@ -1253,12 +1253,17 @@ fn sleep_hours_parse_and_window() {
 }
 
 #[test]
-fn qq_owner_users_must_also_be_admins() {
+fn qq_owner_users_are_admins_without_being_listed_twice() {
     let mut config = AppConfig::default();
     config.platforms.qq.owner_users = vec![20000];
-    let error = config.validate_platforms().unwrap_err().to_string();
-    assert!(error.contains("owner_users"), "{error}");
-
-    config.platforms.qq.admin_users = vec![20000];
     assert!(config.validate_platforms().is_ok());
+    assert!(
+        config.platforms.qq.is_static_admin(20000),
+        "owner outranks admin"
+    );
+    assert!(config.platforms.qq.is_owner(20000));
+    assert!(!config.platforms.qq.is_static_admin(30000));
+
+    config.platforms.qq.owner_users = vec![0];
+    assert!(config.validate_platforms().is_err(), "ids must be positive");
 }

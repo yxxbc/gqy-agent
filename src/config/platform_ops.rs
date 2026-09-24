@@ -98,13 +98,6 @@ impl AppConfig {
                 bail!("platforms.qq.{field} must contain unique positive QQ ids");
             }
         }
-        if let Some(owner) = qq
-            .owner_users
-            .iter()
-            .find(|owner| !qq.admin_users.contains(owner))
-        {
-            bail!("platforms.qq.owner_users: {owner} must also be listed in admin_users");
-        }
         let mut trigger_keywords = HashSet::with_capacity(qq.group_chats.trigger_keywords.len());
         for keyword in &qq.group_chats.trigger_keywords {
             if keyword.is_empty()

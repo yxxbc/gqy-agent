@@ -411,12 +411,18 @@ fn format_permission_list(
     permission: AccessPermission,
 ) -> String {
     let mut entries = BTreeMap::<i64, AccessSources>::new();
-    let configured = match permission {
-        AccessPermission::Administrator => &config.admin_users,
-        AccessPermission::PrivateWhitelist => &config.private_chats.whitelist,
-        AccessPermission::GroupWhitelist => &config.group_chats.whitelist,
+    // 主人号自动算管理员，列表里一并显示为配置项。
+    let configured: Vec<i64> = match permission {
+        AccessPermission::Administrator => config
+            .owner_users
+            .iter()
+            .chain(&config.admin_users)
+            .copied()
+            .collect(),
+        AccessPermission::PrivateWhitelist => config.private_chats.whitelist.clone(),
+        AccessPermission::GroupWhitelist => config.group_chats.whitelist.clone(),
     };
-    for target_id in configured {
+    for target_id in &configured {
         entries.entry(*target_id).or_default().configured = true;
     }
     for grant in grants.iter().filter(|grant| {

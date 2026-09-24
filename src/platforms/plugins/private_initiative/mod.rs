@@ -91,7 +91,7 @@ fn eligible(config: &AppConfig, state_store: &StateStore, account: &str, user: &
     let listed = user
         .parse::<i64>()
         .ok()
-        .is_some_and(|id| qq.admin_users.contains(&id) || qq.private_chats.whitelist.contains(&id));
+        .is_some_and(|id| qq.is_static_admin(id) || qq.private_chats.whitelist.contains(&id));
     listed
         || has_dynamic_access(state_store, account, AccessPermission::Administrator, user)
         || has_dynamic_access(

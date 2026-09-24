@@ -204,9 +204,9 @@ pub(in crate::platforms::onebot) fn admission_for_access_at(
     let account_id = self_id.to_string();
     let user_id_text = user_id.to_string();
     let is_admin = state.map_or_else(
-        || config.admin_users.contains(&user_id),
+        || config.is_static_admin(user_id),
         |state| {
-            config.admin_users.contains(&user_id)
+            config.is_static_admin(user_id)
                 || has_dynamic_access(
                     state,
                     &account_id,

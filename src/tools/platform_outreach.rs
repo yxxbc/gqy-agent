@@ -1,8 +1,8 @@
 //! `send_qq_message`:本地会话(REPL / WebUI / shellhook)里让模型把消息发到
 //! 用户的 QQ。只在 `platforms.terminal_outreach` 打开时注册,平台会话不注册
-//! (那边有 `send_message_to_user`)。收件人只能是 `qq.admin_users` 里的号码:
+//! (那边有 `send_message_to_user`)。收件人只能是 `qq.owner_users` 与 `qq.admin_users` 里的号码:
 //! `to` 的可选项按 `qq.admin_aliases` 的别名列出(没别名显示号码),不传发给
-//! 第一个(主管理员)。`voice: true` 走文本转语音发语音消息。
+//! 第一个(有主人号时是主人,否则是第一个管理员)。`voice: true` 走文本转语音发语音消息。
 
 use super::{ToolRegistry, ToolSpec};
 use crate::config::AppConfig;
@@ -25,11 +25,14 @@ pub fn qq_connected() -> bool {
     })
 }
 
-/// (QQ 号, 显示名)按配置顺序;第一个是主管理员。
+/// (QQ 号, 显示名)按配置顺序:主人号在前(权限最高),再是管理员,去重;第一个是主收件人。
 fn recipients(config: &AppConfig) -> Vec<(i64, String)> {
     let qq = &config.platforms.qq;
-    qq.admin_users
+    let mut seen = std::collections::HashSet::new();
+    qq.owner_users
         .iter()
+        .chain(&qq.admin_users)
+        .filter(|id| seen.insert(**id))
         .map(|id| {
             let label = qq
                 .admin_aliases

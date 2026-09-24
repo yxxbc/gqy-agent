@@ -49,7 +49,7 @@ impl AccessPermission {
 
     pub(crate) fn statically_contains(self, config: &OneBotConfig, target_id: i64) -> bool {
         match self {
-            Self::Administrator => config.admin_users.contains(&target_id),
+            Self::Administrator => config.is_static_admin(target_id),
             Self::PrivateWhitelist => config.private_chats.whitelist.contains(&target_id),
             Self::GroupWhitelist => config.group_chats.whitelist.contains(&target_id),
         }
@@ -78,7 +78,7 @@ pub(crate) fn is_effective_admin(
     user_id: &str,
 ) -> bool {
     user_id.parse::<i64>().ok().is_some_and(|numeric_user_id| {
-        config.admin_users.contains(&numeric_user_id)
+        config.is_static_admin(numeric_user_id)
             || has_dynamic_access(state, account_id, AccessPermission::Administrator, user_id)
     })
 }
@@ -92,7 +92,7 @@ pub(crate) fn administrator_authorization(
         statically_authorized: user_id
             .parse::<i64>()
             .ok()
-            .is_some_and(|user_id| config.admin_users.contains(&user_id)),
+            .is_some_and(|user_id| config.is_static_admin(user_id)),
         dynamic_key: PlatformAccessGrantKey {
             platform: ONEBOT_PLATFORM.to_string(),
             account_scope: account_id.to_string(),
