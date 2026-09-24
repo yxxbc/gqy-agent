@@ -1,3 +1,585 @@
 {
-  "feature_edges": []
+  "_comment": "P2 拆分时从 app.js 闭包里如实继承的功能间依赖（2026-09-25 冻结）。新增边要写 reason；能删的边直接删。",
+  "feature_edges": [
+    {
+      "from": "accounts",
+      "to": "auth",
+      "reason": "P2 拆分前 app.js 闭包内已有"
+    },
+    {
+      "from": "accounts",
+      "to": "console",
+      "reason": "P2 拆分前 app.js 闭包内已有"
+    },
+    {
+      "from": "accounts",
+      "to": "persona-list",
+      "reason": "P2 拆分前 app.js 闭包内已有"
+    },
+    {
+      "from": "appearance",
+      "to": "conversation",
+      "reason": "P2 拆分前 app.js 闭包内已有"
+    },
+    {
+      "from": "artifacts",
+      "to": "markdown",
+      "reason": "P2 拆分前 app.js 闭包内已有"
+    },
+    {
+      "from": "artifacts",
+      "to": "sidebar",
+      "reason": "P2 拆分前 app.js 闭包内已有"
+    },
+    {
+      "from": "auth",
+      "to": "boot",
+      "reason": "P2 拆分前 app.js 闭包内已有"
+    },
+    {
+      "from": "auth",
+      "to": "composer",
+      "reason": "P2 拆分前 app.js 闭包内已有"
+    },
+    {
+      "from": "auth",
+      "to": "console",
+      "reason": "P2 拆分前 app.js 闭包内已有"
+    },
+    {
+      "from": "auth",
+      "to": "live",
+      "reason": "P2 拆分前 app.js 闭包内已有"
+    },
+    {
+      "from": "auth",
+      "to": "questions",
+      "reason": "P2 拆分前 app.js 闭包内已有"
+    },
+    {
+      "from": "auth",
+      "to": "sessions",
+      "reason": "P2 拆分前 app.js 闭包内已有"
+    },
+    {
+      "from": "auth",
+      "to": "status",
+      "reason": "P2 拆分前 app.js 闭包内已有"
+    },
+    {
+      "from": "boot",
+      "to": "appearance",
+      "reason": "P2 拆分前 app.js 闭包内已有"
+    },
+    {
+      "from": "boot",
+      "to": "auth",
+      "reason": "P2 拆分前 app.js 闭包内已有"
+    },
+    {
+      "from": "boot",
+      "to": "composer",
+      "reason": "P2 拆分前 app.js 闭包内已有"
+    },
+    {
+      "from": "boot",
+      "to": "conversation",
+      "reason": "P2 拆分前 app.js 闭包内已有"
+    },
+    {
+      "from": "boot",
+      "to": "live",
+      "reason": "P2 拆分前 app.js 闭包内已有"
+    },
+    {
+      "from": "boot",
+      "to": "model-menu",
+      "reason": "P2 拆分前 app.js 闭包内已有"
+    },
+    {
+      "from": "boot",
+      "to": "oobe",
+      "reason": "P2 拆分前 app.js 闭包内已有"
+    },
+    {
+      "from": "boot",
+      "to": "persona",
+      "reason": "P2 拆分前 app.js 闭包内已有"
+    },
+    {
+      "from": "boot",
+      "to": "sessions",
+      "reason": "P2 拆分前 app.js 闭包内已有"
+    },
+    {
+      "from": "boot",
+      "to": "status",
+      "reason": "P2 拆分前 app.js 闭包内已有"
+    },
+    {
+      "from": "composer",
+      "to": "artifacts",
+      "reason": "P2 拆分前 app.js 闭包内已有"
+    },
+    {
+      "from": "composer",
+      "to": "boot",
+      "reason": "P2 拆分前 app.js 闭包内已有"
+    },
+    {
+      "from": "composer",
+      "to": "conversation",
+      "reason": "P2 拆分前 app.js 闭包内已有"
+    },
+    {
+      "from": "composer",
+      "to": "goal",
+      "reason": "P2 拆分前 app.js 闭包内已有"
+    },
+    {
+      "from": "composer",
+      "to": "live",
+      "reason": "P2 拆分前 app.js 闭包内已有"
+    },
+    {
+      "from": "composer",
+      "to": "model-menu",
+      "reason": "P2 拆分前 app.js 闭包内已有"
+    },
+    {
+      "from": "composer",
+      "to": "sessions",
+      "reason": "P2 拆分前 app.js 闭包内已有"
+    },
+    {
+      "from": "composer",
+      "to": "settings",
+      "reason": "P2 拆分前 app.js 闭包内已有"
+    },
+    {
+      "from": "composer",
+      "to": "status",
+      "reason": "P2 拆分前 app.js 闭包内已有"
+    },
+    {
+      "from": "console",
+      "to": "accounts",
+      "reason": "P2 拆分前 app.js 闭包内已有"
+    },
+    {
+      "from": "console",
+      "to": "auth",
+      "reason": "P2 拆分前 app.js 闭包内已有"
+    },
+    {
+      "from": "console",
+      "to": "settings",
+      "reason": "P2 拆分前 app.js 闭包内已有"
+    },
+    {
+      "from": "conversation",
+      "to": "artifacts",
+      "reason": "P2 拆分前 app.js 闭包内已有"
+    },
+    {
+      "from": "conversation",
+      "to": "composer",
+      "reason": "P2 拆分前 app.js 闭包内已有"
+    },
+    {
+      "from": "conversation",
+      "to": "goal",
+      "reason": "P2 拆分前 app.js 闭包内已有"
+    },
+    {
+      "from": "conversation",
+      "to": "jobs",
+      "reason": "P2 拆分前 app.js 闭包内已有"
+    },
+    {
+      "from": "conversation",
+      "to": "live",
+      "reason": "P2 拆分前 app.js 闭包内已有"
+    },
+    {
+      "from": "conversation",
+      "to": "markdown",
+      "reason": "P2 拆分前 app.js 闭包内已有"
+    },
+    {
+      "from": "conversation",
+      "to": "persona",
+      "reason": "P2 拆分前 app.js 闭包内已有"
+    },
+    {
+      "from": "conversation",
+      "to": "questions",
+      "reason": "P2 拆分前 app.js 闭包内已有"
+    },
+    {
+      "from": "conversation",
+      "to": "sessions",
+      "reason": "P2 拆分前 app.js 闭包内已有"
+    },
+    {
+      "from": "conversation",
+      "to": "status",
+      "reason": "P2 拆分前 app.js 闭包内已有"
+    },
+    {
+      "from": "conversation",
+      "to": "tools",
+      "reason": "P2 拆分前 app.js 闭包内已有"
+    },
+    {
+      "from": "goal",
+      "to": "sessions",
+      "reason": "P2 拆分前 app.js 闭包内已有"
+    },
+    {
+      "from": "goal",
+      "to": "status",
+      "reason": "P2 拆分前 app.js 闭包内已有"
+    },
+    {
+      "from": "jobs",
+      "to": "conversation",
+      "reason": "P2 拆分前 app.js 闭包内已有"
+    },
+    {
+      "from": "jobs",
+      "to": "live",
+      "reason": "P2 拆分前 app.js 闭包内已有"
+    },
+    {
+      "from": "jobs",
+      "to": "sessions",
+      "reason": "P2 拆分前 app.js 闭包内已有"
+    },
+    {
+      "from": "keyboard",
+      "to": "artifacts",
+      "reason": "P2 拆分前 app.js 闭包内已有"
+    },
+    {
+      "from": "keyboard",
+      "to": "console",
+      "reason": "P2 拆分前 app.js 闭包内已有"
+    },
+    {
+      "from": "keyboard",
+      "to": "model-menu",
+      "reason": "P2 拆分前 app.js 闭包内已有"
+    },
+    {
+      "from": "keyboard",
+      "to": "session-mode",
+      "reason": "P2 拆分前 app.js 闭包内已有"
+    },
+    {
+      "from": "keyboard",
+      "to": "sessions",
+      "reason": "P2 拆分前 app.js 闭包内已有"
+    },
+    {
+      "from": "keyboard",
+      "to": "settings",
+      "reason": "P2 拆分前 app.js 闭包内已有"
+    },
+    {
+      "from": "keyboard",
+      "to": "sidebar",
+      "reason": "P2 拆分前 app.js 闭包内已有"
+    },
+    {
+      "from": "live",
+      "to": "auth",
+      "reason": "P2 拆分前 app.js 闭包内已有"
+    },
+    {
+      "from": "live",
+      "to": "boot",
+      "reason": "P2 拆分前 app.js 闭包内已有"
+    },
+    {
+      "from": "live",
+      "to": "composer",
+      "reason": "P2 拆分前 app.js 闭包内已有"
+    },
+    {
+      "from": "live",
+      "to": "console",
+      "reason": "P2 拆分前 app.js 闭包内已有"
+    },
+    {
+      "from": "live",
+      "to": "conversation",
+      "reason": "P2 拆分前 app.js 闭包内已有"
+    },
+    {
+      "from": "live",
+      "to": "goal",
+      "reason": "P2 拆分前 app.js 闭包内已有"
+    },
+    {
+      "from": "live",
+      "to": "jobs",
+      "reason": "P2 拆分前 app.js 闭包内已有"
+    },
+    {
+      "from": "live",
+      "to": "markdown",
+      "reason": "P2 拆分前 app.js 闭包内已有"
+    },
+    {
+      "from": "live",
+      "to": "persona",
+      "reason": "P2 拆分前 app.js 闭包内已有"
+    },
+    {
+      "from": "live",
+      "to": "questions",
+      "reason": "P2 拆分前 app.js 闭包内已有"
+    },
+    {
+      "from": "live",
+      "to": "sessions",
+      "reason": "P2 拆分前 app.js 闭包内已有"
+    },
+    {
+      "from": "live",
+      "to": "status",
+      "reason": "P2 拆分前 app.js 闭包内已有"
+    },
+    {
+      "from": "live",
+      "to": "tools",
+      "reason": "P2 拆分前 app.js 闭包内已有"
+    },
+    {
+      "from": "markdown",
+      "to": "conversation",
+      "reason": "P2 拆分前 app.js 闭包内已有"
+    },
+    {
+      "from": "markdown",
+      "to": "live",
+      "reason": "P2 拆分前 app.js 闭包内已有"
+    },
+    {
+      "from": "model-menu",
+      "to": "composer",
+      "reason": "P2 拆分前 app.js 闭包内已有"
+    },
+    {
+      "from": "model-menu",
+      "to": "goal",
+      "reason": "P2 拆分前 app.js 闭包内已有"
+    },
+    {
+      "from": "oobe",
+      "to": "accounts",
+      "reason": "P2 拆分前 app.js 闭包内已有"
+    },
+    {
+      "from": "oobe",
+      "to": "auth",
+      "reason": "P2 拆分前 app.js 闭包内已有"
+    },
+    {
+      "from": "oobe",
+      "to": "boot",
+      "reason": "P2 拆分前 app.js 闭包内已有"
+    },
+    {
+      "from": "oobe",
+      "to": "composer",
+      "reason": "P2 拆分前 app.js 闭包内已有"
+    },
+    {
+      "from": "oobe",
+      "to": "console",
+      "reason": "P2 拆分前 app.js 闭包内已有"
+    },
+    {
+      "from": "persona-list",
+      "to": "boot",
+      "reason": "P2 拆分前 app.js 闭包内已有"
+    },
+    {
+      "from": "persona-list",
+      "to": "oobe",
+      "reason": "P2 拆分前 app.js 闭包内已有"
+    },
+    {
+      "from": "questions",
+      "to": "composer",
+      "reason": "P2 拆分前 app.js 闭包内已有"
+    },
+    {
+      "from": "questions",
+      "to": "conversation",
+      "reason": "P2 拆分前 app.js 闭包内已有"
+    },
+    {
+      "from": "questions",
+      "to": "live",
+      "reason": "P2 拆分前 app.js 闭包内已有"
+    },
+    {
+      "from": "questions",
+      "to": "sessions",
+      "reason": "P2 拆分前 app.js 闭包内已有"
+    },
+    {
+      "from": "session-mode",
+      "to": "boot",
+      "reason": "P2 拆分前 app.js 闭包内已有"
+    },
+    {
+      "from": "session-mode",
+      "to": "composer",
+      "reason": "P2 拆分前 app.js 闭包内已有"
+    },
+    {
+      "from": "session-mode",
+      "to": "conversation",
+      "reason": "P2 拆分前 app.js 闭包内已有"
+    },
+    {
+      "from": "session-mode",
+      "to": "sessions",
+      "reason": "P2 拆分前 app.js 闭包内已有"
+    },
+    {
+      "from": "session-mode",
+      "to": "sidebar",
+      "reason": "P2 拆分前 app.js 闭包内已有"
+    },
+    {
+      "from": "sessions",
+      "to": "auth",
+      "reason": "P2 拆分前 app.js 闭包内已有"
+    },
+    {
+      "from": "sessions",
+      "to": "boot",
+      "reason": "P2 拆分前 app.js 闭包内已有"
+    },
+    {
+      "from": "sessions",
+      "to": "composer",
+      "reason": "P2 拆分前 app.js 闭包内已有"
+    },
+    {
+      "from": "sessions",
+      "to": "conversation",
+      "reason": "P2 拆分前 app.js 闭包内已有"
+    },
+    {
+      "from": "sessions",
+      "to": "goal",
+      "reason": "P2 拆分前 app.js 闭包内已有"
+    },
+    {
+      "from": "sessions",
+      "to": "jobs",
+      "reason": "P2 拆分前 app.js 闭包内已有"
+    },
+    {
+      "from": "sessions",
+      "to": "live",
+      "reason": "P2 拆分前 app.js 闭包内已有"
+    },
+    {
+      "from": "sessions",
+      "to": "model-menu",
+      "reason": "P2 拆分前 app.js 闭包内已有"
+    },
+    {
+      "from": "sessions",
+      "to": "session-mode",
+      "reason": "P2 拆分前 app.js 闭包内已有"
+    },
+    {
+      "from": "sessions",
+      "to": "sidebar",
+      "reason": "P2 拆分前 app.js 闭包内已有"
+    },
+    {
+      "from": "sessions",
+      "to": "tools",
+      "reason": "P2 拆分前 app.js 闭包内已有"
+    },
+    {
+      "from": "settings",
+      "to": "boot",
+      "reason": "P2 拆分前 app.js 闭包内已有"
+    },
+    {
+      "from": "settings",
+      "to": "composer",
+      "reason": "P2 拆分前 app.js 闭包内已有"
+    },
+    {
+      "from": "settings",
+      "to": "console",
+      "reason": "P2 拆分前 app.js 闭包内已有"
+    },
+    {
+      "from": "settings",
+      "to": "conversation",
+      "reason": "P2 拆分前 app.js 闭包内已有"
+    },
+    {
+      "from": "settings",
+      "to": "goal",
+      "reason": "P2 拆分前 app.js 闭包内已有"
+    },
+    {
+      "from": "settings",
+      "to": "model-menu",
+      "reason": "P2 拆分前 app.js 闭包内已有"
+    },
+    {
+      "from": "settings",
+      "to": "persona",
+      "reason": "P2 拆分前 app.js 闭包内已有"
+    },
+    {
+      "from": "settings",
+      "to": "status",
+      "reason": "P2 拆分前 app.js 闭包内已有"
+    },
+    {
+      "from": "sidebar",
+      "to": "artifacts",
+      "reason": "P2 拆分前 app.js 闭包内已有"
+    },
+    {
+      "from": "tools",
+      "to": "artifacts",
+      "reason": "P2 拆分前 app.js 闭包内已有"
+    },
+    {
+      "from": "tools",
+      "to": "conversation",
+      "reason": "P2 拆分前 app.js 闭包内已有"
+    },
+    {
+      "from": "tools",
+      "to": "goal",
+      "reason": "P2 拆分前 app.js 闭包内已有"
+    },
+    {
+      "from": "tools",
+      "to": "live",
+      "reason": "P2 拆分前 app.js 闭包内已有"
+    },
+    {
+      "from": "tools",
+      "to": "sessions",
+      "reason": "P2 拆分前 app.js 闭包内已有"
+    }
+  ]
 }

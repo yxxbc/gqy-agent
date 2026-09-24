@@ -1,0 +1,384 @@
+import { apiRequest } from "../../core/api.js";
+import { BRAILLE_FRAMES } from "../../core/constants.js";
+import { firstLine, formatRelativeTime } from "../../core/format.js";
+import { makeIconSlot } from "../../core/icons.js";
+import { showToast } from "../../core/toast.js";
+import { updateConversationChrome } from "../conversation/chrome.js";
+import { scrollToBottom } from "../conversation/scroll.js";
+import { requestClearConversation } from "../session-mode.js";
+import { deriveConversationDetails, findSession, multiSessionEnabled, sessionDisplayName, sessionHasRuns } from "./runs.js";
+import { deleteSession, openSessionView, refreshSessions } from "./view.js";
+import { closeSidebar } from "../sidebar.js";
+import { elements } from "../../state/elements.js";
+import { state } from "../../state/store.js";
+
+export function closeSessionMenu() {
+  if (!state.sessionMenuFor) return;
+  state.sessionMenuFor = null;
+  renderSessionList();
+}
+
+export function toggleSessionMenu(sessionId) {
+  state.sessionMenuFor = state.sessionMenuFor === sessionId ? null : sessionId;
+  renderSessionList();
+  if (!state.sessionMenuFor) return;
+  const item = elements.sessionItems.querySelector(`.session-item[data-session-id="${CSS.escape(sessionId)}"]`);
+  const menu = item?.querySelector(".session-menu");
+  if (menu) {
+    const menuRect = menu.getBoundingClientRect();
+    const listRect = elements.sessionList.getBoundingClientRect();
+    if (menuRect.bottom > listRect.bottom - 4) menu.classList.add("open-up");
+    window.requestAnimationFrame(() => menu.querySelector("button")?.focus());
+  }
+}
+
+export function beginSessionRename(sessionId) {
+  state.sessionRenaming = sessionId;
+  renderSessionList();
+}
+
+export function cancelSessionRename() {
+  state.sessionRenaming = null;
+  renderSessionList();
+}
+
+export async function commitSessionRename(sessionId, value) {
+  if (state.sessionRenaming !== sessionId) return;
+  state.sessionRenaming = null;
+  const session = findSession(sessionId);
+  const name = String(value || "").trim();
+  if (!session || !name || name === String(session.name || "").trim()) {
+    renderSessionList();
+    return;
+  }
+  try {
+    await apiRequest(`/api/sessions/${encodeURIComponent(sessionId)}`, {
+      method: "PATCH",
+      body: JSON.stringify({ name })
+    });
+    session.name = name;
+    showToast("会话已重命名");
+  } catch (error) {
+    showToast(error.message || "重命名失败", "error");
+  }
+  renderSessionList();
+  if (sessionId === state.viewSessionId) updateConversationChrome();
+}
+
+export function buildSessionMenu(session, isDefault) {
+  const id = String(session?.session_id || "");
+  const menu = document.createElement("div");
+  menu.className = "session-menu";
+  menu.setAttribute("role", "menu");
+  menu.setAttribute("aria-label", `会话操作：${sessionDisplayName(session)}`);
+  // 终端集成会话是固定入口:不可改名、不可删除、不可被顶替,
+  // 菜单只留「清空对话」;其余会话不再提供「设为默认」。
+  const actions = [];
+  if (!isDefault) actions.push({ label: "重命名", handler: () => beginSessionRename(id) });
+  // 清空对本来只给默认会话（它不能改名/删除，拿这个顶位），可普通会话一样
+  // 需要「留着会话、只丢历史」——删掉重建会连模型/工作目录覆盖一起丢。
+  actions.push({ label: "清空对话", handler: requestClearConversation });
+  if (!isDefault) actions.push({ label: "删除", danger: true, handler: () => deleteSession(id) });
+  for (const action of actions) {
+    const button = document.createElement("button");
+    button.type = "button";
+    button.setAttribute("role", "menuitem");
+    if (action.danger) button.classList.add("is-danger");
+    button.textContent = action.label;
+    button.addEventListener("click", (event) => {
+      event.stopPropagation();
+      closeSessionMenu();
+      action.handler();
+    });
+    menu.appendChild(button);
+  }
+  return menu;
+}
+
+// 终端集成会话（固定 id "default"）不在侧栏列出：它是 shellhook 那条车道，
+// 由终端驱动，在 WebUI 的会话列表里既不该被误点进去、更不该被误删。真要看
+// 它的历史，用 REPL 的 /session 切过去。
+export function isTerminalSession(sessionId) {
+  return String(sessionId || "") === "default";
+}
+
+export function buildSessionItem(session) {
+  const id = String(session?.session_id || "");
+  const isView = Boolean(id) && (id === state.viewSessionId || id === state.switchingToSessionId);
+  // 终端集成会话固定为 id "default",不再跟随可变的全局指针。
+  const isDefault = id === "default";
+  const item = document.createElement("div");
+  item.className = `session-item${isView ? " active" : ""}`;
+  item.dataset.sessionId = id;
+
+  const renaming = state.sessionRenaming === id;
+  // 侧栏拖拽排序(组内):HTML5 DnD,drop 时全量提交新顺序。
+  if (!renaming) attachSessionDrag(item, session, id);
+  const main = document.createElement(renaming ? "div" : "button");
+  main.className = `session-item-main${renaming ? " is-renaming" : ""}`;
+  if (!renaming) {
+    main.type = "button";
+    main.title = isView ? sessionDisplayName(session) : `查看「${sessionDisplayName(session)}」`;
+    main.addEventListener("click", () => openSessionView(id));
+  }
+  // 行首那一格只放状态指示器。模式图标搬去了分组标题——同一组里每行都
+  // 画一遍相同的图标，重复十几次也说不出新东西，还占着状态该用的位置。
+  // 空着的时候格子仍在，文字左缘不会因为有没有指示器而移位。
+  const lead = document.createElement("span");
+  lead.className = "session-lead";
+  if (sessionHasRuns(id)) {
+    const spinner = document.createElement("span");
+    spinner.className = "session-run-spinner";
+    spinner.title = "有回复正在运行";
+    spinner.textContent = BRAILLE_FRAMES[state.brailleFrame % BRAILLE_FRAMES.length];
+    lead.appendChild(spinner);
+  } else if (state.unreadSessions.has(id)) {
+    const dot = document.createElement("span");
+    dot.className = "session-unread-dot";
+    dot.title = "有未读的新回复";
+    lead.appendChild(dot);
+  }
+  main.appendChild(lead);
+
+  const copy = document.createElement("span");
+  copy.className = "session-copy";
+  if (renaming) {
+    const input = document.createElement("input");
+    input.className = "session-rename-input";
+    input.type = "text";
+    input.value = String(session?.name || "");
+    input.maxLength = 200;
+    input.setAttribute("aria-label", "会话名称");
+    input.addEventListener("click", (event) => event.stopPropagation());
+    input.addEventListener("keydown", (event) => {
+      event.stopPropagation();
+      if (event.key === "Enter") {
+        event.preventDefault();
+        commitSessionRename(id, input.value);
+      } else if (event.key === "Escape") {
+        event.preventDefault();
+        cancelSessionRename();
+      }
+    });
+    input.addEventListener("blur", () => {
+      if (state.sessionRenaming === id) commitSessionRename(id, input.value);
+    });
+    copy.appendChild(input);
+    window.requestAnimationFrame(() => {
+      input.focus();
+      input.select();
+    });
+  } else {
+    const titleRow = document.createElement("span");
+    titleRow.className = "session-title-row";
+    const title = document.createElement("strong");
+    title.textContent = sessionDisplayName(session);
+    titleRow.appendChild(title);
+    if (isDefault) {
+      const badge = document.createElement("span");
+      badge.className = "session-default-badge";
+      badge.textContent = "默认";
+      badge.title = "CLI 与快捷入口的默认会话";
+      titleRow.appendChild(badge);
+    }
+    copy.appendChild(titleRow);
+  }
+
+  // Gemini-style list rows: name only; details live in the hover tooltip.
+  if (!renaming) {
+    const snippet = firstLine(session?.last_user_content || "");
+    const sandbox = String(session?.sandbox || "").trim();
+    const details = [snippet, sandbox ? `sandbox: ${sandbox}` : ""].filter(Boolean).join("\n");
+    if (details) {
+      main.title = `${sessionDisplayName(session)}\n${details}`;
+    }
+  }
+
+  main.appendChild(copy);
+  item.appendChild(main);
+
+  const trailing = document.createElement("span");
+  trailing.className = "session-trailing";
+
+  const menuButton = document.createElement("button");
+  menuButton.type = "button";
+  menuButton.className = "session-menu-button";
+  menuButton.title = "会话操作";
+  menuButton.setAttribute("aria-label", `会话操作：${sessionDisplayName(session)}`);
+  menuButton.setAttribute("aria-haspopup", "menu");
+  menuButton.setAttribute("aria-expanded", String(state.sessionMenuFor === id));
+  menuButton.appendChild(makeIconSlot("ellipsis"));
+  menuButton.addEventListener("click", (event) => {
+    event.stopPropagation();
+    toggleSessionMenu(id);
+  });
+  trailing.appendChild(menuButton);
+  item.appendChild(trailing);
+
+  if (state.sessionMenuFor === id) item.appendChild(buildSessionMenu(session, isDefault));
+  return item;
+}
+
+export function buildFallbackSessionItem() {
+  const details = deriveConversationDetails();
+  const item = document.createElement("div");
+  item.className = "session-item active";
+  const main = document.createElement("button");
+  main.type = "button";
+  main.className = "session-item-main";
+  main.title = details.title;
+  main.appendChild(makeIconSlot("message-circle"));
+  const copy = document.createElement("span");
+  copy.className = "session-copy";
+  const title = document.createElement("strong");
+  title.textContent = details.title;
+  const snippet = document.createElement("small");
+  snippet.className = "session-snippet";
+  snippet.textContent = details.snippet;
+  snippet.title = details.snippet;
+  copy.append(title, snippet);
+  main.appendChild(copy);
+  main.addEventListener("click", () => {
+    closeSidebar();
+    scrollToBottom({ force: true, smooth: true });
+  });
+  item.appendChild(main);
+  const trailing = document.createElement("span");
+  trailing.className = "session-trailing";
+  const time = document.createElement("span");
+  time.className = "session-time";
+  time.textContent = details.timestamp ? formatRelativeTime(details.timestamp) : "";
+  trailing.appendChild(time);
+  item.appendChild(trailing);
+  return item;
+}
+
+export function renderSessionList() {
+  if (!elements.sessionItems) return;
+  if (state.sessionRenaming && elements.sessionItems.querySelector(".session-rename-input")) return;
+  elements.sessionItems.replaceChildren();
+  if (!multiSessionEnabled() || state.sessions.length === 0) {
+    elements.sessionItems.appendChild(buildFallbackSessionItem());
+    return;
+  }
+  // 侧栏按会话模式分组(创建时定死)。终端集成会话不列出——它是 shellhook
+  // 那条车道,由终端驱动,WebUI 里既不该被误点进去也不该被误删;要看它的
+  // 历史用 REPL 的 /session 切过去。
+  const normal = state.sessions.filter(
+    (session) => !isTerminalSession(session?.session_id) && session?.mode !== "dev"
+  );
+  const dev = state.sessions.filter(
+    (session) => !isTerminalSession(session?.session_id) && session?.mode === "dev"
+  );
+  if (normal.length) {
+    elements.sessionItems.appendChild(buildSessionGroupHeader("普通模式", "message-circle"));
+    for (const session of normal) elements.sessionItems.appendChild(buildSessionItem(session));
+  }
+  if (dev.length) {
+    elements.sessionItems.appendChild(buildSessionGroupHeader("开发模式", "code"));
+    for (const session of dev) elements.sessionItems.appendChild(buildSessionItem(session));
+  }
+}
+
+/// 一个计时器喂所有转圈。
+///
+/// 每个转圈各起一个 interval 的话,列表一重画就要收拾一批计时器,漏一个就
+/// 是一个永远跑下去的定时器;而且各自起跑点不同,几行并排时相位乱跳。
+/// 共用一个帧号还有个好处:重画时新建的元素直接落在当前帧上,不会从头闪。
+export function startBrailleTicker() {
+  window.setInterval(() => {
+    if (document.hidden) return;
+    const spinners = document.querySelectorAll(".session-run-spinner");
+    if (!spinners.length) return;
+    state.brailleFrame = (state.brailleFrame + 1) % BRAILLE_FRAMES.length;
+    const glyph = BRAILLE_FRAMES[state.brailleFrame];
+    for (const spinner of spinners) spinner.textContent = glyph;
+  }, 90);
+}
+
+export function clearSessionDropMarkers() {
+  if (!elements.sessionItems) return;
+  for (const el of elements.sessionItems.querySelectorAll(".drop-before, .drop-after")) {
+    el.classList.remove("drop-before", "drop-after");
+  }
+}
+
+export function attachSessionDrag(item, session, id) {
+  item.draggable = true;
+  item.addEventListener("dragstart", (event) => {
+    state.sessionDragId = id;
+    item.classList.add("is-dragging");
+    event.dataTransfer.effectAllowed = "move";
+    try { event.dataTransfer.setData("text/plain", id); } catch (_) { /* 老内核 */ }
+  });
+  item.addEventListener("dragend", () => {
+    state.sessionDragId = null;
+    item.classList.remove("is-dragging");
+    clearSessionDropMarkers();
+  });
+  item.addEventListener("dragover", (event) => {
+    const dragId = state.sessionDragId;
+    if (!dragId || dragId === id) return;
+    // 只在同一分组(普通/dev)内排序,跨组语义(改会话模式)不存在。
+    const dragging = findSession(dragId);
+    if (!dragging || (dragging?.mode === "dev") !== (session?.mode === "dev")) return;
+    event.preventDefault();
+    event.dataTransfer.dropEffect = "move";
+    const rect = item.getBoundingClientRect();
+    const before = event.clientY < rect.top + rect.height / 2;
+    clearSessionDropMarkers();
+    item.classList.add(before ? "drop-before" : "drop-after");
+  });
+  item.addEventListener("dragleave", (event) => {
+    if (event.relatedTarget && item.contains(event.relatedTarget)) return;
+    item.classList.remove("drop-before", "drop-after");
+  });
+  item.addEventListener("drop", (event) => {
+    const dragId = state.sessionDragId;
+    if (!dragId || dragId === id) return;
+    event.preventDefault();
+    const before = item.classList.contains("drop-before");
+    clearSessionDropMarkers();
+    state.sessionDragId = null;
+    commitSessionReorder(dragId, id, before);
+  });
+}
+
+export async function commitSessionReorder(dragId, targetId, before) {
+  const list = state.sessions;
+  const from = list.findIndex((s) => String(s?.session_id) === String(dragId));
+  if (from < 0) return;
+  const [moved] = list.splice(from, 1);
+  let to = list.findIndex((s) => String(s?.session_id) === String(targetId));
+  if (to < 0) {
+    list.splice(from, 0, moved);
+    return;
+  }
+  list.splice(before ? to : to + 1, 0, moved);
+  renderSessionList();
+  // 全量提交当前顺序(两组按数组序混排;后端按序重写 sort_key,分组是
+  // 前端展示层的事)。终端车道会话不参与。
+  const ids = list
+    .filter((s) => !isTerminalSession(s?.session_id))
+    .map((s) => String(s.session_id));
+  state.lastReorderIds = ids.join("\n");
+  try {
+    await apiRequest("/api/sessions/order", {
+      method: "PUT",
+      body: JSON.stringify({ session_ids: ids })
+    });
+  } catch (error) {
+    showToast(error.message || "排序保存失败", "error");
+    refreshSessions();
+  }
+}
+
+export function buildSessionGroupHeader(label, icon) {
+  const header = document.createElement("div");
+  header.className = "session-group-header";
+  if (icon) header.appendChild(makeIconSlot(icon));
+  const text = document.createElement("span");
+  text.textContent = label;
+  header.appendChild(text);
+  return header;
+}
