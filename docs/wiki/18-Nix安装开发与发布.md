@@ -85,10 +85,11 @@ curl -fsSL https://raw.githubusercontent.com/yxxbc/gqy-agent/gqy/nix/migrate.sh 
 
 ### 本机用哪个 gqy
 
-**预编译包和 Nix 包都不带语音前端 `gqy-voice`**（它依赖 sherpa-onnx 静态库）。需要语音的开发机，日常用的还是自己编译的版本：
+**预编译包和 Nix 包都不带语音前端 `gqy-voice`**（它依赖 sherpa-onnx 静态库）。开发机日常用自己编译的版本，默认不带语音（编译更快）：
 
 ```bash
-cargo install --path . --locked --features voice   # 装到 ~/.cargo/bin/{gqy,gqy-voice}
+cargo install --path . --locked                    # 装到 ~/.cargo/bin/gqy
+cargo install --path . --locked --features voice   # 要改或验收语音时才用，额外装 gqy-voice
 ```
 
 开发机上**不要再 `nix profile install` 一份**：`~/.cargo/bin` 排在前面，Nix 版根本用不到，只会造成混乱。要验收发布出去的 Nix 版，用沙箱跑一次就够了（`GQY_HOME` 沙箱，别连到生产 daemon）：

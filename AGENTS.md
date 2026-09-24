@@ -82,7 +82,7 @@ docs/中有所有的计划和文档，可以自行按需阅读。
 7.2 **Nix 是分发主路**，正典是 `docs/wiki/18-Nix安装开发与发布.md`，动打包/发布前先读它。发版链：Actions 页手动运行 `publish-release.yml` 填版本号 → 工作流用 `.github/scripts/release.py prepare` 把 `CHANGELOG.md` 的 `[Unreleased]` 定稿为 `[X.Y.Z] - 日期` 并同步 `Cargo.toml`/`Cargo.lock`/README 徽章 → github-actions[bot] 提交并打 tag `vX.Y.Z`（bot 推的 tag 不触发工作流，所以定稿与编译发布在同一工作流里串跑）→ 云端编 4 平台发 Release（正文=CHANGELOG 该版本段 + 安装说明，缺段编译前即失败）并自动提交 `nix/release.json` → 本地 `git pull`。hotfix 可本地 prepare 后手动推 tag。`nix/release.json` 只由 `nix/update-release.py` 生成，禁止手改 hash。
 7.3 资源/外部命令/平台的增减要两处同步：`publish-release.yml` 打包步骤、`nix/package.nix`（及 `nix/prebuilt.nix` 的 wrapProgram PATH）。改完 `nix flake check --no-build --all-systems`。Intel Mac 不在 flake 里（nixpkgs 已弃），走 install.sh。
 7.4 Nix 下程序路径是 `/nix/store/<hash>-…`，每次升级都变：`gqy_executable()` 只用于起子进程或每次都会重建的配置，禁止写进 shell rc、launchd/systemd、用户配置等持久文件（写 `gqy` 靠 PATH）。
-7.5 预编译包和 Nix 包都不带 `gqy-voice`。开发机用 `cargo install --path . --locked --features voice`，不要同机再 `nix profile install`（`~/.cargo/bin` 会遮住它）；验收 Nix 版用 `GQY_HOME=$(mktemp -d) nix run github:yxxbc/gqy-agent/gqy`。
+7.5 预编译包和 Nix 包都不带 `gqy-voice`。开发机本地构建不带语音：`cargo install --path . --locked`（要验语音再单独加 `--features voice`）；不要同机再 `nix profile install`（`~/.cargo/bin` 会遮住它）；验收 Nix 版用 `GQY_HOME=$(mktemp -d) nix run github:yxxbc/gqy-agent/gqy`。
 7.6 shell 脚本里紧挨中文的变量必须加花括号（`${var}，`）：macOS 的 sh 在中文 locale 下会把全角标点的首字节吞进变量名，`set -u` 直接报错。
 7.7 只有 Nix 和 `install.sh` 两条安装路线。上游继承的 Arch/DEB/RPM 打包（`packaging/`、release.yml 等）已删除，别再恢复或往里加东西；`install.sh` 给没有 Nix 的用户，检测到 Nix 版会拒绝重复安装。CI（ci.yml）在任意分支 push 与 PR 上跑全套（fmt+flake、六道脚本门禁（含 WebUI 依赖方向与 CSS token）与 CHANGELOG 格式检查、Linux/macOS 测试与用例数门禁（降了报红，涨了出 warning 提示更新 `.test-count`）、voice 编译、1.89 MSRV）；`#[ignore]` 用例只在手动触发并勾选 run_ignored 时跑、不阻塞。
 
