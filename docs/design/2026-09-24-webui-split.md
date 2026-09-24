@@ -1,6 +1,6 @@
 # WebUI 拆分：架构设计
 
-> 状态：已定稿（2026-09-24 用户裁定 D1–D4 均取推荐项）。P0 已施工（2026-09-25），见 §11。
+> 状态：P0–P5 已施工（2026-09-25），见 §11。与原计划不同之处也记在那里。
 > 目标：把 `web/app.js`（13266 行）与 `web/styles.css`（11759 行）拆成有层次、有边界的模块，
 > 并把「加一个文件」「加一个面板」变成不需要记忆隐性规则的事。拆分本身零行为变化。
 
@@ -165,3 +165,51 @@ D1 原生 ES 模块 · D2 构建期拼接 · D3 本期 `app.js` + `styles.css` �
 - 测试 `web::tests::embedded_assets`：页面引用与模块 import 必须解析到嵌入表；已验证把引用改回 `/dash/` 时报红。
 - `test_scripts/web_dep_check.py` + `web-deps.json`：分层方向门禁，四条规则各自验证过报红。进 CI 与 `refactor-check.sh`。
 - `refactor_size_report.py` 覆盖 `web/**/*.{js,css,html}`（排除 vendor），基线重写；拆分进度只算 `.rs`。
+
+### 平台页与设置入口（2026-09-25，用户要求随拆分一起做）
+
+- 控制台新增「平台」页：左侧平台列表，右侧分页。QQ 的「连接与设置」（原设置页 QQ 平台）、「消息记录」（原 `qq` 面板）、
+  「群聊管理」（原 `groups` 面板）并到这里。加平台：`index.html` 加按钮与 `platform-body`，`features/console/panel.js`
+  的 `PLATFORMS` 登记分页（`settingsPage` 复用设置页渲染器，`dash` 复用看板）。旧深链自动转到新位置。
+- 保存栏只有一个：设置页或平台页的设置分页在显示时，`placeSettingsFooter` 把它挪过去。
+- 左下角独立的设置图标删除，设置从控制台进（控制台是总入口，设置本来就是其中一页）。
+
+### P2 app.js → ES 模块（先于 P1 做）
+
+- 顺序对调：先拆，core 从 app.js 里自然分出来，再去合并旧脚本里的副本，比先凭空建 core 稳。
+- `test_scripts/split_app_js.mjs`（acorn）按边界表机械搬运：原文与注释照搬，自动生成 import/export；
+  顶层副作用语句收进各模块 `start()`，入口按原顺序调用。工具拒绝两类错误：跨模块给 `let` 赋值（ES 模块导入只读）、
+  加载时读非 core/state 模块的值（循环依赖下的 TDZ）。
+- 结果：66 个模块，最大 595 行；ESLint `no-undef` 前后均为 0。
+- §3 规则 3「顶层只声明」的例外：`elements`（取 DOM 引用）与 `usageTip`（建元素）这类声明本身带 DOM 操作，保留原样。
+- 功能之间的 116 条依赖是 app.js 闭包里本来就有的，原样冻结进 `test_scripts/web-deps.json`。缩减它们是后续工作。
+
+### P1 公共层去重
+
+- 图标表合一（106 个）：冲突时取旧脚本用的新版 lucide 图形；播放器的实心 play/pause 改名 `play-solid`/`pause-solid`。
+- toast 合一：看板改用主提示条（看板只用到错误与普通两种）。看板 `api()` 走 `apiRequest`，登录过期同样回登录页。
+- 三个 `formatTime` 不是重复：分别格式化时钟、日期时间、媒体时长，保留。
+- `core/expose.js` 把公共层挂到 `window.GqyCore`，在 `index.html` 里排在所有旧脚本之前。
+
+### P3 CSS 第一刀
+
+- 36 个文件（最大 636 行），拼接结果与原 `styles.css` 逐字节相同（切分时脚本断言）。
+  build.rs 按文件名顺序拼成 `/styles.css`，没有保留字节对比测试：P4 紧接着就要改动它。
+
+### P4 CSS 归并：大部分不做（与原计划不同）
+
+- `test_scripts/css_move_check.mjs` 逐条检查：挪动经过的每条规则里，有没有同优先级、同属性（含简写）的。
+  主体类名前缀分属不相交源文件时视为不会命中同一元素，其余一律按可能命中处理。
+- 结论：`82-bubble-overrides`（16 条里 0 条可挪）、`76-dashboard-extras`（54 条里 2 条）、`80-process-timeline` 是**真覆盖层**，
+  靠「排在后面」生效，已在文件头标注，不挪。原计划「逐组件归并」的前提（散落规则只是写得乱）不成立。
+- 只做了零风险的切点调整：`36-stage-states` 末尾的输入框规则并入 `40-composer`（拼接字节不变）。
+- 真要继续归并，需要先有截图对比的视觉回归，再改选择器优先级，不能只靠挪位置。
+
+### P5 状态分片
+
+- 125 个共享键里 47 个只有一个模块读写，移入该模块的私有 `xxxState`；1 个无人使用的键删除。
+  其余 77 个是多模块共用，或被 `settings.js` 经 `ctx.state` 读取，留在 `store.js`。
+
+### 门禁
+
+- `test_scripts/css_token_check.py`：每个 CSS 文件的字面量字号与两位数 z-index 只许减少（存量 50 与 7）。已进 CI。

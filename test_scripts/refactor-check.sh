@@ -67,6 +67,7 @@ python3 test_scripts/refactor_size_report.py --check
 step "依赖方向"
 python3 test_scripts/arch_dep_check.py
 python3 test_scripts/web_dep_check.py
+python3 test_scripts/css_token_check.py
 
 step "AGENTS.md 引用"
 python3 test_scripts/check-agents-refs.py

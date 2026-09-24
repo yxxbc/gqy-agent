@@ -1,0 +1,146 @@
+{
+  "00-tokens.css": {
+    "font-size-px": 0,
+    "z-index-literal": 0
+  },
+  "05-base.css": {
+    "font-size-px": 2,
+    "z-index-literal": 1
+  },
+  "10-sidebar.css": {
+    "font-size-px": 1,
+    "z-index-literal": 0
+  },
+  "12-stage-controls.css": {
+    "font-size-px": 1,
+    "z-index-literal": 1
+  },
+  "14-goal-and-jobs.css": {
+    "font-size-px": 0,
+    "z-index-literal": 0
+  },
+  "20-messages.css": {
+    "font-size-px": 4,
+    "z-index-literal": 0
+  },
+  "22-markdown.css": {
+    "font-size-px": 1,
+    "z-index-literal": 0
+  },
+  "24-reasoning-media.css": {
+    "font-size-px": 0,
+    "z-index-literal": 0
+  },
+  "26-linkcards-preview.css": {
+    "font-size-px": 1,
+    "z-index-literal": 0
+  },
+  "28-todos.css": {
+    "font-size-px": 0,
+    "z-index-literal": 0
+  },
+  "30-tools.css": {
+    "font-size-px": 0,
+    "z-index-literal": 0
+  },
+  "31-subagent-panel.css": {
+    "font-size-px": 2,
+    "z-index-literal": 0
+  },
+  "32-indicators.css": {
+    "font-size-px": 0,
+    "z-index-literal": 0
+  },
+  "34-artifacts.css": {
+    "font-size-px": 10,
+    "z-index-literal": 1
+  },
+  "36-stage-states.css": {
+    "font-size-px": 2,
+    "z-index-literal": 1
+  },
+  "40-composer.css": {
+    "font-size-px": 1,
+    "z-index-literal": 1
+  },
+  "42-context-panel.css": {
+    "font-size-px": 3,
+    "z-index-literal": 0
+  },
+  "44-selection-menu.css": {
+    "font-size-px": 1,
+    "z-index-literal": 0
+  },
+  "46-attachments-voice.css": {
+    "font-size-px": 0,
+    "z-index-literal": 1
+  },
+  "48-composer-controls.css": {
+    "font-size-px": 0,
+    "z-index-literal": 1
+  },
+  "50-settings.css": {
+    "font-size-px": 0,
+    "z-index-literal": 0
+  },
+  "52-settings-cards.css": {
+    "font-size-px": 1,
+    "z-index-literal": 0
+  },
+  "54-dialogs.css": {
+    "font-size-px": 1,
+    "z-index-literal": 0
+  },
+  "60-console.css": {
+    "font-size-px": 5,
+    "z-index-literal": 0
+  },
+  "62-inline-content.css": {
+    "font-size-px": 0,
+    "z-index-literal": 0
+  },
+  "64-shared-files.css": {
+    "font-size-px": 2,
+    "z-index-literal": 0
+  },
+  "66-audio-player.css": {
+    "font-size-px": 0,
+    "z-index-literal": 0
+  },
+  "70-dashboard-kit.css": {
+    "font-size-px": 1,
+    "z-index-literal": 0
+  },
+  "72-dashboard-panels.css": {
+    "font-size-px": 3,
+    "z-index-literal": 0
+  },
+  "74-settings-kit.css": {
+    "font-size-px": 2,
+    "z-index-literal": 0
+  },
+  "76-dashboard-extras.css": {
+    "font-size-px": 2,
+    "z-index-literal": 0
+  },
+  "78-accounts-oobe.css": {
+    "font-size-px": 3,
+    "z-index-literal": 0
+  },
+  "80-process-timeline.css": {
+    "font-size-px": 0,
+    "z-index-literal": 0
+  },
+  "82-bubble-overrides.css": {
+    "font-size-px": 0,
+    "z-index-literal": 0
+  },
+  "84-mapcard.css": {
+    "font-size-px": 1,
+    "z-index-literal": 0
+  },
+  "86-expresscard.css": {
+    "font-size-px": 0,
+    "z-index-literal": 0
+  }
+}
