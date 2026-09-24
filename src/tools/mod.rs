@@ -463,18 +463,20 @@ pub(crate) fn rescope_platform_memory_tools(
         registry.unregister(name);
     }
     let principal = context.principal().stable_key();
-    let access = if context.is_admin() {
+    let access = if context.privileged_memory() {
         crate::memory::MemoryAccess::Privileged
     } else {
         crate::memory::MemoryAccess::principal(principal.clone())
     };
+    // 主人本人的私聊写入算主人的（privileged），其余记在发起者名下。
+    let writer = (!context.owner_bound()).then_some(principal);
     if readonly {
         memory::register_readonly_with_context(
             registry,
             config.clone(),
             paths.clone(),
             access,
-            Some(principal),
+            writer,
             context.sender_display_name(),
         );
     } else {
@@ -483,7 +485,7 @@ pub(crate) fn rescope_platform_memory_tools(
             config.clone(),
             paths.clone(),
             access,
-            Some(principal),
+            writer,
             context.sender_display_name(),
         );
     }

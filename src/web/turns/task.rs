@@ -439,17 +439,25 @@ async fn run_turn_task_inner(
                 // 平台回合的工具轮数兜底(max_rounds=0 时生效,见方法注释)。
                 agent.cap_tool_rounds_for_platform();
                 let principal = context.principal().stable_key();
+                let owner_bound = context.owner_bound();
                 agent.set_memory_request_context(
-                    if context.is_admin {
+                    if context.privileged_memory() {
                         MemoryAccess::Privileged
                     } else {
                         MemoryAccess::principal(principal.clone())
                     },
-                    Some(principal),
+                    // 主人本人的私聊：写入算主人的，不记在这个 QQ 号名下。
+                    (!owner_bound).then_some(principal),
                     context.sender_display_name.clone(),
                 );
                 agent.set_memory_origin(MemoryOrigin {
-                    kind: "platform".to_string(),
+                    // owner_platform：来源仍记下是哪个平台、哪条消息，但归属判定
+                    // （`principal_ownership`）只认 "platform"，所以日记与整理产物都算主人的。
+                    kind: if owner_bound {
+                        "owner_platform".to_string()
+                    } else {
+                        "platform".to_string()
+                    },
                     platform: context.conversation.platform.clone(),
                     account_id: context.conversation.account_id.clone(),
                     conversation_kind: context.conversation.kind.as_str().to_string(),

@@ -333,6 +333,25 @@ impl PlatformTurnContext {
             )
     }
 
+    /// 本回合能不能读全部记忆：管理员，**并且在私聊里**。群里的回复所有人都
+    /// 看得见，管理员在群里也只读自己的记忆和公开记忆——否则只该主人看的记忆
+    /// 会被召回进群聊回复。
+    pub(crate) fn privileged_memory(&self) -> bool {
+        self.is_admin && self.conversation.kind == ConversationKind::Private
+    }
+
+    /// 主人本人的私聊（`platforms.qq.owner_users`）：记忆与终端 / WebUI 共享，
+    /// 写入算主人自己的，并带上用户资料。只认配置里写的号，不认动态授予的管理员。
+    pub(crate) fn owner_bound(&self) -> bool {
+        self.privileged_memory()
+            && self.conversation.platform == "onebot"
+            && self
+                .sender_id
+                .parse::<i64>()
+                .ok()
+                .is_some_and(|sender| self.config.platforms.qq.owner_users.contains(&sender))
+    }
+
     pub(crate) fn host_tools_allowed(&self) -> bool {
         if self.is_admin {
             return true;

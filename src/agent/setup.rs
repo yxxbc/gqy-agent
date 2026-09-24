@@ -256,6 +256,13 @@ impl Agent {
             .unwrap_or("agent")
     }
 
+    /// 平台回合，且不是主人本人的私聊。主人私聊按本人对待：带用户资料。
+    pub(in crate::agent) fn foreign_platform_turn(&self) -> bool {
+        self.platform_context
+            .as_ref()
+            .is_some_and(|context| !context.owner_bound())
+    }
+
     pub fn prepare_for_turn(&mut self) -> Result<()> {
         // (档案进不进由 user_profile_applies 决定:平台回合不进。)
         let mode_prompt = mode_system_prompt(
@@ -263,7 +270,7 @@ impl Agent {
             &self.paths,
             self.mode,
             self.prompt_audience,
-            user_profile_applies(self.prompt_audience, self.platform_context.is_some()),
+            user_profile_applies(self.prompt_audience, self.foreign_platform_turn()),
         )?;
         {
             // 指纹永远按人格/模式提示词算,不看整体替换的覆盖:覆盖是回合级
@@ -513,7 +520,7 @@ impl Agent {
             &self.paths,
             self.mode,
             self.prompt_audience,
-            user_profile_applies(self.prompt_audience, self.platform_context.is_some()),
+            user_profile_applies(self.prompt_audience, self.foreign_platform_turn()),
         )?;
         self.system_prompt = self.assemble_system_prompt(mode_prompt);
         Ok(())
@@ -641,7 +648,8 @@ impl Agent {
 }
 
 /// 属主/成员档案进不进系统提示词:终端(Owner)与 WebUI(External 且没有平台
-/// 上下文)进;QQ 等平台回合与内部回合不进。
+/// 上下文)进;QQ 等平台回合与内部回合不进——主人本人的私聊除外
+/// (`platforms.qq.owner_users`,见 `Agent::foreign_platform_turn`)。
 pub(in crate::agent) fn user_profile_applies(
     audience: PromptAudience,
     platform_turn: bool,

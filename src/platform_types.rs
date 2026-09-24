@@ -539,6 +539,12 @@ pub(crate) trait PlatformToolContext: Send + Sync {
     /// 当前发起者是不是管理员。
     fn is_admin(&self) -> bool;
 
+    /// 本回合能不能读全部记忆（管理员且在私聊里）。
+    fn privileged_memory(&self) -> bool;
+
+    /// 主人本人的私聊：写入的记忆算主人的，不记在这个平台账号名下。
+    fn owner_bound(&self) -> bool;
+
     /// 发起者的显示名，记忆里用它标注"谁说的"。
     fn sender_display_name(&self) -> String;
 

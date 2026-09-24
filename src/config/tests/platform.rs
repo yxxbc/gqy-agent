@@ -1251,3 +1251,14 @@ fn sleep_hours_parse_and_window() {
     config.platforms.qq.sleep_hours = "night".into();
     assert!(config.validate_platforms().is_err());
 }
+
+#[test]
+fn qq_owner_users_must_also_be_admins() {
+    let mut config = AppConfig::default();
+    config.platforms.qq.owner_users = vec![20000];
+    let error = config.validate_platforms().unwrap_err().to_string();
+    assert!(error.contains("owner_users"), "{error}");
+
+    config.platforms.qq.admin_users = vec![20000];
+    assert!(config.validate_platforms().is_ok());
+}

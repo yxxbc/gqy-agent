@@ -2029,6 +2029,13 @@
         default: [],
       },
       {
+        path: "owner_users",
+        label: "主人 QQ 号",
+        hint: "你本人的号。只在私聊里生效：和终端、网页共用同一份记忆，并带上你的用户资料。必须同时在管理员里；群聊里不生效",
+        kind: "id-list",
+        default: [],
+      },
+      {
         path: "admin_aliases",
         label: "管理员别名",
         hint: "键 = QQ 号,值 = 别名;AI 从终端发消息时按别名选收件人",

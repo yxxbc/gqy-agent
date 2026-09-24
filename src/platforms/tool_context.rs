@@ -15,6 +15,14 @@ impl crate::platform_types::PlatformToolContext for PlatformTurnContext {
         self.is_admin
     }
 
+    fn privileged_memory(&self) -> bool {
+        PlatformTurnContext::privileged_memory(self)
+    }
+
+    fn owner_bound(&self) -> bool {
+        PlatformTurnContext::owner_bound(self)
+    }
+
     fn sender_display_name(&self) -> String {
         self.sender_display_name.clone()
     }

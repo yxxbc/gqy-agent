@@ -243,6 +243,8 @@ impl PlatformsConfig {
         self.qq.group_chats.migrate_legacy_rate_limits();
         self.qq.admin_users.sort_unstable();
         self.qq.admin_users.dedup();
+        self.qq.owner_users.sort_unstable();
+        self.qq.owner_users.dedup();
         self.qq.sleep_hours = self.qq.sleep_hours.trim().to_string();
         self.qq.private_chats.whitelist.sort_unstable();
         self.qq.private_chats.whitelist.dedup();
@@ -651,6 +653,12 @@ pub struct OneBotConfig {
     /// Empty tokens are accepted only from a loopback peer.
     pub access_token: String,
     pub admin_users: Vec<i64>,
+    /// 主人本人的 QQ 号。只在**私聊**里生效：与终端 / WebUI 共享同一份记忆（读全部、
+    /// 写入算主人自己的），并带上用户资料。必须同时列在 `admin_users` 里。
+    /// 群聊里不生效——群里的回复所有人都看得见。和管理员分开设：管理员可以在
+    /// 聊天里临时授予，主人身份只能在配置文件里写。
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub owner_users: Vec<i64>,
     /// 管理员别名(键 = QQ 号字符串):终端发消息工具的 `to` 选项用它列出
     /// 能发给谁;没有别名的显示号码。
     #[serde(default, skip_serializing_if = "BTreeMap::is_empty")]
@@ -911,6 +919,7 @@ impl Default for OneBotConfig {
             reverse_ws_port: 8300,
             access_token: String::new(),
             admin_users: Vec::new(),
+            owner_users: Vec::new(),
             admin_aliases: BTreeMap::new(),
             allow_non_admin_host_tools: false,
             group_intermediate_messages: false,

@@ -35,7 +35,7 @@
   const TRUTH_CLASS = { accepted: "is-active", uncertain: "is-warn", fictional: "is-warn", rejected: "is-danger" };
   const VISIBILITY = { public: "公开", principal: "本人", privileged: "特权" };
   const RETENTION = { short_term: "短期", long_term: "长期" };
-  const ORIGIN = { local: "本地", platform: "平台", "": "—" };
+  const ORIGIN = { local: "本地", platform: "平台", owner_platform: "主人 QQ", "": "—" };
   const ROLE = { user: "用户", assistant: "助手" };
   const TAB_LABEL = { facts: "事实", episodes: "经历", evicted: "归档回合", reviews: "复盘" };
 
@@ -110,7 +110,7 @@
         filterSelect("status", STATUS, "全部状态"),
         filterSelect("retention", RETENTION, "全部保留"),
         filterSelect("stage", { unconsolidated: "未整理", consolidated: "已整理", promotion_pending: "待晋升", promoted: "已晋升" }, "全部阶段"),
-        filterSelect("origin_kind", { local: "本地", platform: "平台" }, "全部来源"),
+        filterSelect("origin_kind", { local: "本地", platform: "平台", owner_platform: "主人 QQ" }, "全部来源"),
         tagInput(f));
     } else if (state.tab === "evicted") {
       const start = D.el("input.dash-select", { type: "date", title: "起始日期", value: f.startDate || "", onchange: () => { f.startDate = start.value; state.offset = 0; loadItems(); } });
