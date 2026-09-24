@@ -569,11 +569,15 @@
             </nav>
             <div class="settings-content platform-body" data-platform-body="qq">
               <nav class="platform-tabs" aria-label="QQ 分页">
-                <button class="active" type="button" data-platform-tab="settings">连接与设置</button>
+                <button class="active" type="button" data-platform-tab="settings">通用</button>
+                <button type="button" data-platform-tab="private">私聊</button>
+                <button type="button" data-platform-tab="group">群聊</button>
                 <button type="button" data-platform-tab="history">消息记录</button>
                 <button type="button" data-platform-tab="groups">群聊管理</button>
               </nav>
               <section class="platform-pane st-page" data-platform-pane="settings"><div class="st-root" id="settings-qq"></div></section>
+              <section class="platform-pane st-page" data-platform-pane="private" hidden><div class="st-root" id="settings-qq-private"></div></section>
+              <section class="platform-pane st-page" data-platform-pane="group" hidden><div class="st-root" id="settings-qq-group"></div></section>
               <section class="platform-pane" data-platform-pane="history" hidden><div class="con-inner is-wide" id="dashQqRoot"></div></section>
               <section class="platform-pane" data-platform-pane="groups" hidden><div class="con-inner is-wide" id="dashGroupsRoot"></div></section>
             </div>

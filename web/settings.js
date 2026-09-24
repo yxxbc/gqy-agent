@@ -2349,21 +2349,49 @@ window.GqySettings = (() => {
     { id: "models", title: "配置模型", description: "QQ 里用哪些模型；不设则继承全局池。" }
   ];
 
+  /* QQ 设置拆成三页（平台页里的「通用 / 私聊 / 群聊」分页）。字段归哪页只看路径，
+     新字段按前缀自动落位：private_chats.* 与 private_* 进私聊，group_chats.*、
+     group_context.* 与 group_* / show_group_name 进群聊，其余进通用。 */
+  function qqFieldScope(path) {
+    if (path.startsWith("private_chats.") || path.startsWith("private_")) return "private";
+    if (path.startsWith("group_chats.") || path.startsWith("group_context.") || path.startsWith("group_") || path === "show_group_name") return "group";
+    return "general";
+  }
+
+  function qqPages() { return ["qq", "qq-private", "qq-group"]; }
+  function rerenderQq() { qqPages().forEach((name) => rerender(name)); }
+
+  function qqSectionCards(root, scope) {
+    const qqSchema = schema().qq || {};
+    QQ_SECTIONS.forEach((section, index) => {
+      const fields = (qqSchema[section.id] || []).filter((field) => field.path !== "enabled" && qqFieldScope(field.path) === scope);
+      if (!fields.length) return;
+      const node = card(fieldRows(fields, qqBindingFor), { title: section.title, description: scope === "general" ? section.description : undefined });
+      node.style.setProperty("--i", String(index));
+      root.append(node);
+    });
+  }
+
   function renderQqPage(root) {
     const qq = qqConfig();
     const switchLabel = el("span", { text: qq.enabled ? "已启用" : "未启用" });
     const enabled = toggle(Boolean(qq.enabled), (value) => { qq.enabled = value; dirty(); switchLabel.textContent = value ? "已启用" : "未启用"; root.classList.toggle("is-platform-off", !value); });
-    root.append(el("div.st-page-head", null, el("div", null, el("h2", { text: "QQ 平台" }), el("p.st-page-desc", { text: "腾讯 QQ 接入。改动保存后会重启监听。" })), el("label.st-head-switch", null, switchLabel, enabled)));
+    root.append(el("div.st-page-head", null, el("div", null, el("h2", { text: "QQ 平台" }), el("p.st-page-desc", { text: "腾讯 QQ 接入。这里是私聊和群聊共用的设置；各自的设置在「私聊」「群聊」分页。改动保存后会重启监听。" })), el("label.st-head-switch", null, switchLabel, enabled)));
     root.classList.toggle("is-platform-off", !qq.enabled);
-    const qqSchema = schema().qq || {};
-    QQ_SECTIONS.forEach((section, index) => {
-      const fields = (qqSchema[section.id] || []).filter((field) => field.path !== "enabled");
-      const node = card(fieldRows(fields, qqBindingFor), { title: section.title, description: section.description });
-      node.style.setProperty("--i", String(index));
-      root.append(node);
-    });
-    root.append(routesCard());
+    qqSectionCards(root, "general");
     root.append(qqPluginsCard());
+  }
+
+  function renderQqPrivatePage(root) {
+    root.append(el("div.st-page-head", null, el("div", null, el("h2", { text: "QQ 私聊" }), el("p.st-page-desc", { text: "谁能私聊她、非白名单怎么限流，以及单个私聊的专属配置。" }))));
+    qqSectionCards(root, "private");
+    root.append(routesCard("private"));
+  }
+
+  function renderQqGroupPage(root) {
+    root.append(el("div.st-page-head", null, el("div", null, el("h2", { text: "QQ 群聊" }), el("p.st-page-desc", { text: "哪些群能用、触发词与限流、群聊上下文，以及单个群的专属配置。" }))));
+    qqSectionCards(root, "group");
+    root.append(routesCard("group"));
   }
 
   /* 会话专属配置(私聊/群聊路由) */
@@ -2388,16 +2416,19 @@ window.GqySettings = (() => {
     return chips;
   }
 
-  function routesCard() {
+  /* kind：只列这一种会话（私聊页 / 群聊页各一份）；新增的条目也是这一种。 */
+  function routesCard(kind) {
     const list = routes();
-    const add = button("新增会话配置", { iconName: "plus", small: true, onClick: () => {
-      list.push({ conversation: { kind: "group", id: "" } });
+    const noun = kind === "private" ? "私聊" : "群聊";
+    const add = button(`新增${noun}配置`, { iconName: "plus", small: true, onClick: () => {
+      list.push({ conversation: { kind, id: "" } });
       dirty();
       openRouteDrawer(list.length - 1);
     } });
     const body = el("div.st-card-body.is-list");
-    if (!list.length) body.append(empty("没有专属配置；所有会话按上面的平台设置走。"));
-    list.forEach((route, index) => {
+    const shown = list.map((route, index) => [route, index]).filter(([route]) => (route.conversation?.kind || "group") === kind);
+    if (!shown.length) body.append(empty(`没有${noun}专属配置；所有${noun}按上面的设置走。`));
+    shown.forEach(([route, index]) => {
       const item = el("button.st-route-row", { type: "button", onclick: () => openRouteDrawer(index) });
       item.style.setProperty("--i", String(index));
       item.append(
@@ -2407,7 +2438,7 @@ window.GqySettings = (() => {
       body.append(item);
     });
     const node = el("section.st-card", null,
-      el("header.st-card-head", null, el("div", null, el("h3", { text: "会话专属配置" }), el("p", { text: "某个群或私聊单独用另一套人格、模型或提示词。" })), el("div.st-card-actions", null, add)),
+      el("header.st-card-head", null, el("div", null, el("h3", { text: `${noun}专属配置` }), el("p", { text: `某个${kind === "private" ? "私聊" : "群"}单独用另一套人格、模型或提示词。` })), el("div.st-card-actions", null, add)),
       body);
     node.style.setProperty("--i", "4");
     return node;
@@ -2464,7 +2495,7 @@ window.GqySettings = (() => {
       onClose: () => {
         normalizeRoutePersona(route);
         if (!String(route.conversation?.id || "").trim()) { list.splice(list.indexOf(route), 1); dirty(); toast("没有填号码的会话配置已丢弃", "error"); }
-        rerender("qq");
+        rerenderQq();
       }
     });
   }
@@ -2517,7 +2548,7 @@ window.GqySettings = (() => {
     const instance = qqPluginInstance(id);
     const settings = instance.settings;
     const bindingFor = (field, keyOverride) => nestedBinding(settings, keyOverride || field.key);
-    const statusCard = () => card([row("插件状态", toggle(qqPluginEnabled(id, definition), (value) => { instance.enabled = value; dirty(); rerender("qq"); }), { hint: definition.description || "" })]);
+    const statusCard = () => card([row("插件状态", toggle(qqPluginEnabled(id, definition), (value) => { instance.enabled = value; dirty(); rerenderQq(); }), { hint: definition.description || "" })]);
     let tabs = null;
     let body = null;
     if (Array.isArray(definition.groups) && definition.groups.length) {
@@ -2536,7 +2567,7 @@ window.GqySettings = (() => {
         if (definition.custom === "scheduled_tasks") host.append(scheduledTasksCard(settings, definition));
       };
     }
-    openDrawer({ title: definition.title || id, subtitle: `platforms.qq.plugins.${id}`, width: tabs ? "760px" : "560px", tabs: tabs || undefined, body: body || undefined, footer: [el("span.st-foot-spacer"), button("完成", { kind: "primary", onClick: () => closeDrawer() })], onClose: () => rerender("qq") });
+    openDrawer({ title: definition.title || id, subtitle: `platforms.qq.plugins.${id}`, width: tabs ? "760px" : "560px", tabs: tabs || undefined, body: body || undefined, footer: [el("span.st-foot-spacer"), button("完成", { kind: "primary", onClick: () => closeDrawer() })], onClose: () => rerenderQq() });
   }
 
   function joinApprovalGroupsCard(settings, definition) {
@@ -2626,7 +2657,9 @@ window.GqySettings = (() => {
     general: renderGeneralPage,
     mcp: renderMcpPage,
     plugins: renderPluginsPage,
-    qq: renderQqPage
+    qq: renderQqPage,
+    "qq-private": renderQqPrivatePage,
+    "qq-group": renderQqGroupPage
   };
 
   function init(context) {

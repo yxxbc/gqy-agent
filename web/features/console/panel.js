@@ -93,6 +93,8 @@ export const PLATFORMS = {
   qq: {
     tabs: {
       settings: { settingsPage: "qq" },
+      private: { settingsPage: "qq-private" },
+      group: { settingsPage: "qq-group" },
       history: { dash: "qq" },
       groups: { dash: "groups" }
     }
