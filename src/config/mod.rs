@@ -576,6 +576,11 @@ pub struct DisplayConfig {
     /// （代码高亮、diff、展开区底色），界面色始终跟终端 16 色槽位走。
     #[serde(default = "default_display_theme")]
     pub theme: String,
+    /// 开屏欢迎框里的吉祥物：`portrait`（顾清影立绘，默认）/ `cat`（黑猫字符画）/
+    /// `custom`（读 `config/banner.txt`）/ `off`。立绘在 16 色以下的终端画不出，
+    /// 自动换成黑猫。
+    #[serde(default = "default_display_mascot")]
+    pub mascot: String,
     /// 这个版本不认识的显示项，原样留着写回。见 [`AppConfig::extra`]。
     #[serde(flatten, skip_serializing_if = "BTreeMap::is_empty")]
     pub extra: BTreeMap<String, serde_json::Value>,
@@ -637,6 +642,8 @@ struct RawDisplayConfig {
     banner: Option<bool>,
     #[serde(default)]
     theme: Option<String>,
+    #[serde(default)]
+    mascot: Option<String>,
     #[serde(flatten, default)]
     extra: BTreeMap<String, serde_json::Value>,
 }
@@ -682,6 +689,7 @@ impl<'de> Deserialize<'de> for DisplayConfig {
                 .unwrap_or_else(default_repl_replay_turns),
             banner: raw.banner.unwrap_or(true),
             theme: raw.theme.unwrap_or_else(default_display_theme),
+            mascot: raw.mascot.unwrap_or_else(default_display_mascot),
             extra: raw.extra,
         })
     }
@@ -1072,6 +1080,7 @@ impl Default for DisplayConfig {
             repl_replay_turns: default_repl_replay_turns(),
             banner: true,
             theme: default_display_theme(),
+            mascot: default_display_mascot(),
             extra: BTreeMap::new(),
         }
     }

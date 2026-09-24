@@ -236,6 +236,19 @@
           default: 3,
         },
         {
+          path: "display.mascot",
+          label: "开屏吉祥物",
+          hint: "终端开屏欢迎框里画什么;立绘在 16 色终端画不出时自动换黑猫",
+          kind: "select",
+          choices: [
+            { value: "portrait", label: "顾清影立绘" },
+            { value: "cat", label: "黑猫字符画" },
+            { value: "custom", label: "自定义(config/banner.txt)" },
+            { value: "off", label: "不画" },
+          ],
+          default: "portrait",
+        },
+        {
           path: "display.theme",
           label: "终端底色",
           hint: "影响代码高亮、diff 等内容色，界面色跟终端配色走",

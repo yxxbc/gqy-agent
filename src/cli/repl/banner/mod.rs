@@ -1,56 +1,53 @@
-//! 空会话的画面：渐变 GQY 艺术字、两侧稀疏的星空、周期扫光、模式行。
+//! 空会话的画面：Claude Code 式的开屏欢迎框（吉祥物 + 欢迎语 + 目录 + 模式 +
+//! 提示，框下列最近会话）。
 //!
 //! 只在**会话没有任何回合**时存在。第一条消息一发它就撤，会话模式随之钉死
 //! （中途换模式 = 系统提示词换血 = 全量缓存作废）；`/new` 开出空会话它又回来。
 //!
-//! 画面本身不认识后端：[`BannerScene::render`] 只产片段行，全屏后端把它铺进
-//! 正文区（垂直居中），inline 后端把它塞在输入框上方（紧凑块）。
+//! 09-24 起取代原来的大号渐变艺术字 + 星空 + 扫光（方案见
+//! `docs/plan/2026-09-23-tui-launch-and-lobby.md` §三）。画面是静止的，空闲时
+//! 不再每帧重画。吉祥物由 `display.mascot` 选（见 [`mascot`]），
+//! `config/banner.txt` 是 `custom` 那一档的来源；`display.banner = false` 整个关掉。
 //!
-//! 艺术字是可替换的：`config/banner.txt` 存在就用它（见 [`BannerArt::from_text`]），
-//! 渐变、星空、扫光照给；`display.banner = false` 整个关掉。
+//! 画面本身不认识后端：全屏后端用 [`BannerScene::lobby`] 把它铺进正文区、输入框
+//! 嵌在框下面；inline 后端用 [`BannerScene::render_ansi`] 塞在输入框上方。
 
 use crate::agent::AgentMode;
-use crate::cli::repl::tail::screen::ansi::{spans_to_ansi, AnsiSpan};
 use crate::config::AppConfig;
 use crate::i18n::text as t;
 use crate::paths::GqyPaths;
-use crate::terminal::palette::{Theme, BLUE, CORAL, DIM, FAINT, GOLD};
-use crate::terminal::starfield::{
-    fade, gradient_banner, segs_width, star_seg, subtitle_rule, BannerArt, Seg,
-};
+use crate::terminal::palette::Theme;
+use crate::terminal::starfield::BannerArt;
 
+pub(in crate::cli) mod mascot;
 pub(in crate::cli) mod preview;
-use ratatui::style::Modifier;
+pub(in crate::cli) mod welcome;
 
-/// 用户自带艺术字的文件名（放在配置目录下）。
+use mascot::Mascot;
+use welcome::{welcome_rows, WelcomeInfo};
+
+/// 用户自带艺术字的文件名（放在配置目录下），`display.mascot = custom` 时用。
 pub(in crate::cli) const BANNER_FILE: &str = "banner.txt";
 
-/// 扫光的周期（帧）与一次扫过的速度（列/帧）。空闲 tick 是 80ms 一帧。
-const GLINT_PAUSE: usize = 25;
-const GLINT_SPEED: f32 = 0.9;
-/// 星空密度（值越大越稀）：inline 块小，星只在字两侧；全屏大厅铺满。
-const STAR_SPARSITY: u32 = 9;
-const STAR_SPARSITY_LOBBY: u32 = 8;
-/// 大厅里的星更暗:只是氛围,进正文后还得盯着字看。
-const STAR_DIM_LOBBY: f32 = 0.42;
-/// 大厅的星只铺在艺术字周围这一圈(上下各几行、左右各几十列),不铺满屏。
-const LOBBY_STAR_PAD_X: usize = 34;
-const LOBBY_STAR_PAD_Y: usize = 11;
-const STAR_DIM: f32 = 0.55;
-/// 星域比艺术字大一圈（左右各这么多列）。
-const STAR_PAD_X: usize = 14;
+/// 欢迎框最宽多少列。
+const MAX_WIDTH: usize = 84;
+/// inline 模式下欢迎框最多占几行（含框线与最近那行）：inline 挤在输入框上面，
+/// 不能把输入框顶出屏幕。
+const INLINE_MAX_ROWS: usize = 17;
+/// 最近会话列几条。
+const RECENT_LIMIT: usize = 3;
+/// 最近会话标题最多显示几列。
+const RECENT_TITLE_COLS: usize = 16;
 
 pub(in crate::cli) struct BannerScene {
     theme: Theme,
-    art: BannerArt,
+    mascot: Mascot,
+    info: WelcomeInfo,
     mode: AgentMode,
-    tick: usize,
-    /// 出场淡入：前几帧从底色浮出来。
-    born: usize,
 }
 
 impl BannerScene {
-    /// 按配置决定画不画、画哪份艺术字。`None` = 关掉了。
+    /// 按配置决定画不画、画哪种吉祥物。`None` = 关掉了。
     pub(in crate::cli) fn load(
         config: &AppConfig,
         paths: &GqyPaths,
@@ -60,16 +57,26 @@ impl BannerScene {
             return None;
         }
         let theme = Theme::detect();
-        let art = std::fs::read_to_string(paths.config_dir.join(BANNER_FILE))
+        let custom = std::fs::read_to_string(paths.config_dir.join(BANNER_FILE))
             .ok()
-            .and_then(|text| BannerArt::from_text(&text))
-            .unwrap_or_else(|| BannerArt::builtin(theme.ascii));
+            .and_then(|text| BannerArt::from_text(&text));
+        let mascot = Mascot::from_setting(&config.display.mascot, custom, theme);
+        // 测试里不读人格文件和会话库：`GqyPaths::new()` 指向开发机真实的 ~/.gqy
+        // （AGENTS §5.3）。
+        let info = if cfg!(test) {
+            WelcomeInfo::default()
+        } else {
+            WelcomeInfo {
+                persona: crate::web::persona_display_name(config, paths),
+                cwd: current_dir_label(),
+                recent: recent_sessions(config, paths, mode),
+            }
+        };
         Some(Self {
             theme,
-            art,
+            mascot,
+            info,
             mode,
-            tick: 0,
-            born: 0,
         })
     }
 
@@ -77,318 +84,149 @@ impl BannerScene {
         self.mode = mode;
     }
 
-    /// 跳过出场淡入。`/reset`、`/new` 从非空会话回到大厅时用:画面本来就亮着,
-    /// 再从底色浮一次像卡了一下。
-    pub(in crate::cli) fn settle(&mut self) {
-        self.born = 24;
-    }
+    /// 原来用来跳过出场淡入；欢迎框是静止的，留着接口给调用方。
+    pub(in crate::cli) fn settle(&mut self) {}
 
-    /// 走一帧。返回这一帧要不要重画（每帧都画：40ms 一帧才顺）。
+    /// 走一帧。欢迎框是静止的：不需要重画（空闲时零重绘）。
     pub(in crate::cli) fn tick(&mut self) -> bool {
-        self.tick = self.tick.wrapping_add(1);
-        if self.born < 24 {
-            self.born += 1;
-        }
-        true
-    }
-
-    /// 扫光此刻在第几列（可能在字外面）。扫完停一小会儿马上再来，持续播放。
-    fn glint(&self) -> Option<f32> {
-        if !self.theme.depth.gradient_ok() {
-            return None;
-        }
-        let travel = self.art.cols() as f32 + 12.0;
-        let period = (travel / GLINT_SPEED) as usize + GLINT_PAUSE;
-        let pos = (self.tick % period) as f32 * GLINT_SPEED - 6.0;
-        (pos <= self.art.cols() as f32 + 6.0).then_some(pos)
+        false
     }
 
     pub(in crate::cli) fn mode(&self) -> AgentMode {
         self.mode
     }
 
-    fn fade_in(&self) -> f32 {
-        (self.born as f32 / 24.0).min(1.0)
-    }
-
-    /// 紧凑块的高度（不含星空外圈）：艺术字 + 副标题 + 版本 + 空行 + 模式行 + 提示。
+    /// inline 模式下欢迎框占几行（按当前终端宽度）。
     pub(in crate::cli) fn block_rows(&self) -> usize {
-        self.art.rows() + 4
+        let cols = crossterm::terminal::size()
+            .map(|(cols, _)| usize::from(cols))
+            .unwrap_or(80);
+        self.card(inline_width(cols), INLINE_MAX_ROWS).len()
     }
 
-    /// 艺术字以外的几行：副标题、版本、空行、模式行、提示。宽度都按 `cols` 居中。
-    fn caption_rows(&self, cols: usize) -> Vec<Vec<Seg>> {
-        let theme = self.theme;
-        let fade_t = self.fade_in();
-        let mut rows = Vec::with_capacity(4);
-        let subtitle = subtitle_rule(theme, &self.art.subtitle);
-        rows.push(center(
-            vec![Seg::new(subtitle, fade(theme, DIM, fade_t))],
-            cols,
-        ));
-        rows.push(Vec::new());
-        rows.push(center(self.mode_row(), cols));
-        rows.push(center(self.hint_row(), cols));
-        rows
+    fn card(&self, width: usize, max_rows: usize) -> Vec<String> {
+        welcome_rows(
+            &self.info,
+            &self.mascot,
+            self.theme,
+            self.mode,
+            width,
+            max_rows,
+        )
     }
 
-    /// `/config 进入设置 · /sandbox <路径> 设置沙盒`,命令用金色(「可以按」的颜色)。
-    fn hint_row(&self) -> Vec<Seg> {
-        let theme = self.theme;
-        let fade_t = self.fade_in();
-        // 整行都是暗色:它是备注,不是号召。命令比说明亮半档,认得出是命令就行。
-        let command = fade(theme, DIM, fade_t);
-        let note = fade(theme, FAINT, fade_t);
-        vec![
-            Seg::new("/config", command),
-            Seg::new(t(" open settings", " 进入设置"), note),
-            Seg::new("  ·  ", note),
-            Seg::new(t("/sandbox <path>", "/sandbox <路径>"), command),
-            Seg::new(t(" bind a sandbox", " 设置沙盒"), note),
-        ]
-    }
-
-    /// `◉ 普通   ○ 开发     Tab 切换`。当前模式用它自己的颜色（普通=雾蓝，开发=酒红）。
-    fn mode_row(&self) -> Vec<Seg> {
-        let theme = self.theme;
-        let fade_t = self.fade_in();
-        let mut segs = Vec::new();
-        for (index, mode) in [AgentMode::Normal, AgentMode::Dev].into_iter().enumerate() {
-            if index > 0 {
-                segs.push(Seg::raw("   "));
-            }
-            let here = mode == self.mode;
-            let color = match mode {
-                AgentMode::Normal => BLUE,
-                AgentMode::Dev => CORAL,
-            };
-            let (dot, style) = if here {
-                (
-                    theme.dot_here(),
-                    fade(theme, color, fade_t).add_modifier(Modifier::BOLD),
-                )
-            } else {
-                (theme.dot_todo(), fade(theme, FAINT, fade_t))
-            };
-            segs.push(Seg::new(dot, style));
-            segs.push(Seg::raw(" "));
-            segs.push(Seg::new(
-                mode_name(mode),
-                if here {
-                    fade(theme, color, fade_t).add_modifier(Modifier::BOLD)
-                } else {
-                    fade(theme, FAINT, fade_t)
-                },
-            ));
+    /// inline 用：欢迎框缩进两格画在输入框上方，补齐或截到正好 `rows` 行。
+    pub(in crate::cli) fn render_ansi(&self, cols: usize, rows: usize) -> Vec<String> {
+        if cols == 0 || rows == 0 {
+            return Vec::new();
         }
-        segs.push(Seg::raw("     "));
-        segs.push(Seg::new("Tab", fade(theme, GOLD, fade_t)));
-        segs.push(Seg::raw(" "));
-        segs.push(Seg::new(t("switch", "切换"), fade(theme, FAINT, fade_t)));
-        segs
+        let mut lines: Vec<String> = self
+            .card(inline_width(cols), rows.min(INLINE_MAX_ROWS))
+            .into_iter()
+            .map(|line| format!("  {line}"))
+            .collect();
+        lines.truncate(rows);
+        lines.resize(rows, String::new());
+        lines
     }
 
-    /// 画成 `rows` 行、每行 `cols` 列的片段行。
-    ///
-    /// `fill` = 全屏正文区：整块垂直居中，星铺满正文两侧的空白；否则是 inline
-    /// 用的紧凑块，星只在艺术字那几行的两侧。行数不够时从艺术字底部往下裁。
-    pub(in crate::cli) fn render(&self, cols: usize, rows: usize) -> Vec<Vec<Seg>> {
-        let theme = self.theme;
-        let art_cols = self.art.cols();
-        let art_rows = self.art.rows();
-        let glint = self.glint();
-        let fade_t = self.fade_in();
-        let mut banner = gradient_banner(&self.art, theme, glint);
-        if fade_t < 1.0 {
-            for row in &mut banner {
-                for seg in row {
-                    seg.style = seg.style.add_modifier(Modifier::DIM);
-                }
-            }
-        }
-        let captions = self.caption_rows(cols);
-        let block_rows = art_rows + captions.len();
-        let top = rows.saturating_sub(block_rows) / 2;
-        let left = cols.saturating_sub(art_cols) / 2;
-        // 星域：艺术字左右各 STAR_PAD_X 列，上下各两行，不贴字。
-        let star_left = left.saturating_sub(STAR_PAD_X);
-        let star_right = (left + art_cols + STAR_PAD_X).min(cols);
-        let star_top = top.saturating_sub(2);
-        let star_bottom = top + art_rows + 2;
-        let mut out = Vec::with_capacity(rows);
-        for y in 0..rows {
-            if y >= top && y < top + art_rows {
-                let mut row = Vec::with_capacity(cols);
-                for x in 0..left {
-                    row.push(self.star_or_blank(x, y, star_left, star_right, theme));
-                }
-                row.extend(banner[y - top].iter().cloned());
-                for x in (left + art_cols)..cols {
-                    row.push(self.star_or_blank(x, y, star_left, star_right, theme));
-                }
-                out.push(row);
-            } else if y >= top + art_rows && y < top + block_rows {
-                out.push(captions[y - top - art_rows].clone());
-            } else if y >= star_top && y < star_bottom {
-                let mut row = Vec::with_capacity(cols);
-                for x in 0..cols {
-                    row.push(self.star_or_blank(x, y, star_left, star_right, theme));
-                }
-                out.push(row);
-            } else {
-                out.push(Vec::new());
-            }
-        }
-        out
-    }
-
-    fn star_or_blank(&self, x: usize, y: usize, left: usize, right: usize, theme: Theme) -> Seg {
-        if x >= left && x < right {
-            star_seg(
-                x,
-                y,
-                self.tick,
-                theme,
-                STAR_DIM * self.fade_in(),
-                STAR_SPARSITY,
-            )
-        } else {
-            Seg::raw(" ")
-        }
-    }
-
-    /// 全屏大厅：整块垂直居中，输入框（`activity_rows` 行）**嵌在 banner 下面**、
-    /// 收窄居中；星空铺满全屏，只避开正文那一列。回车发第一句话后整块撤掉，
-    /// 输入框回到屏底、恢复全宽。
+    /// 全屏大厅：欢迎框和输入框（`activity_rows` 行，含前面一行空）一起垂直
+    /// 居中，输入框和欢迎框同宽、左边对齐。回车发第一句话后整块撤掉，输入框
+    /// 回到屏底、恢复全宽。
     pub(in crate::cli) fn lobby(&self, cols: usize, rows: usize, activity_rows: usize) -> Lobby {
-        let theme = self.theme;
-        let art_cols = self.art.cols();
-        let art_rows = self.art.rows();
-        // 输入框宽度：终端的三分之二上下，至少比艺术字宽一圈，最多 84 列。
-        let width = (cols * 2 / 3)
-            .max(art_cols + 8)
-            .min(84)
-            .min(cols.saturating_sub(2))
-            .max(20);
+        let width = lobby_width(cols);
         let left = cols.saturating_sub(width) / 2;
-        let art_left = cols.saturating_sub(art_cols) / 2;
-        // 艺术字 + 副标题 + 版本 + 空行 + 输入框 + 空行 + 模式行 + 提示。
-        let block_rows = art_rows + 2 + activity_rows + 3;
+        let card = self.card(width, rows.saturating_sub(activity_rows + 1));
+        let block_rows = card.len() + activity_rows;
         let top = rows.saturating_sub(block_rows) / 2;
-        let tail_start = top + art_rows + 2;
-        // 星只铺在艺术字周围这一圈,不铺满屏——进正文前的画面不能太花。
-        let star_rows = top.saturating_sub(LOBBY_STAR_PAD_Y)..(top + block_rows + LOBBY_STAR_PAD_Y);
-        let star_cols =
-            art_left.saturating_sub(LOBBY_STAR_PAD_X)..(art_left + art_cols + LOBBY_STAR_PAD_X);
-        let captions = self.caption_rows(cols);
-        // 正文那一列（艺术字与输入框取较宽者，两侧各留 2 列缓冲）不铺星。
-        let column_left = left.min(art_left).saturating_sub(2);
-        let column_right = ((left + width).max(art_left + art_cols) + 2).min(cols);
-        let fade_t = self.fade_in();
-        let mut banner = gradient_banner(&self.art, theme, self.glint());
-        if fade_t < 1.0 {
-            for row in &mut banner {
-                for seg in row {
-                    seg.style = seg.style.add_modifier(Modifier::DIM);
-                }
+        let tail_start = top + card.len();
+        let mut out = vec![String::new(); rows];
+        for (offset, line) in card.iter().enumerate() {
+            if let Some(slot) = out.get_mut(top + offset) {
+                *slot = format!("{}{line}", " ".repeat(left));
             }
-        }
-        let star = |x: usize, y: usize| -> Seg {
-            if !star_rows.contains(&y) || !star_cols.contains(&x) {
-                return Seg::raw(" ");
-            }
-            star_seg(
-                x,
-                y,
-                self.tick,
-                theme,
-                STAR_DIM_LOBBY * fade_t,
-                STAR_SPARSITY_LOBBY,
-            )
-        };
-        let mut out = Vec::with_capacity(rows);
-        for y in 0..rows {
-            let in_block = y >= top && y < top + block_rows;
-            let mut row: Vec<Seg> = Vec::with_capacity(cols);
-            if !in_block {
-                for x in 0..cols {
-                    row.push(star(x, y));
-                }
-                out.push(row);
-                continue;
-            }
-            // 正文列以外照铺星，列内按行填内容。
-            for x in 0..column_left.min(cols) {
-                row.push(star(x, y));
-            }
-            let offset = y - top;
-            let content: Vec<Seg> = if offset < art_rows {
-                let mut segs = vec![Seg::raw(" ".repeat(art_left.saturating_sub(column_left)))];
-                segs.extend(banner[offset].iter().cloned());
-                segs
-            } else if offset < art_rows + 2 {
-                // 副标题、版本：caption_rows 已经按整屏居中，去掉前面属于星区的那截。
-                trim_left(captions[offset - art_rows].clone(), column_left)
-            } else if offset >= art_rows + 2 + activity_rows + 1 {
-                let index = 2 + (offset - (art_rows + 2 + activity_rows + 1));
-                trim_left(
-                    captions.get(index).cloned().unwrap_or_default(),
-                    column_left,
-                )
-            } else {
-                // 空行与输入框那几行：留白，输入框自己往上画。
-                Vec::new()
-            };
-            let used = segs_width(&content);
-            row.extend(content);
-            let filled = column_left.min(cols) + used;
-            if filled < column_right {
-                row.push(Seg::raw(" ".repeat(column_right - filled)));
-            }
-            for x in column_right.max(filled)..cols {
-                row.push(star(x, y));
-            }
-            out.push(row);
         }
         Lobby {
-            rows: out
-                .into_iter()
-                .map(|segs| {
-                    let spans: Vec<AnsiSpan> = segs
-                        .into_iter()
-                        .map(|seg| AnsiSpan::styled(seg.text, seg.style))
-                        .collect();
-                    spans_to_ansi(&spans).trim_end().to_string()
-                })
-                .collect(),
+            rows: out,
             tail_start: tail_start.min(u16::MAX as usize) as u16,
             left: left.min(u16::MAX as usize) as u16,
             width: width.min(u16::MAX as usize) as u16,
             below: (top + block_rows).min(u16::MAX as usize) as u16,
         }
     }
+}
 
-    /// 同 [`Self::render`]，但每行已经转成带 SGR 的字符串（活动区与全屏正文都吃这个）。
-    pub(in crate::cli) fn render_ansi(&self, cols: usize, rows: usize) -> Vec<String> {
-        self.render(cols, rows)
-            .into_iter()
-            .map(|segs| {
-                let spans: Vec<AnsiSpan> = segs
-                    .into_iter()
-                    .map(|seg| AnsiSpan::styled(seg.text, seg.style))
-                    .collect();
-                // 去掉行尾的纯空格片段：省字节，也让 diff 更容易命中「没变」。
-                spans_to_ansi(&spans).trim_end().to_string()
-            })
-            .collect()
+/// 全屏大厅里欢迎框（也是输入框）的宽度：终端的四分之三上下，最多 84 列。
+fn lobby_width(cols: usize) -> usize {
+    (cols * 3 / 4)
+        .min(MAX_WIDTH)
+        .min(cols.saturating_sub(2))
+        .max(32.min(cols))
+}
+
+/// inline 下欢迎框的宽度：两边各留两格。
+fn inline_width(cols: usize) -> usize {
+    cols.saturating_sub(4).min(MAX_WIDTH)
+}
+
+/// 当前目录，家目录写成 `~`。
+fn current_dir_label() -> String {
+    let Ok(dir) = std::env::current_dir() else {
+        return String::new();
+    };
+    let text = dir.display().to_string();
+    match std::env::var("HOME") {
+        Ok(home) if !home.is_empty() && text.starts_with(&home) => {
+            format!("~{}", &text[home.len()..])
+        }
+        _ => text,
     }
 }
 
-fn mode_name(mode: AgentMode) -> &'static str {
-    match mode {
-        AgentMode::Normal => t("normal", "普通模式"),
-        AgentMode::Dev => t("dev", "开发模式"),
-    }
+/// 这条车道最近几条说过话的会话：标题（没起名就用最后一句话）与相对时间。
+fn recent_sessions(config: &AppConfig, paths: &GqyPaths, mode: AgentMode) -> Vec<(String, String)> {
+    let persona = if mode == AgentMode::Dev {
+        crate::state::DEV_PERSONA.to_string()
+    } else {
+        config.active_persona_scope()
+    };
+    let Ok(store) = crate::state::StateStore::new(paths) else {
+        return Vec::new();
+    };
+    let Ok(mut sessions) = store.list_sessions(&persona) else {
+        return Vec::new();
+    };
+    sessions.retain(|session| {
+        session.turn_count > 0
+            && !session.record.archived
+            && session.record.kind == crate::state::USER_SESSION_KIND
+            && session.record.session_id != crate::state::DEFAULT_SESSION_ID
+    });
+    sessions.sort_by(|a, b| b.record.updated_at.cmp(&a.record.updated_at));
+    let now = chrono::Utc::now();
+    sessions
+        .into_iter()
+        .take(RECENT_LIMIT)
+        .map(|session| {
+            let name = session.record.name.trim().to_string();
+            let title = if name.is_empty() {
+                session
+                    .last_user_content
+                    .as_deref()
+                    .and_then(|text| text.lines().next())
+                    .unwrap_or_default()
+                    .trim()
+                    .to_string()
+            } else {
+                name
+            };
+            (
+                crate::cli::truncate_visible_width(&title, RECENT_TITLE_COLS),
+                welcome::relative_age(&session.record.updated_at, now),
+            )
+        })
+        .filter(|(title, _)| !title.is_empty())
+        .collect()
 }
 
 /// 全屏大厅的一帧：整屏的行，加上输入框该落在哪。
@@ -403,46 +241,12 @@ pub(in crate::cli) struct Lobby {
     pub below: u16,
 }
 
-/// 居中过的一行去掉开头 `skip` 列的空白（那部分归星区画）。
-fn trim_left(segs: Vec<Seg>, skip: usize) -> Vec<Seg> {
-    let mut remaining = skip;
-    let mut out = Vec::with_capacity(segs.len());
-    for mut seg in segs {
-        if remaining == 0 {
-            out.push(seg);
-            continue;
-        }
-        let width = segs_width(std::slice::from_ref(&seg));
-        if width <= remaining {
-            remaining -= width;
-            continue;
-        }
-        // 只可能是开头那段纯空格：按列数切。
-        seg.text = seg.text.chars().skip(remaining).collect();
-        remaining = 0;
-        out.push(seg);
-    }
-    out
-}
-
-/// 把一行片段在 `cols` 列里居中（左边补空格）。
-fn center(segs: Vec<Seg>, cols: usize) -> Vec<Seg> {
-    let width = segs_width(&segs);
-    let left = cols.saturating_sub(width) / 2;
-    let mut out = Vec::with_capacity(segs.len() + 1);
-    if left > 0 {
-        out.push(Seg::raw(" ".repeat(left)));
-    }
-    out.extend(segs);
-    out
-}
-
 /// 空会话提示行（inline 后端在输入框上方、没有 banner 时也要有一句）。
 #[allow(dead_code)]
 pub(in crate::cli) fn plain_mode_hint(mode: AgentMode) -> String {
     format!(
         "{} · {}",
-        mode_name(mode),
+        welcome::mode_name(mode),
         t("Tab switches normal/dev", "Tab 切换 普通/开发")
     )
 }
@@ -452,116 +256,73 @@ mod tests {
     use super::*;
     use crate::terminal::palette::Depth;
 
-    fn scene() -> BannerScene {
+    fn scene(mascot: Mascot) -> BannerScene {
         BannerScene {
             theme: Theme {
                 depth: Depth::True,
                 ascii: false,
             },
-            art: BannerArt::builtin(false),
+            mascot,
+            info: WelcomeInfo::default(),
             mode: AgentMode::Normal,
-            tick: 0,
-            born: 24,
         }
     }
 
     #[test]
     fn render_fills_exactly_the_requested_rows() {
-        let scene = scene();
-        let rows = scene.render(80, 30);
-        assert_eq!(rows.len(), 30);
-        let ansi = scene.render_ansi(80, 30);
-        assert_eq!(ansi.len(), 30);
-        // 艺术字那几行的显示宽度不超过终端列数。
-        for row in &rows {
-            assert!(
-                segs_width(row) <= 80,
-                "row wider than terminal: {}",
-                segs_width(row)
+        let scene = scene(Mascot::Portrait);
+        let ansi = scene.render_ansi(80, 16);
+        assert_eq!(ansi.len(), 16);
+        for row in &ansi {
+            let width = crate::cli::repl::width::visible_width(
+                &crate::cli::strip_terminal_control_sequences(row),
             );
+            assert!(width <= 80, "row wider than terminal: {width}");
         }
+        assert!(scene.render_ansi(0, 0).is_empty());
+        assert_eq!(scene.render_ansi(20, 6).len(), 6);
+    }
+
+    /// 欢迎框是静止的：空闲时不要求重画。
+    #[test]
+    fn welcome_screen_does_not_animate() {
+        let mut scene = scene(Mascot::Portrait);
+        assert!(!scene.tick());
     }
 
     #[test]
-    fn narrow_terminal_still_renders_without_panicking() {
-        let scene = scene();
-        let rows = scene.render(20, 8);
-        assert_eq!(rows.len(), 8);
-        let rows = scene.render(0, 0);
-        assert!(rows.is_empty());
-    }
-
-    #[test]
-    fn mode_row_marks_the_active_mode() {
-        let mut scene = scene();
-        let normal: String = scene
-            .mode_row()
-            .iter()
-            .map(|seg| seg.text.as_str())
-            .collect();
-        assert!(normal.starts_with("◉ 普通模式") || normal.starts_with("◉ normal"));
-        scene.set_mode(AgentMode::Dev);
-        let dev: String = scene
-            .mode_row()
-            .iter()
-            .map(|seg| seg.text.as_str())
-            .collect();
-        assert!(dev.contains("◉ 开发模式") || dev.contains("◉ dev"));
-    }
-
-    #[test]
-    fn glint_keeps_sweeping_with_a_short_pause() {
-        let mut scene = scene();
-        let period = ((scene.art.cols() as f32 + 12.0) / GLINT_SPEED) as usize + GLINT_PAUSE;
-        let mut lit = 0usize;
-        for _ in 0..period {
-            if scene.glint().is_some() {
-                lit += 1;
-            }
-            scene.tick();
-        }
-        assert!(lit > 0 && lit < period);
-        let mut again = false;
-        for _ in 0..period {
-            again |= scene.glint().is_some();
-            scene.tick();
-        }
-        assert!(again);
-    }
-
-    #[test]
-    fn lobby_reserves_the_activity_band_inside_the_block() {
-        let scene = scene();
-        let lobby = scene.lobby(100, 36, 5);
-        assert_eq!(lobby.rows.len(), 36);
+    fn lobby_reserves_the_activity_band_below_the_card() {
+        let scene = scene(Mascot::Portrait);
+        let lobby = scene.lobby(100, 40, 5);
+        assert_eq!(lobby.rows.len(), 40);
         assert!(lobby.width >= 40 && lobby.width <= 84);
         assert!(usize::from(lobby.left) + usize::from(lobby.width) <= 100);
-        let band = &lobby.rows[usize::from(lobby.tail_start) + 1];
-        let plain: String = crate::cli::repl::tail::screen::ansi::parse_ansi_line(band)
-            .into_iter()
-            .map(|span| span.text)
-            .collect();
-        let inside = plain
-            .chars()
-            .skip(usize::from(lobby.left))
-            .take(usize::from(lobby.width))
-            .collect::<String>();
-        assert!(inside.trim().is_empty(), "band not blank: {inside:?}");
+        // 活动区那几行留白，输入框自己往上画。
+        for offset in 0..5 {
+            let band = &lobby.rows[usize::from(lobby.tail_start) + offset];
+            assert!(band.trim().is_empty(), "band not blank: {band:?}");
+        }
+        // 欢迎框在活动区之上，最后一行是下框线。
+        let above = &lobby.rows[usize::from(lobby.tail_start) - 1];
+        assert!(crate::cli::strip_terminal_control_sequences(above).contains('╰'));
         let tiny = scene.lobby(30, 10, 4);
         assert_eq!(tiny.rows.len(), 10);
     }
 
     #[test]
-    fn text_art_file_is_used_when_present() {
+    fn mascot_setting_and_banner_switch_are_honoured() {
         let dir = tempfile::tempdir().unwrap();
         std::fs::write(dir.path().join(BANNER_FILE), "subtitle: MINE\nAB\nCD\n").unwrap();
         let mut config = AppConfig::default();
         config.display.banner = true;
+        config.display.mascot = "custom".into();
         let mut paths = crate::paths::GqyPaths::new().unwrap();
         paths.config_dir = dir.path().to_path_buf();
         let scene = BannerScene::load(&config, &paths, AgentMode::Normal).unwrap();
-        assert_eq!(scene.art.subtitle, "MINE");
-        assert_eq!(scene.art.rows(), 2);
+        assert!(matches!(&scene.mascot, Mascot::Custom(art) if art.rows() == 2));
+        config.display.mascot = "off".into();
+        let scene = BannerScene::load(&config, &paths, AgentMode::Normal).unwrap();
+        assert!(matches!(scene.mascot, Mascot::Off));
         config.display.banner = false;
         assert!(BannerScene::load(&config, &paths, AgentMode::Normal).is_none());
     }

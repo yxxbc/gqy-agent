@@ -232,6 +232,12 @@ pub(crate) fn composer_placeholder(config: &AppConfig, paths: &GqyPaths) -> Stri
     persona_identity(config, &prompts).composer_placeholder
 }
 
+/// 当前人格的显示名（TUI 开屏欢迎语用）。与 WebUI 人格看板同源。
+pub(crate) fn persona_display_name(config: &AppConfig, paths: &GqyPaths) -> String {
+    let prompts = read_prompt_documents(config, paths).unwrap_or_default();
+    persona_identity(config, &prompts).name
+}
+
 pub(in crate::web) fn active_persona_avatar_path(
     config: &AppConfig,
     prompts: &PromptDocuments,

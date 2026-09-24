@@ -2,6 +2,7 @@
 """开屏吉祥物：把透明底立绘裁成头肩、缩成终端半格字符画，并出深/浅底预览。
 
     python3 testkit/tui/mascot.py [源图] [宽度,宽度…] [输出目录]
+    python3 testkit/tui/mascot.py --export-portrait   # 重新生成 assets/mascot/portrait.png
     默认：assets/mascot/gqy-mascot-source.png  32,24  ./mascot-out
 
 每个宽度产出：
@@ -80,7 +81,27 @@ def preview(image, scale):
     return both
 
 
+PORTRAIT_OUT = ROOT / "assets/mascot/portrait.png"
+PORTRAIT_WIDTH = 256
+
+
+def export_portrait(source=DEFAULT_SOURCE, out=PORTRAIT_OUT):
+    """编译进程序的头像：裁好的头肩、宽 256 像素、透明底。
+
+    程序运行时从它生成半格字符画（32 / 24 列）和 kitty 贴图，所以这里只做
+    裁剪与调色，不做缩到终端格子那一步。源图 1.4MB 不直接嵌。
+    """
+    image = bust(source)
+    height = round(image.height * PORTRAIT_WIDTH / image.width)
+    image = image.resize((PORTRAIT_WIDTH, height), Image.Resampling.LANCZOS)
+    image.save(out, optimize=True)
+    print(f"导出 {out}（{image.width}×{image.height}，{out.stat().st_size} 字节）")
+
+
 def main(argv):
+    if argv[:1] == ["--export-portrait"]:
+        export_portrait()
+        return
     source = Path(argv[0]) if len(argv) > 0 else DEFAULT_SOURCE
     widths = [int(w) for w in (argv[1] if len(argv) > 1 else "32,24").split(",")]
     out = Path(argv[2]) if len(argv) > 2 else Path("mascot-out")

@@ -149,6 +149,10 @@ pub(crate) fn default_display_theme() -> String {
     "auto".to_string()
 }
 
+pub(crate) fn default_display_mascot() -> String {
+    "portrait".to_string()
+}
+
 pub(crate) fn default_reasoning_display() -> String {
     "summary".to_string()
 }

@@ -197,6 +197,17 @@ pub(in crate::config_tui) fn edit_settings(
         )
         .with(
             Field::new(
+                t("Welcome screen mascot", "开屏吉祥物"),
+                config.display.mascot.clone(),
+            )
+            .choices(&["portrait", "cat", "custom", "off"]),
+            |config, value| {
+                config.display.mascot = value.trim().to_string();
+                Ok(())
+            },
+        )
+        .with(
+            Field::new(
                 t("Terminal background", "终端底色"),
                 config.display.theme.clone(),
             )
