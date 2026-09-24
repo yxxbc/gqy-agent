@@ -182,7 +182,7 @@
     },
     "src/cli/args.rs": {
       "tests": 0,
-      "total": 490
+      "total": 498
     },
     "src/cli/daemon_cmds.rs": {
       "tests": 0,
@@ -206,7 +206,7 @@
     },
     "src/cli/footer.rs": {
       "tests": 0,
-      "total": 454
+      "total": 455
     },
     "src/cli/github_cmds.rs": {
       "tests": 0,
@@ -230,7 +230,7 @@
     },
     "src/cli/localize.rs": {
       "tests": 0,
-      "total": 827
+      "total": 830
     },
     "src/cli/mcp_schema.rs": {
       "tests": 41,
@@ -245,8 +245,8 @@
       "total": 210
     },
     "src/cli/mod.rs": {
-      "tests": 23,
-      "total": 1457
+      "tests": 25,
+      "total": 1497
     },
     "src/cli/model_cmds.rs": {
       "tests": 0,
@@ -266,23 +266,35 @@
     },
     "src/cli/pm_cmds.rs": {
       "tests": 0,
-      "total": 316
+      "total": 326
     },
     "src/cli/pop_cmds.rs": {
       "tests": 0,
       "total": 680
     },
+    "src/cli/repl/banner/mascot.rs": {
+      "tests": 53,
+      "total": 294
+    },
     "src/cli/repl/banner/mod.rs": {
-      "tests": 119,
-      "total": 569
+      "tests": 76,
+      "total": 330
     },
     "src/cli/repl/banner/preview.rs": {
       "tests": 0,
-      "total": 93
+      "total": 94
+    },
+    "src/cli/repl/banner/welcome.rs": {
+      "tests": 99,
+      "total": 365
+    },
+    "src/cli/repl/command_picker.rs": {
+      "tests": 119,
+      "total": 326
     },
     "src/cli/repl/commands.rs": {
       "tests": 0,
-      "total": 136
+      "total": 184
     },
     "src/cli/repl/composer_hint.rs": {
       "tests": 0,
@@ -294,15 +306,15 @@
     },
     "src/cli/repl/direct.rs": {
       "tests": 0,
-      "total": 952
+      "total": 960
     },
     "src/cli/repl/editor.rs": {
       "tests": 0,
-      "total": 533
+      "total": 589
     },
     "src/cli/repl/input.rs": {
       "tests": 0,
-      "total": 1000
+      "total": 1055
     },
     "src/cli/repl/jobs.rs": {
       "tests": 0,
@@ -310,7 +322,7 @@
     },
     "src/cli/repl/layout.rs": {
       "tests": 0,
-      "total": 462
+      "total": 531
     },
     "src/cli/repl/live_turn.rs": {
       "tests": 0,
@@ -318,7 +330,7 @@
     },
     "src/cli/repl/mod.rs": {
       "tests": 0,
-      "total": 21
+      "total": 22
     },
     "src/cli/repl/placeholder.rs": {
       "tests": 0,
@@ -326,7 +338,7 @@
     },
     "src/cli/repl/remote/interactive.rs": {
       "tests": 0,
-      "total": 1319
+      "total": 1328
     },
     "src/cli/repl/remote/mod.rs": {
       "tests": 0,
@@ -338,11 +350,11 @@
     },
     "src/cli/repl/session.rs": {
       "tests": 0,
-      "total": 929
+      "total": 908
     },
     "src/cli/repl/tail/frame.rs": {
       "tests": 0,
-      "total": 644
+      "total": 633
     },
     "src/cli/repl/tail/mod.rs": {
       "tests": 75,
@@ -361,8 +373,8 @@
       "total": 398
     },
     "src/cli/repl/tail/screen/mod.rs": {
-      "tests": 36,
-      "total": 1319
+      "tests": 35,
+      "total": 1311
     },
     "src/cli/repl/tail/screen/overlay.rs": {
       "tests": 34,
@@ -374,7 +386,7 @@
     },
     "src/cli/repl/tail/screen/select.rs": {
       "tests": 19,
-      "total": 451
+      "total": 453
     },
     "src/cli/repl/tail/screen/term.rs": {
       "tests": 0,
@@ -382,7 +394,7 @@
     },
     "src/cli/repl/tail/screen/toast.rs": {
       "tests": 0,
-      "total": 297
+      "total": 273
     },
     "src/cli/repl/wake.rs": {
       "tests": 0,
@@ -430,7 +442,7 @@
     },
     "src/cli/tests/footer_tail.rs": {
       "tests": 0,
-      "total": 821
+      "total": 845
     },
     "src/cli/tests/hangup.rs": {
       "tests": 0,
@@ -438,7 +450,7 @@
     },
     "src/cli/tests/input_editing.rs": {
       "tests": 0,
-      "total": 1050
+      "total": 1106
     },
     "src/cli/tests/ipc_event.rs": {
       "tests": 0,
@@ -458,7 +470,7 @@
     },
     "src/cli/tests/slash_commands.rs": {
       "tests": 0,
-      "total": 212
+      "total": 234
     },
     "src/cli/tests/static_timeline.rs": {
       "tests": 0,
@@ -498,7 +510,7 @@
     },
     "src/config/defaults.rs": {
       "tests": 0,
-      "total": 512
+      "total": 516
     },
     "src/config/feature_catalog.rs": {
       "tests": 82,
@@ -510,7 +522,7 @@
     },
     "src/config/mod.rs": {
       "tests": 54,
-      "total": 1222
+      "total": 1232
     },
     "src/config/paths.rs": {
       "tests": 0,
@@ -522,7 +534,7 @@
     },
     "src/config/persona_paths.rs": {
       "tests": 0,
-      "total": 411
+      "total": 424
     },
     "src/config/platform.rs": {
       "tests": 0,
@@ -594,11 +606,11 @@
     },
     "src/config/tool_plugins.rs": {
       "tests": 0,
-      "total": 877
+      "total": 882
     },
     "src/config_tui/antigravity_form.rs": {
       "tests": 0,
-      "total": 119
+      "total": 132
     },
     "src/config_tui/claude_code_form.rs": {
       "tests": 0,
@@ -614,7 +626,7 @@
     },
     "src/config_tui/mod.rs": {
       "tests": 4,
-      "total": 978
+      "total": 1029
     },
     "src/config_tui/personas.rs": {
       "tests": 0,
@@ -642,7 +654,7 @@
     },
     "src/config_tui/plugins.rs": {
       "tests": 44,
-      "total": 1112
+      "total": 1171
     },
     "src/config_tui/providers.rs": {
       "tests": 0,
@@ -676,9 +688,37 @@
       "tests": 76,
       "total": 387
     },
-    "src/config_tui/settings.rs": {
+    "src/config_tui/settings/accounts.rs": {
       "tests": 0,
-      "total": 268
+      "total": 23
+    },
+    "src/config_tui/settings/cache.rs": {
+      "tests": 0,
+      "total": 44
+    },
+    "src/config_tui/settings/context.rs": {
+      "tests": 0,
+      "total": 109
+    },
+    "src/config_tui/settings/display.rs": {
+      "tests": 0,
+      "total": 82
+    },
+    "src/config_tui/settings/mod.rs": {
+      "tests": 0,
+      "total": 210
+    },
+    "src/config_tui/settings/notifications.rs": {
+      "tests": 0,
+      "total": 30
+    },
+    "src/config_tui/settings/spec.rs": {
+      "tests": 0,
+      "total": 124
+    },
+    "src/config_tui/settings/tools.rs": {
+      "tests": 0,
+      "total": 80
     },
     "src/config_tui/tests/custom_models.rs": {
       "tests": 0,
@@ -690,7 +730,7 @@
     },
     "src/config_tui/tests/mod.rs": {
       "tests": 0,
-      "total": 9
+      "total": 10
     },
     "src/config_tui/tests/plugins.rs": {
       "tests": 0,
@@ -703,6 +743,10 @@
     "src/config_tui/tests/qq.rs": {
       "tests": 0,
       "total": 205
+    },
+    "src/config_tui/tests/settings_groups.rs": {
+      "tests": 0,
+      "total": 100
     },
     "src/config_tui/tests/shared.rs": {
       "tests": 0,
@@ -726,7 +770,7 @@
     },
     "src/config_tui/widgets/form.rs": {
       "tests": 0,
-      "total": 911
+      "total": 969
     },
     "src/config_tui/widgets/mod.rs": {
       "tests": 0,
@@ -741,8 +785,8 @@
       "total": 12
     },
     "src/default_kb.rs": {
-      "tests": 83,
-      "total": 663
+      "tests": 87,
+      "total": 699
     },
     "src/default_models.rs": {
       "tests": 0,
@@ -798,7 +842,7 @@
     },
     "src/ipc/protocol.rs": {
       "tests": 0,
-      "total": 462
+      "total": 466
     },
     "src/json_extract.rs": {
       "tests": 45,
@@ -882,15 +926,15 @@
     },
     "src/llm/openai_compatible/antigravity/mod.rs": {
       "tests": 50,
-      "total": 523
+      "total": 580
     },
     "src/llm/openai_compatible/antigravity/setup.rs": {
       "tests": 67,
       "total": 314
     },
     "src/llm/openai_compatible/antigravity/stream.rs": {
-      "tests": 71,
-      "total": 606
+      "tests": 96,
+      "total": 661
     },
     "src/llm/openai_compatible/antigravity/warm.rs": {
       "tests": 36,
@@ -986,7 +1030,7 @@
     },
     "src/llm/openai_compatible/tests/antigravity.rs": {
       "tests": 0,
-      "total": 485
+      "total": 503
     },
     "src/llm/openai_compatible/tests/chat_stream.rs": {
       "tests": 0,
@@ -1754,11 +1798,11 @@
     },
     "src/pm/mod.rs": {
       "tests": 4,
-      "total": 989
+      "total": 996
     },
     "src/pm/tests.rs": {
       "tests": 0,
-      "total": 314
+      "total": 319
     },
     "src/prompts.rs": {
       "tests": 0,
@@ -1830,15 +1874,15 @@
     },
     "src/render/stream/timeline.rs": {
       "tests": 8,
-      "total": 2402
+      "total": 2403
     },
     "src/render/stream/tool_summary.rs": {
       "tests": 0,
-      "total": 909
+      "total": 910
     },
     "src/render/style.rs": {
       "tests": 42,
-      "total": 365
+      "total": 373
     },
     "src/render/table.rs": {
       "tests": 0,
@@ -1878,7 +1922,7 @@
     },
     "src/render/tests/timeline.rs": {
       "tests": 0,
-      "total": 1523
+      "total": 1526
     },
     "src/render/tests/tool_summary.rs": {
       "tests": 0,
@@ -1890,7 +1934,7 @@
     },
     "src/render/tool_display.rs": {
       "tests": 0,
-      "total": 572
+      "total": 582
     },
     "src/render/usage.rs": {
       "tests": 41,
@@ -1978,7 +2022,7 @@
     },
     "src/slash_commands.rs": {
       "tests": 0,
-      "total": 317
+      "total": 318
     },
     "src/state/accounts.rs": {
       "tests": 49,
@@ -2086,7 +2130,7 @@
     },
     "src/state/sessions.rs": {
       "tests": 0,
-      "total": 519
+      "total": 535
     },
     "src/state/shared_files.rs": {
       "tests": 139,
@@ -2134,7 +2178,7 @@
     },
     "src/state/tests/sessions.rs": {
       "tests": 0,
-      "total": 630
+      "total": 662
     },
     "src/state/tests/shared.rs": {
       "tests": 0,
@@ -2181,8 +2225,8 @@
       "total": 323
     },
     "src/terminal/tone.rs": {
-      "tests": 36,
-      "total": 219
+      "tests": 92,
+      "total": 320
     },
     "src/token_counter.rs": {
       "tests": 0,
@@ -2310,7 +2354,7 @@
     },
     "src/tools/image_generation.rs": {
       "tests": 107,
-      "total": 619
+      "total": 627
     },
     "src/tools/jobs/ledger.rs": {
       "tests": 0,
@@ -2621,8 +2665,8 @@
       "total": 628
     },
     "src/tools/workspace.rs": {
-      "tests": 101,
-      "total": 393
+      "tests": 117,
+      "total": 445
     },
     "src/transfer/export.rs": {
       "tests": 0,
@@ -2702,7 +2746,7 @@
     },
     "src/web/assets.rs": {
       "tests": 0,
-      "total": 1042
+      "total": 758
     },
     "src/web/attachments.rs": {
       "tests": 0,
@@ -2780,6 +2824,10 @@
       "tests": 0,
       "total": 594
     },
+    "src/web/embedded.rs": {
+      "tests": 11,
+      "total": 82
+    },
     "src/web/event_map.rs": {
       "tests": 0,
       "total": 505
@@ -2790,7 +2838,7 @@
     },
     "src/web/ipc_server.rs": {
       "tests": 0,
-      "total": 1024
+      "total": 1027
     },
     "src/web/job_access.rs": {
       "tests": 21,
@@ -2817,8 +2865,8 @@
       "total": 381
     },
     "src/web/mod.rs": {
-      "tests": 67,
-      "total": 390
+      "tests": 43,
+      "total": 358
     },
     "src/web/ownership.rs": {
       "tests": 0,
@@ -2826,7 +2874,7 @@
     },
     "src/web/persona.rs": {
       "tests": 0,
-      "total": 806
+      "total": 812
     },
     "src/web/prompt_files.rs": {
       "tests": 0,
@@ -2854,7 +2902,7 @@
     },
     "src/web/server.rs": {
       "tests": 0,
-      "total": 1072
+      "total": 1053
     },
     "src/web/session_cmds.rs": {
       "tests": 0,
@@ -2876,6 +2924,10 @@
       "tests": 0,
       "total": 215
     },
+    "src/web/tests/embedded_assets.rs": {
+      "tests": 0,
+      "total": 146
+    },
     "src/web/tests/events_questions.rs": {
       "tests": 0,
       "total": 141
@@ -2890,7 +2942,7 @@
     },
     "src/web/tests/mod.rs": {
       "tests": 0,
-      "total": 11
+      "total": 12
     },
     "src/web/tests/session.rs": {
       "tests": 0,
@@ -2898,7 +2950,7 @@
     },
     "src/web/tests/settings_schema.rs": {
       "tests": 0,
-      "total": 489
+      "total": 494
     },
     "src/web/tests/shared.rs": {
       "tests": 0,
@@ -2918,7 +2970,7 @@
     },
     "src/web/turns/task.rs": {
       "tests": 0,
-      "total": 961
+      "total": 966
     },
     "src/web/ui_prefs.rs": {
       "tests": 0,
@@ -2935,6 +2987,134 @@
     "src/web/voice_tts.rs": {
       "tests": 248,
       "total": 773
+    },
+    "web/app.js": {
+      "tests": 0,
+      "total": 13267
+    },
+    "web/artifactchips.js": {
+      "tests": 0,
+      "total": 84
+    },
+    "web/commands.js": {
+      "tests": 0,
+      "total": 431
+    },
+    "web/contextpanel.js": {
+      "tests": 0,
+      "total": 453
+    },
+    "web/dash-affection.js": {
+      "tests": 0,
+      "total": 337
+    },
+    "web/dash-album.js": {
+      "tests": 0,
+      "total": 335
+    },
+    "web/dash-groups.js": {
+      "tests": 0,
+      "total": 246
+    },
+    "web/dash-kb.js": {
+      "tests": 0,
+      "total": 739
+    },
+    "web/dash-ledger-manage.js": {
+      "tests": 0,
+      "total": 361
+    },
+    "web/dash-ledger.js": {
+      "tests": 0,
+      "total": 580
+    },
+    "web/dash-memes.js": {
+      "tests": 0,
+      "total": 494
+    },
+    "web/dash-memory.js": {
+      "tests": 0,
+      "total": 562
+    },
+    "web/dash-qq.js": {
+      "tests": 0,
+      "total": 363
+    },
+    "web/dash-scripts.js": {
+      "tests": 0,
+      "total": 310
+    },
+    "web/dash-sponsor.js": {
+      "tests": 0,
+      "total": 372
+    },
+    "web/dashboards.js": {
+      "tests": 0,
+      "total": 399
+    },
+    "web/diff.js": {
+      "tests": 0,
+      "total": 212
+    },
+    "web/expresscard.js": {
+      "tests": 0,
+      "total": 123
+    },
+    "web/fence-frame.html": {
+      "tests": 0,
+      "total": 28
+    },
+    "web/fencepreview.js": {
+      "tests": 0,
+      "total": 233
+    },
+    "web/highlight.js": {
+      "tests": 0,
+      "total": 291
+    },
+    "web/index.html": {
+      "tests": 0,
+      "total": 793
+    },
+    "web/lightbox.js": {
+      "tests": 0,
+      "total": 137
+    },
+    "web/linkcards.js": {
+      "tests": 0,
+      "total": 211
+    },
+    "web/mapcard.js": {
+      "tests": 0,
+      "total": 485
+    },
+    "web/preview.js": {
+      "tests": 0,
+      "total": 246
+    },
+    "web/selectionmenu.js": {
+      "tests": 0,
+      "total": 574
+    },
+    "web/settings-schema.js": {
+      "tests": 0,
+      "total": 3567
+    },
+    "web/settings.js": {
+      "tests": 0,
+      "total": 2681
+    },
+    "web/shared.js": {
+      "tests": 0,
+      "total": 729
+    },
+    "web/styles.css": {
+      "tests": 0,
+      "total": 11778
+    },
+    "web/todos.js": {
+      "tests": 0,
+      "total": 118
     }
   }
 }

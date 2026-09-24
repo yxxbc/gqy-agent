@@ -1,6 +1,6 @@
 # WebUI 拆分：架构设计
 
-> 状态：已定稿（2026-09-24 用户裁定 D1–D4 均取推荐项），待开工 P0。
+> 状态：已定稿（2026-09-24 用户裁定 D1–D4 均取推荐项）。P0 已施工（2026-09-25），见 §11。
 > 目标：把 `web/app.js`（13266 行）与 `web/styles.css`（11759 行）拆成有层次、有边界的模块，
 > 并把「加一个文件」「加一个面板」变成不需要记忆隐性规则的事。拆分本身零行为变化。
 
@@ -65,7 +65,7 @@ web/
 层序：`core` → `state` → `widgets` → `features` → `app.js`。
 
 1. 只能从左往右依赖：`core` 不 import 任何其他层，`state` 只 import `core`，依此类推。
-2. feature 之间默认不互相 import。确有需要的边在 `web/deps.json` 里白名单声明，带一句理由
+2. feature 之间默认不互相 import。确有需要的边在 `test_scripts/web-deps.json` 里白名单声明（不放在 `web/` 下：那里的文件都会被当成静态资源发出去），带一句理由
    （例：`conversation → markdown`、`live → conversation`）。新增一条边要改这个文件，所以它会出现在 diff 里。
 3. **模块顶层只声明，不执行**：不读 DOM、不调其他模块的函数、不引用其他模块的常量来算新值。
    副作用一律放进 `init()`。这条是 ES 模块循环依赖不出 TDZ 错误的前提：`const JOB_BRAILLE = BRAILLE_FRAMES`
@@ -153,3 +153,15 @@ D1 原生 ES 模块 · D2 构建期拼接 · D3 本期 `app.js` + `styles.css` �
 - 不引入 npm、打包器、TypeScript、前端框架：资源编译进二进制、零构建步骤是现有定案，拆分不改变它。
 - 不在拆分提交里顺手改行为。发现 bug 记下来，单独修。
 - 不追求一次拆完。任何阶段停下来，仓库都处在比开始时更好的状态。
+
+## 11. 施工记录
+
+### P0 基建（2026-09-25）
+
+- `build.rs` 的 `build_web_asset_index` 扫描 `web/` 生成 `WEB_ASSETS`；`src/web/embedded.rs` 逐条注册精确路由，
+  并统一给 `index.html` 里的 `.js`/`.css` 引用挂 `?v=构建号`（图片不挂，JS 里按裸路径引用）。
+  原来的 19 个手写 handler、19 条路由、`DASH_SCRIPTS` 表与对应常量删除。
+- 看板与设置脚本的地址从 `/dash/<名>` 改为 `/<名>`（地址规则统一为「相对 `web/` 的路径」），只有 `index.html` 引用它们。
+- 测试 `web::tests::embedded_assets`：页面引用与模块 import 必须解析到嵌入表；已验证把引用改回 `/dash/` 时报红。
+- `test_scripts/web_dep_check.py` + `web-deps.json`：分层方向门禁，四条规则各自验证过报红。进 CI 与 `refactor-check.sh`。
+- `refactor_size_report.py` 覆盖 `web/**/*.{js,css,html}`（排除 vendor），基线重写；拆分进度只算 `.rs`。

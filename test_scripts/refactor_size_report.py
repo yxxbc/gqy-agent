@@ -49,6 +49,7 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent.parent
 SRC = ROOT / "src"
+WEB = ROOT / "web"
 # 基线跟脚本走,不认目录名(见 arch_dep_check.py 同款修法)。
 BASELINE = Path(__file__).resolve().parent / "refactor-size-baseline.json"
 
@@ -100,12 +101,26 @@ def test_line_count(lines):
     return total
 
 
+def web_sources():
+    """WebUI 的 JS/CSS/HTML，同一套三条线（见 docs/design/2026-09-24-webui-split.md）。
+
+    `vendor/` 是第三方压缩包，不算。
+    """
+    for pattern in ("*.js", "*.css", "*.html"):
+        for path in WEB.rglob(pattern):
+            if "vendor" not in path.relative_to(WEB).parts:
+                yield path
+
+
 def collect():
     rows = {}
     for path in sorted(SRC.rglob("*.rs")):
         lines = path.read_text(encoding="utf-8", errors="replace").split("\n")
         rel = str(path.relative_to(ROOT))
         rows[rel] = {"total": len(lines), "tests": test_line_count(lines)}
+    for path in sorted(web_sources()):
+        lines = path.read_text(encoding="utf-8", errors="replace").split("\n")
+        rows[str(path.relative_to(ROOT))] = {"total": len(lines), "tests": 0}
     return rows
 
 
@@ -126,7 +141,11 @@ INITIAL_OVER_RED = 20
 
 
 def progress(rows):
-    """返回 (已消化比例, 当前超标行数, 当前越红线文件数)。"""
+    """返回 (已消化比例, 当前超标行数, 当前越红线文件数)。
+
+    只算 `.rs`：两个历史刻度是 Rust 拆分开工时量的，混进前端文件就失真了。
+    """
+    rows = {name: row for name, row in rows.items() if name.endswith(".rs")}
     excess = sum(max(0, row["total"] - TARGET) for row in rows.values())
     over_red = sum(1 for row in rows.values() if row["total"] > RED_LINE)
     done = max(0.0, (INITIAL_EXCESS - excess) / INITIAL_EXCESS)

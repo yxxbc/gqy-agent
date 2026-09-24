@@ -316,22 +316,10 @@ pub(in crate::web) async fn follow_run(
 }
 
 pub(in crate::web) fn router(state: DaemonState) -> Router {
-    Router::new()
+    with_web_assets(Router::new())
         .route("/", get(index_asset))
-        .route("/styles.css", get(styles_asset))
         .route("/theme.css", get(theme_css))
-        .route("/app.js", get(app_asset))
-        .route("/commands.js", get(commands_js_asset))
-        .route("/lightbox.js", get(lightbox_js_asset))
-        .route("/preview.js", get(preview_js_asset))
-        .route("/linkcards.js", get(linkcards_js_asset))
-        .route("/todos.js", get(todos_js_asset))
-        .route("/contextpanel.js", get(contextpanel_js_asset))
-        .route("/selectionmenu.js", get(selectionmenu_js_asset))
-        .route("/artifactchips.js", get(artifactchips_js_asset))
-        .route("/fencepreview.js", get(fencepreview_js_asset))
         .route("/fence-frame.html", get(fence_frame_asset))
-        .route("/highlight.js", get(highlight_js_asset))
         // artifact 的沙箱 iframe 也来这里取库,而它是不透明源——浏览器会为此强制
         // 发 OPTIONS 预检,所以每条都得配一个 options 分支,漏一条那个库就加载不上。
         .route(
@@ -366,8 +354,6 @@ pub(in crate::web) fn router(state: DaemonState) -> Router {
             "/api/link-preview/image/{asset_id}",
             get(link_preview::link_preview_image),
         )
-        .route("/assets/gqy-logo.png", get(logo_asset))
-        .route("/assets/gqywallpaper.png", get(wallpaper_asset))
         .route("/api/health", get(health))
         .route("/api/auth/login", post(auth_login))
         .route("/api/auth/logout", post(auth_logout))
@@ -449,11 +435,6 @@ pub(in crate::web) fn router(state: DaemonState) -> Router {
             "/api/shared/{share_id}",
             get(shared_file_download).delete(shared_file_delete),
         )
-        .route("/shared.js", get(shared_js_asset))
-        .route("/diff.js", get(diff_js_asset))
-        .route("/mapcard.js", get(mapcard_js_asset))
-        .route("/expresscard.js", get(expresscard_js_asset))
-        .route("/dash/{script}", get(dash_script_asset))
         .route("/api/dash/memory/personas", get(dash_memory_personas))
         .route("/api/dash/memory/stats", get(dash_memory_stats))
         .route("/api/dash/memory/items", get(dash_memory_items))

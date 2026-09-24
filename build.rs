@@ -19,9 +19,6 @@ fn main() {
     // left running from an older build.
     println!("cargo:rerun-if-changed=src");
     println!("cargo:rerun-if-changed=web");
-    println!("cargo:rerun-if-changed=web/index.html");
-    println!("cargo:rerun-if-changed=web/styles.css");
-    println!("cargo:rerun-if-changed=web/app.js");
     println!("cargo:rerun-if-env-changed=GQY_BUILD_ID");
     let build_id = env::var("GQY_BUILD_ID").unwrap_or_else(|_| {
         std::time::SystemTime::now()
@@ -66,6 +63,7 @@ fn main() {
     .expect("write generated prompt asset");
 
     build_tool_description_index(&out_dir);
+    build_web_asset_index(&out_dir);
     build_o200k_vocab();
     build_jieba_index();
 }
@@ -96,6 +94,73 @@ fn build_tool_description_index(out_dir: &str) {
     source.push_str("];\n");
     fs::write(Path::new(out_dir).join("tool_description_files.rs"), source)
         .expect("write generated tool description index");
+}
+
+/// Every servable file under `web/` becomes one `(url, bytes, content-type)`
+/// entry, served at `/<path relative to web/>`. Adding a frontend file used to
+/// take three hand edits in `src/web` (a constant, a handler, a route) plus a
+/// `?v=` rewrite; forgetting one only showed up as a 404 in the browser.
+///
+/// Skipped: `vendor/` (gzip bodies and CORS preflight, served by hand),
+/// `index.html` and `fence-frame.html` (their own handlers: versioned rewrite
+/// and a sandbox CSP), and anything that is not a frontend asset.
+fn build_web_asset_index(out_dir: &str) {
+    const ROOT: &str = "web";
+    const SPECIAL: &[&str] = &["index.html", "fence-frame.html"];
+    let manifest_dir = env::var("CARGO_MANIFEST_DIR").expect("CARGO_MANIFEST_DIR is set by cargo");
+    let mut files = Vec::new();
+    collect_web_assets(Path::new(ROOT), &mut files);
+    files.sort();
+    let mut source = String::from("static WEB_ASSETS: &[(&str, &[u8], &str)] = &[\n");
+    for path in &files {
+        let relative = path
+            .strip_prefix(ROOT)
+            .expect("web asset under web/")
+            .to_string_lossy()
+            .replace('\\', "/");
+        if SPECIAL.contains(&relative.as_str()) {
+            continue;
+        }
+        let Some(content_type) = web_content_type(path) else {
+            continue;
+        };
+        let absolute = Path::new(&manifest_dir).join(path);
+        source.push_str(&format!(
+            "    ({:?}, include_bytes!({:?}), {content_type:?}),\n",
+            format!("/{relative}"),
+            absolute.display().to_string()
+        ));
+    }
+    source.push_str("];\n");
+    fs::write(Path::new(out_dir).join("web_assets.rs"), source)
+        .expect("write generated web asset index");
+}
+
+fn collect_web_assets(dir: &Path, files: &mut Vec<PathBuf>) {
+    for entry in fs::read_dir(dir).unwrap_or_else(|_| panic!("read {}", dir.display())) {
+        let path = entry.expect("web asset entry").path();
+        if path.is_dir() {
+            if path.file_name().is_some_and(|name| name != "vendor") {
+                collect_web_assets(&path, files);
+            }
+        } else {
+            files.push(path);
+        }
+    }
+}
+
+fn web_content_type(path: &Path) -> Option<&'static str> {
+    Some(match path.extension()?.to_str()? {
+        "js" => "application/javascript; charset=utf-8",
+        "css" => "text/css; charset=utf-8",
+        "html" => "text/html; charset=utf-8",
+        "json" => "application/json; charset=utf-8",
+        "svg" => "image/svg+xml",
+        "png" => "image/png",
+        "webp" => "image/webp",
+        "woff2" => "font/woff2",
+        _ => return None,
+    })
 }
 
 fn build_jieba_index() {

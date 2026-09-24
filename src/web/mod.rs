@@ -29,6 +29,7 @@ mod config_api;
 mod context_panel;
 mod dashboards;
 mod dto;
+mod embedded;
 mod event_map;
 mod goal_driver;
 mod job_access;
@@ -80,6 +81,7 @@ use dashboards::qq::*;
 use dashboards::scripts::*;
 use dashboards::sponsor::*;
 use dto::*;
+use embedded::*;
 use event_map::*;
 use goal_driver::*;
 use ipc_server::*;
@@ -162,34 +164,8 @@ const MAX_PROMPT_DOCUMENT_CHARS: usize = 200_000;
 const MAX_PROMPT_DOCUMENTS: usize = 128;
 
 const INDEX_HTML: &str = include_str!("../../web/index.html");
-const STYLES_CSS: &str = include_str!("../../web/styles.css");
-const APP_JS: &str = include_str!("../../web/app.js");
-// 斜杠命令层单独一个文件:app.js 已经 9500 行,再往里长就找不到东西了。
-const COMMANDS_JS: &str = include_str!("../../web/commands.js");
-const LIGHTBOX_JS: &str = include_str!("../../web/lightbox.js");
-const PREVIEW_JS: &str = include_str!("../../web/preview.js");
-const LINKCARDS_JS: &str = include_str!("../../web/linkcards.js");
-const TODOS_JS: &str = include_str!("../../web/todos.js");
-// 上下文圆环点开的分项弹窗(2026-09-14)。
-const CONTEXT_PANEL_JS: &str = include_str!("../../web/contextpanel.js");
-// 聊天正文选中文字的右键菜单(2026-09-14)。
-const SELECTION_MENU_JS: &str = include_str!("../../web/selectionmenu.js");
-// 回复气泡底部的产物 chip(2026-09-14 webui-delivery §5)。
-const ARTIFACT_CHIPS_JS: &str = include_str!("../../web/artifactchips.js");
-// ```svg / ```html 围栏预览与它的沙箱宿主页(2026-09-14 webui-delivery §9)。
-const FENCE_PREVIEW_JS: &str = include_str!("../../web/fencepreview.js");
 const FENCE_FRAME_HTML: &str = include_str!("../../web/fence-frame.html");
-// 代码块语法高亮:只用 Prism 的分词器,上色的 DOM 由这个文件亲手搭。
-const HIGHLIGHT_JS: &str = include_str!("../../web/highlight.js");
-// 文件分享面板:独立文件,与 artifact 演示区无关。
-const SHARED_JS: &str = include_str!("../../web/shared.js");
-// 文件编辑工具的 diff 渲染:把 patchText 参数画成增删配色的 diff 卡。
-const DIFF_JS: &str = include_str!("../../web/diff.js");
-// 地图卡片:自己写的切片地图(没引第三方地图库),瓦片走 /api/map/tile。
-const MAPCARD_JS: &str = include_str!("../../web/mapcard.js");
-// 快递卡片:物流轨迹时间线。
-const EXPRESSCARD_JS: &str = include_str!("../../web/expresscard.js");
-// 插件 dashboard 脚本走 assets.rs 的 DASH_SCRIPTS 静态表,加面板只改那一行。
+// 其余 web/ 文件由 build.rs 扫描成表，见 embedded.rs。
 // KaTeX 0.18.4(vendored):公式渲染;字体只带 woff2(css 里 woff2 列首,
 // 现代浏览器不会去请求 woff/ttf 回退项)。
 const KATEX_JS: &str = include_str!("../../web/vendor/katex/katex.min.js");
@@ -291,14 +267,6 @@ static KATEX_FONTS: &[(&str, &[u8])] = &[
         include_bytes!("../../web/vendor/katex/fonts/KaTeX_Typewriter-Regular.woff2"),
     ),
 ];
-// 这两张是 `pics/` 里原图的**显示尺寸副本**，不是原图。原图 1254×1254 和
-// 3344×1882，而 WebUI 里头像只显示 38/64 px、看板图最大 330×178 px——浏览器
-// 解码是按像素数来的，原图会占掉 30 MiB GPU 纹理去画两个缩略图，还让二进制
-// 多背 7.2 MiB。降到 256×256 和 1280×720（2x DPR 仍有富余）后纹理 3.7 MiB。
-// 原图留在 `pics/` 不动：README、终端演示、外部链接还在引用。
-// 重新生成见 `test_scripts/gen_web_assets.py`。
-const GQY_LOGO: &[u8] = include_bytes!("../../web/assets/gqy-logo.png");
-const GQY_WALLPAPER: &[u8] = include_bytes!("../../web/assets/gqywallpaper.png");
 
 impl From<QueuedPrompt> for SafeQueuedPrompt {
     fn from(prompt: QueuedPrompt) -> Self {

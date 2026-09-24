@@ -9,8 +9,8 @@
 花 30 MiB 显存去画两个缩略图，二进制和每次 HTTP 传输还各多背 7.2 MiB。
 
 原图**不覆盖**——README、终端演示、外部链接都在引用它们。副本单独放在
-`web/assets/`，`src/web/mod.rs` 的 `include_bytes!` 指向副本，路由名和
-content-type 都不变（所以格式必须还是 PNG）。
+`web/assets/`，build.rs 扫描 `web/` 时把副本编进去（见 `src/web/embedded.rs`），
+路由名和 content-type 都不变（所以格式必须还是 PNG）。
 
 ## 尺寸怎么定的
 
