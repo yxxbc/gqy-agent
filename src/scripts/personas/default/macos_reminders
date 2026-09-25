@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 # Display name: macOS 待办
 # Platform: macos
-# Description: Read and write macOS Reminders: add, list, complete or delete todos. Use for daily todo management.
+# Description: Read and write todos in macOS Reminders. Add, list, complete or delete todos. Use for daily todo management.
 # Timeout: 60
 # Group: life
 # Parameters:
@@ -9,15 +9,15 @@
 #   "type": "object",
 #   "properties": {
 #     "action": {"type": "string", "enum": ["lists", "list", "today", "add", "complete", "delete"], "description": "lists: 列出所有列表; list: 列出未完成; today: 今天到期或已逾期; add: 新增; complete: 完成; delete: 删除"},
-#     "text": {"type": "string", "description": "待办内容（add 必填；complete/delete 为匹配关键字）"},
-#     "list": {"type": "string", "description": "列表名，默认使用默认列表"},
-#     "due": {"type": "string", "description": "截止时间，ISO 8601，如 2026-09-15T19:00:00（本地时间）"},
-#     "note": {"type": "string", "description": "备注"},
-#     "remind_at": {"type": "string", "description": "提醒时间，ISO 8601 本地时间，到点由系统提醒"},
-#     "repeat": {"type": "string", "description": "重复规则，iCalendar RRULE，如 FREQ=DAILY 表示每天重复"},
+#     "text": {"type": "string", "description": "Todo text. Required for add, and the match keyword for complete and delete"},
+#     "list": {"type": "string", "description": "List name. The default list when omitted"},
+#     "due": {"type": "string", "description": "Due time as ISO 8601 local time, e.g. 2026-09-15T19:00:00"},
+#     "note": {"type": "string", "description": "Note text"},
+#     "remind_at": {"type": "string", "description": "Alert time as ISO 8601 local time. macOS alerts when it is due"},
+#     "repeat": {"type": "string", "description": "Repeat rule as an iCalendar RRULE, e.g. FREQ=DAILY for every day"},
 #     "include_completed": {"type": "boolean", "description": "list 时是否包含已完成项，默认 false"},
-#     "limit": {"type": "integer", "description": "最多返回条数，默认 30"},
-#     "format": {"type": "string", "enum": ["text", "json"], "description": "输出格式，默认 text"}
+#     "limit": {"type": "integer", "description": "Maximum items to return, default 30"},
+#     "format": {"type": "string", "enum": ["text", "json"], "description": "Output format, default text"}
 #   },
 #   "required": ["action"]
 # }

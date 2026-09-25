@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 # Display name: Blender 3D 建模与渲染
-# Description: Control Blender for 3D modeling, procedural asset generation, bpy code execution, model export (.glb/.gltf/.obj/.blend), and scene rendering. Automatically uses live Blender viewport if open, or headless background Blender.
+# Description: Control Blender for 3D modeling, rendering and export. Covers procedural assets, bpy code, model export (.glb/.gltf/.obj/.blend) and scene renders. Uses the open Blender viewport when there is one, otherwise a headless background Blender.
 # Timeout: 180
 # Group: creative
 # Parameters:
@@ -23,16 +23,16 @@
 #     },
 #     "export_path": {
 #       "type": "string",
-#       "description": "模型导出绝对路径，如 /Users/mac/Desktop/model.glb"
+#       "description": "Where to save the exported model, e.g. ~/Desktop/model.glb"
 #     },
 #     "render_path": {
 #       "type": "string",
-#       "description": "渲染图片保存绝对路径，如 /Users/mac/Desktop/render.png"
+#       "description": "Where to save the rendered image, e.g. ~/Desktop/render.png"
 #     },
 #     "prefer_mode": {
 #       "type": "string",
 #       "enum": ["auto", "live", "headless"],
-#       "description": "执行模式，auto 自动检测活体视口，live 强制连开着的 Blender，headless 强制后台无头执行"
+#       "description": "auto uses the open Blender viewport when there is one, live forces the running Blender, headless forces a background run"
 #     }
 #   },
 #   "required": ["action"]
@@ -272,6 +272,9 @@ def main():
     asset_type = req.get("asset_type", "lowpoly_tree")
     export_path = req.get("export_path")
     render_path = req.get("render_path")
+    # 示例路径写的是 ~/Desktop/…，Blender 不会自己展开 ~
+    export_path = os.path.expanduser(export_path) if export_path else export_path
+    render_path = os.path.expanduser(render_path) if render_path else render_path
     prefer_mode = req.get("prefer_mode", "auto")
 
     live_ok, live_ver = check_live_bridge()

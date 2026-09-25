@@ -31,7 +31,7 @@
     "job": "b448772de90e1c4217552e11ed666edcd6c99221cdaa81f4c5de97fd56106efb",
     "kb": "7dc875e8f0ecc8b4f242d041d9d3a1dfed52b68f9936a3a513c20e149b6fed77",
     "ledger": "2a008a937c4c14219f033dfdf9987f78fd1689adefd60749c393c7ff3483ffef",
-    "load_skill": "10a5f3de768dbec5857757b6e66ca233413c035c120a1eae2c3d46802c0bf9aa",
+    "load_skill": "7ce6e2dc6da6b3ca52063b63d79a9aa148c9f5430247f51398b207aa8e1dd89e",
     "load_tools": "09a1fb3b38ba47576479f724df05c60e565be8f79236be2af4e18f41e2902a08",
     "manage_ledger": "4ef44cc4157a22addd3a2da845ca76913f8a4ab4c8f4aa99907c1f9629394539",
     "manage_meme": "b0209fec384e79b475fd644477d7e546167b7afab264be29b6b626d5ef62bbc2",
@@ -60,7 +60,7 @@
   },
   "restricted": {
     "express_query": "156e2cd8f4cb85178450aaf9390283d5de2197ef1a6a05e7a60cfd330e0d816d",
-    "load_skill": "10a5f3de768dbec5857757b6e66ca233413c035c120a1eae2c3d46802c0bf9aa",
+    "load_skill": "7ce6e2dc6da6b3ca52063b63d79a9aa148c9f5430247f51398b207aa8e1dd89e",
     "load_tools": "09a1fb3b38ba47576479f724df05c60e565be8f79236be2af4e18f41e2902a08",
     "manage_meme": "b0209fec384e79b475fd644477d7e546167b7afab264be29b6b626d5ef62bbc2",
     "map_search": "40347782b671758532baf0e696f847f88e1a5e6c83c2f3e97612a78dc0ea454d",

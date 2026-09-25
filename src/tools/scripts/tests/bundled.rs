@@ -69,33 +69,40 @@ fn bundled_headers_match_the_legacy_index_contracts() {
 fn bundled_descriptions_follow_the_header_style_rules() {
     let scan = scan_scripts(&[bundled_dir().as_path()]).unwrap();
     let ids: Vec<&str> = scan.entries.iter().map(|entry| entry.id.as_str()).collect();
-    assert_eq!(
-        ids,
-        vec![
-            "bangumi",
-            "battery_care",
-            "bilibili_live_stream",
-            "codec",
-            "crack_search",
-            "divine",
-            "fcitx5_input_method_wiki_qurey",
-            "flight_deals",
-            "game_compat",
-            "get_weather",
-            "goofish_search",
-            "hotel_deals",
-            "online_man",
-            "procusage",
-            "query_deepseek_status",
-            "query_moegirl",
-            "read_clipboard",
-            "reddit_search",
-            "scientific_calculator",
-            "showenv",
-            "xhs_search",
-            "zhihu_search",
-        ]
-    );
+    let mut expected = vec![
+        "afu_scale",
+        "anysearch",
+        "bangumi",
+        "battery_care",
+        "bilibili_live_stream",
+        "blender_model",
+        "codec",
+        "crack_search",
+        "divine",
+        "fcitx5_input_method_wiki_qurey",
+        "flight_deals",
+        "game_compat",
+        "get_weather",
+        "goofish_search",
+        "hotel_deals",
+        "iching_divination",
+        "online_man",
+        "procusage",
+        "query_deepseek_status",
+        "query_moegirl",
+        "read_clipboard",
+        "reddit_search",
+        "scientific_calculator",
+        "showenv",
+        "xhs_search",
+        "zhihu_search",
+    ];
+    // `# Platform: macos` 的脚本只在 macOS 上注册
+    if cfg!(target_os = "macos") {
+        expected.extend(["macos_news", "macos_reminders"]);
+        expected.sort_unstable();
+    }
+    assert_eq!(ids, expected);
     for entry in &scan.entries {
         assert!(
             entry

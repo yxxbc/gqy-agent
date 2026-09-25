@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 # Display name: 蚂蚁阿福体脂秤
-# Description: Read weight and body composition from Ant Afu Welland BLE body scale.
+# Description: Read weight and body fat from an Afu BLE scale. Needs the afu-welland-scale reader: set AFU_WELLAND_CLI, put it on PATH, or keep it in ~/Projects/ant-afu-welland-scale/.venv.
 # Timeout: 60
 # Parameters: {"type":"object","properties":{"action":{"type":"string","enum":["read","scan"],"description":"read (default) to connect and read metrics, scan to discover device"},"timeout":{"type":"integer","description":"scan or read timeout in seconds, default 15"}}}
 import datetime
@@ -9,8 +9,15 @@ import os
 import subprocess
 import sys
 
-BASE_DIR = "/Users/mac/Projects/ant-afu-welland-scale"
-CLI_PATH = os.path.join(BASE_DIR, ".venv/bin/afu-welland-scale")
+import shutil
+
+# 体脂秤读数工具（afu-welland-scale）是单独装的：先看 AFU_WELLAND_CLI，再看 PATH，
+# 最后是它默认的开发目录。
+CLI_PATH = (
+    os.environ.get("AFU_WELLAND_CLI")
+    or shutil.which("afu-welland-scale")
+    or os.path.expanduser("~/Projects/ant-afu-welland-scale/.venv/bin/afu-welland-scale")
+)
 HEALTH_DIR = os.path.expanduser("~/.gqy/data/health")
 RAW_LOG_PATH = os.path.join(HEALTH_DIR, "scale_raw.jsonl")
 HISTORY_PATH = os.path.join(HEALTH_DIR, "weight_history.jsonl")
@@ -32,7 +39,10 @@ def main():
     timeout = str(args.get("timeout", 15))
 
     if not os.path.exists(CLI_PATH):
-        fail("CLI tool not found", fix=f"Please verify {CLI_PATH} exists")
+        fail(
+            "afu-welland-scale reader not found",
+            fix="Install afu-welland-scale and set AFU_WELLAND_CLI to its path, or put it on PATH",
+        )
 
     os.makedirs(HEALTH_DIR, exist_ok=True)
 
