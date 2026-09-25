@@ -41,7 +41,7 @@ pub(in crate::config_tui) fn confirm_save_on_exit(stdout: &mut io::Stdout) -> Re
 }
 
 /// 一组设置：`/config <id>` 直达的就是它。id 与 WebUI 设置页
-/// （`web/settings-schema.js`）的分区 id 一致。
+/// （`web/settings-schema/`）的分区 id 一致。
 pub(crate) struct SettingsGroup {
     pub(crate) id: &'static str,
     en: &'static str,

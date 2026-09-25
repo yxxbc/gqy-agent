@@ -8,7 +8,10 @@
 //!
 //! 哪些文件提供、以什么类型提供，和 build.rs 用的是同一份规则（asset_rules.rs）。
 
-use crate::web::asset_rules::{web_concat_css, web_content_type, web_skip_dir, WEB_SPECIAL_FILES};
+use crate::web::asset_rules::{
+    web_concat_css, web_concat_settings_schema, web_content_type, web_skip_dir,
+    WEB_SETTINGS_SCHEMA_DIR, WEB_SPECIAL_FILES,
+};
 use crate::web::*;
 use axum::http::header::{ETAG, IF_NONE_MATCH};
 use axum::http::{Method, Uri};
@@ -85,6 +88,14 @@ pub(in crate::web) fn asset(headers: &HeaderMap, url_path: &str) -> Option<Respo
             Err(_) => StatusCode::NOT_FOUND.into_response(),
         });
     }
+    if url_path == "/settings-schema.js" {
+        return Some(
+            match web_concat_settings_schema(&dir.join(WEB_SETTINGS_SCHEMA_DIR)) {
+                Ok(body) => respond(headers, body, "application/javascript; charset=utf-8"),
+                Err(_) => StatusCode::NOT_FOUND.into_response(),
+            },
+        );
+    }
     Some(
         match resolve(dir, url_path)
             .and_then(|(file, content_type)| Some((std::fs::read(file).ok()?, content_type)))
@@ -136,7 +147,13 @@ mod tests {
     fn sandbox() -> std::path::PathBuf {
         let root = std::env::temp_dir().join(format!("gqy-dev-assets-{}", std::process::id()));
         let _ = fs::remove_dir_all(&root);
-        for dir in ["web/core", "web/css", "web/vendor", "outside"] {
+        for dir in [
+            "web/core",
+            "web/css",
+            "web/settings-schema",
+            "web/vendor",
+            "outside",
+        ] {
             fs::create_dir_all(root.join(dir)).unwrap();
         }
         for file in [
@@ -144,6 +161,7 @@ mod tests {
             "web/app.js",
             "web/core/api.js",
             "web/css/00-tokens.css",
+            "web/settings-schema/10-general.js",
             "web/vendor/lib.js",
             "web/notes.md",
             "outside/secret.js",
@@ -161,11 +179,12 @@ mod tests {
         assert!(resolve(&web, "/core/api.js").is_some());
         for rejected in [
             "/",
-            "/index.html",           // 有专门 handler
-            "/css/00-tokens.css",    // 拼成 /styles.css，不逐个提供
-            "/vendor/lib.js",        // 手工提供
-            "/notes.md",             // 不认识的类型
-            "/../outside/secret.js", // 越界
+            "/index.html",                    // 有专门 handler
+            "/css/00-tokens.css",             // 拼成 /styles.css，不逐个提供
+            "/settings-schema/10-general.js", // 拼成 /settings-schema.js
+            "/vendor/lib.js",                 // 手工提供
+            "/notes.md",                      // 不认识的类型
+            "/../outside/secret.js",          // 越界
             "/core/../../outside/secret.js",
             "app.js", // 不以 / 开头
         ] {

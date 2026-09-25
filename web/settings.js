@@ -6,7 +6,7 @@
  * 旧版把配置当 JSON 树按类型自动画表单,对象和数组一律扔 textarea 让人手写
  * JSON,QQ 平台整块没有页面。这里改成三层:页面只放卡片/行(概览),点开进
  * 右侧抽屉(详情),细项走弹出框/弹出菜单(微调)。所有 JSON 换成结构化编辑器,
- * 字段的中文标签、范围、枚举来自 settings-schema.js。
+ * 字段的中文标签、范围、枚举来自 settings-schema/（构建时拼成 /settings-schema.js）。
  *
  * 与 app.js 的分工:配置草稿(state.configDraft / promptDraft / secretChanges)、
  * 载入/保存/「高级」JSON 仍在 app.js;本文件只负责渲染与就地修改草稿,通过
@@ -966,7 +966,7 @@ window.GqySettings = (() => {
 
   /* ───────────────────────── schema 驱动的字段 ───────────────────────── */
 
-  /* binding: { get(), set(value) };field 见 settings-schema.js 顶部注释。 */
+  /* binding: { get(), set(value) };field 见 settings-schema/00-common.js 顶部注释。 */
   function fieldControl(field, binding) {
     const value = binding.get();
     const current = value === undefined ? field.default : value;
