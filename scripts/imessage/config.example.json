@@ -21,7 +21,8 @@
     "search_evicted_context",
     "get_exchange_rate",
     "use_meme",
-    "album"
+    "album",
+    "generate_image"
   ],
   "poll_seconds": 2,
   "batch_wait_seconds": 3,
@@ -29,5 +30,6 @@
   "max_backlog_minutes": 30,
   "split_paragraphs": true,
   "max_bubbles": 6,
+  "bubble_pause_seconds": 2,
   "max_memes": 2
 }

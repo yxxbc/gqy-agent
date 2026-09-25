@@ -21,6 +21,8 @@ import threading
 import time
 from dataclasses import dataclass, field
 
+import imessage_commands as commands
+
 HOME = os.path.expanduser("~")
 CONFIG_PATH = os.environ.get(
     "GQY_IMESSAGE_CONFIG", os.path.join(HOME, ".gqy", "config", "imessage.json")
@@ -34,6 +36,9 @@ HINT_PATH = os.path.join(SCRIPT_DIR, "hint.txt")
 APPLE_EPOCH = 978307200
 # chat.style:45 = 一对一,43 = 群聊
 CHAT_STYLE_GROUP = 43
+# message.associated_message_type:2000–2006 是加点按回应,3000 起是撤回点按回应
+TAPBACKS = {2000: "❤️", 2001: "👍", 2002: "👎", 2003: "😂", 2004: "‼️", 2005: "❓"}
+TAPBACK_CUSTOM = 2006
 
 DEFAULT_CONFIG = {
     "enabled": False,
@@ -51,6 +56,7 @@ DEFAULT_CONFIG = {
         "get_exchange_rate",
         "use_meme",
         "album",
+        "generate_image",
     ],
     "poll_seconds": 2,
     "batch_wait_seconds": 3,
@@ -58,6 +64,7 @@ DEFAULT_CONFIG = {
     "max_backlog_minutes": 30,
     "split_paragraphs": True,
     "max_bubbles": 6,
+    "bubble_pause_seconds": 2,
     "max_memes": 2,
 }
 
@@ -99,6 +106,7 @@ class Config:
     max_backlog_minutes: int
     split_paragraphs: bool
     max_bubbles: int
+    bubble_pause_seconds: float
     max_memes: int
 
 
@@ -127,6 +135,7 @@ def load_config() -> Config:
         max_backlog_minutes=int(data["max_backlog_minutes"]),
         split_paragraphs=bool(data["split_paragraphs"]),
         max_bubbles=max(1, int(data["max_bubbles"])),
+        bubble_pause_seconds=max(0.0, float(data["bubble_pause_seconds"])),
         max_memes=max(0, int(data["max_memes"])),
     )
 
@@ -232,6 +241,8 @@ class Inbound:
     text: str
     date_unix: float
     attachments: list = field(default_factory=list)  # [(path, mime, name)]
+    reaction: str = ""  # 非空 = 这是一条点按回应,只作下一轮的上下文,不触发回复
+    quote: str = ""  # 对方长按某条消息回复时,被回复那条的摘要
 
 
 def open_chat_db() -> sqlite3.Connection:
@@ -279,7 +290,8 @@ def max_rowid(conn: sqlite3.Connection) -> int:
 
 NEW_MESSAGES_SQL = """
 SELECT m.ROWID AS rowid, m.text, m.attributedBody, m.is_from_me, m.date,
-       m.associated_message_type, m.item_type, m.cache_has_attachments,
+       m.associated_message_type, m.associated_message_guid, m.thread_originator_guid,
+       m.item_type, m.cache_has_attachments,
        h.id AS handle, c.style AS chat_style
 FROM message m
 LEFT JOIN handle h ON h.ROWID = m.handle_id
@@ -298,6 +310,57 @@ WHERE maj.message_id = ?
 """
 
 
+def message_snippet(conn: sqlite3.Connection, guid: str, limit: int = 60):
+    """按 guid 取一条消息的 (摘要, 是否她发的)。取不到返回 None。"""
+    if not guid:
+        return None
+    row = conn.execute(
+        "SELECT text, attributedBody, is_from_me, cache_has_attachments FROM message WHERE guid = ?",
+        (guid,),
+    ).fetchone()
+    if row is None:
+        return None
+    text = (row["text"] or decode_attributed_body(row["attributedBody"])).replace("\ufffc", "")
+    text = " ".join(text.split())
+    if not text:
+        text = "[image]" if row["cache_has_attachments"] else ""
+    if len(text) > limit:
+        text = text[:limit] + "…"
+    return text, bool(row["is_from_me"])
+
+
+def quoted_text(conn: sqlite3.Connection, guid) -> str:
+    found = message_snippet(conn, guid)
+    if not found or not found[0]:
+        return ""
+    text, from_me = found
+    return f'[replying to {"your" if from_me else "their own"} message: "{text}"]'
+
+
+def tapback_note(conn: sqlite3.Connection, row) -> str:
+    """点按回应 → 一行上下文。目标 guid 形如 p:0/GUID 或 bp:GUID。"""
+    kind = int(row["associated_message_type"])
+    emoji = TAPBACKS.get(kind, "")
+    if kind == TAPBACK_CUSTOM:
+        try:  # 自定义表情回应(macOS 15+ 才有这一列)
+            found = conn.execute(
+                "SELECT associated_message_emoji FROM message WHERE ROWID = ?", (row["rowid"],)
+            ).fetchone()
+            emoji = (found[0] if found else "") or ""
+        except sqlite3.Error:
+            emoji = ""
+    if not emoji:
+        return ""
+    target = (row["associated_message_guid"] or "").split("/")[-1]
+    if target.startswith("bp:"):
+        target = target[3:]
+    found = message_snippet(conn, target)
+    if not found:
+        return f"[reacted {emoji} to a message]"
+    text, from_me = found
+    return f'[reacted {emoji} to {"your" if from_me else "their own"} message: "{text}"]'
+
+
 def fetch_new(conn: sqlite3.Connection, after: int):
     """返回 (新水位, 需要处理的入站消息列表)。其余行只推进水位。"""
     rows = conn.execute(NEW_MESSAGES_SQL, (after,)).fetchall()
@@ -313,10 +376,18 @@ def fetch_new(conn: sqlite3.Connection, after: int):
         seen.add(rowid)
         if row["is_from_me"] or not row["handle"]:
             continue
-        # 点按回应、群事件等不是正文消息
-        if row["associated_message_type"] or row["item_type"]:
-            continue
         if row["chat_style"] == CHAT_STYLE_GROUP:
+            continue
+        kind = int(row["associated_message_type"] or 0)
+        if kind:
+            # 加点按回应记成下一轮的上下文;撤回回应、贴纸等其余关联消息跳过
+            reaction = tapback_note(conn, row) if 2000 <= kind <= TAPBACK_CUSTOM else ""
+            if reaction:
+                inbound.append(Inbound(rowid=rowid, handle=normalize_handle(row["handle"]),
+                                       text="", date_unix=0, reaction=reaction))
+            continue
+        # 群事件等不是正文消息
+        if row["item_type"]:
             continue
         text = row["text"] or decode_attributed_body(row["attributedBody"])
         # U+FFFC 是附件在正文里的占位符
@@ -334,6 +405,7 @@ def fetch_new(conn: sqlite3.Connection, after: int):
                     )
         if not text and not attachments:
             continue
+        quote = quoted_text(conn, row["thread_originator_guid"])
         date = row["date"] or 0
         seconds = date / 1e9 if date > 1e12 else date
         inbound.append(
@@ -343,6 +415,7 @@ def fetch_new(conn: sqlite3.Connection, after: int):
                 text=text,
                 date_unix=seconds + APPLE_EPOCH,
                 attachments=attachments,
+                quote=quote,
             )
         )
     return top, inbound
@@ -538,10 +611,49 @@ def markdown_to_plain(text: str) -> str:
 
 
 def split_bubbles(text: str, max_bubbles: int) -> list:
+    """按空行拆成气泡。段落多于上限时，把相邻段落按长度均衡地并成 max_bubbles 条，
+    让最长的一条尽量短。以前是多出来的全塞进最后一条，实测一半回合超过上限，
+    最后一条中位 175 字、最长 646 字。"""
     parts = [p.strip() for p in re.split(r"\n\s*\n", text) if p.strip()]
     if len(parts) <= max_bubbles:
         return parts
-    return parts[: max_bubbles - 1] + ["\n\n".join(parts[max_bubbles - 1 :])]
+    return ["\n\n".join(group) for group in balanced_groups(parts, max_bubbles)]
+
+
+def balanced_groups(parts: list, count: int) -> list:
+    """把 parts 按原顺序切成 count 段连续分组，使字数最多的一组尽量少（线性划分 DP）。"""
+    n = len(parts)
+    prefix = [0]
+    for part in parts:
+        prefix.append(prefix[-1] + len(part))
+
+    def span(i: int, j: int) -> int:  # parts[i:j] 合成一条的字数，含段间的两个换行
+        return prefix[j] - prefix[i] + 2 * (j - i - 1)
+
+    # best[k][j]：前 j 段分成 k 组时最长一组的最小字数；cut 记下最后一组的起点
+    inf = float("inf")
+    best = [[inf] * (n + 1) for _ in range(count + 1)]
+    cut = [[0] * (n + 1) for _ in range(count + 1)]
+    best[0][0] = 0
+    for k in range(1, count + 1):
+        for j in range(k, n + 1):
+            for i in range(k - 1, j):
+                cost = max(best[k - 1][i], span(i, j))
+                if cost < best[k][j]:
+                    best[k][j], cut[k][j] = cost, i
+    groups, j = [], n
+    for k in range(count, 0, -1):
+        i = cut[k][j]
+        groups.append(parts[i:j])
+        j = i
+    return groups[::-1]
+
+
+def bubble_pause(text: str, ceiling: float) -> float:
+    """发下一条前停一下，像在打字：越长停得越久，不超过 ceiling；0 表示不停。"""
+    if ceiling <= 0:
+        return 0.0
+    return min(ceiling, 0.5 + len(text) / 100)
 
 
 # ---------------------------------------------------------------------------
@@ -682,13 +794,13 @@ def resolve_album(entry_id: str):
     return matches[0] if len(matches) == 1 else None
 
 
-def run_turn(config: Config, contact: str, content: str, images: list):
-    """跑一个回合,返回 (最终正文, 本回合发出的表情包文件列表)。"""
+def run_turn(config: Config, session: str, model, content: str, images: list):
+    """跑一个回合,返回 (最终正文, 本回合要发的图片文件列表)。"""
     cmd = [
         config.gqy_bin,
         "ask",
         "--session",
-        f"imessage-{contact}",
+        session,
         "--create",
         "--output-format",
         "stream-json",
@@ -702,6 +814,8 @@ def run_turn(config: Config, contact: str, content: str, images: list):
     ]
     if os.path.exists(HINT_PATH):
         cmd += ["--append-system-prompt", "@" + HINT_PATH]
+    if model:
+        cmd += ["--model", model]
     for image in images:
         cmd += ["--image", image]
 
@@ -738,10 +852,67 @@ def parse_events(output: str) -> list:
     return events
 
 
-def collect_memes(events: list) -> list:
-    """本回合她「发出」的图:表情包(use_meme)与图库(album show)。
+GQY_CONFIG_PATH = os.path.join(HOME, ".gqy", "config", "config.jsonc")
 
-    只认工具成功输出里的 id,再到本机库里按 index 解析,不接受任意路径。
+
+def strip_jsonc(text: str) -> str:
+    """去掉 JSONC 的注释与尾逗号;字符串里的 // 与 /* 原样保留(URL 里常见)。"""
+    out, i, n = [], 0, len(text)
+    while i < n:
+        ch = text[i]
+        if ch == '"':
+            j = i + 1
+            while j < n and text[j] != '"':
+                j += 2 if text[j] == "\\" else 1
+            out.append(text[i : j + 1])
+            i = j + 1
+        elif text.startswith("//", i):
+            i = text.find("\n", i)
+            i = n if i < 0 else i
+        elif text.startswith("/*", i):
+            i = text.find("*/", i + 2)
+            i = n if i < 0 else i + 2
+        else:
+            out.append(ch)
+            i += 1
+    return re.sub(r",(\s*[}\]])", r"\1", "".join(out))
+
+
+def generated_image_dir():
+    """生图插件的输出目录(gqy 配置里的 plugins.image_generation.output_dir)。"""
+    try:
+        with open(GQY_CONFIG_PATH, encoding="utf-8") as f:
+            config = json.loads(strip_jsonc(f.read()), strict=False)
+        folder = config["plugins"]["image_generation"]["output_dir"]
+    except (OSError, ValueError, KeyError, TypeError):
+        return None
+    return os.path.realpath(os.path.expanduser(folder)) if folder else None
+
+
+def resolve_generated(output: str):
+    """generate_image 的输出是 JSON:{"status": "ok", "path": …}。只发输出目录里、
+    文件头确认是图片、不超过上限的文件。"""
+    try:
+        raw = json.loads(output).get("path") or ""
+    except (ValueError, AttributeError):
+        return None
+    path = os.path.realpath(raw)
+    folder = generated_image_dir()
+    if not folder or os.path.dirname(path) != folder:
+        log.warning("generated image outside the output dir, not sent")
+        return None
+    try:
+        too_big = os.path.getsize(path) > MAX_MEME_BYTES
+    except OSError:
+        return None
+    return path if not too_big and is_image_file(path) else None
+
+
+def collect_memes(events: list) -> list:
+    """本回合她「发出」的图:表情包(use_meme)、图库(album show)与她新生成的图(generate_image)。
+
+    表情包和图库只认工具成功输出里的 id,再到本机库里按 index 解析;生成的图只认
+    生图插件输出目录里的文件。都不接受任意路径。
     """
     pictures = []
     for event in events:
@@ -755,6 +926,11 @@ def collect_memes(events: list) -> list:
         elif name == "album":
             match = ALBUM_SENT_RE.match(output)
             resolve, kind = resolve_album, "album picture"
+        elif name == "generate_image":
+            path = resolve_generated(output)
+            if path:
+                pictures.append(path)
+            continue
         else:
             continue
         if not match:
@@ -776,6 +952,18 @@ class ContactWorker(threading.Thread):
         self.watcher = watcher
         self.watermark = watermark
         self.inbox: queue.Queue = queue.Queue()
+        self._notes: list = []  # 点按回应,攒到下一轮开头一起告诉她
+        self._notes_lock = threading.Lock()
+
+    def add_note(self, note: str) -> None:
+        with self._notes_lock:
+            self._notes = (self._notes + [note])[-10:]
+        log.info("reaction noted for %s", self.contact)
+
+    def take_notes(self) -> list:
+        with self._notes_lock:
+            notes, self._notes = self._notes, []
+        return notes
 
     def run(self) -> None:
         while True:
@@ -801,9 +989,32 @@ class ContactWorker(threading.Thread):
 
     def handle_batch(self, config: Config, batch: list) -> None:
         reply_handle = batch[-1].handle
+        # 快捷指令由桥接直接回复,不进回合
+        chat = []
+        for message in batch:
+            parsed = None if message.attachments else commands.parse_command(message.text)
+            if parsed is None:
+                chat.append(message)
+                continue
+            try:
+                answer = commands.run_command(*parsed, self.contact, config.gqy_bin)
+            except Exception as error:  # noqa: BLE001 — 指令失败要让对方知道
+                log.warning("command /%s failed: %s", parsed[0], error)
+                answer = "这条指令没执行成功，稍后再试。"
+            log.info("command /%s for %s", parsed[0], self.contact)
+            send_text(message.handle, answer)
+        if not chat:
+            return
+        prefs = commands.prefs(self.contact)
+        if prefs["paused"]:
+            log.info("paused, skipped %d message(s) from %s", len(chat), self.contact)
+            return
+        batch = chat
         with tempfile.TemporaryDirectory(prefix="gqy-imessage-") as workdir:
-            lines, images = [], []
+            lines, images = self.take_notes(), []
             for message in batch:
+                if message.quote:
+                    lines.append(message.quote)
                 if message.text:
                     lines.append(message.text)
                 for path, mime, name in message.attachments:
@@ -826,7 +1037,13 @@ class ContactWorker(threading.Thread):
                 len(images),
             )
             started = time.time()
-            reply, memes = run_turn(config, self.contact, content, images)
+            reply, memes = run_turn(
+                config,
+                commands.session_name(self.contact, prefs["topic"]),
+                prefs["model"],
+                content,
+                images,
+            )
 
         plain = markdown_to_plain(reply)
         if not plain and not memes:
@@ -842,9 +1059,13 @@ class ContactWorker(threading.Thread):
             before = max_rowid(conn)
         finally:
             conn.close()
-        for bubble in bubbles:
+        for index, bubble in enumerate(bubbles):
+            if index:
+                time.sleep(bubble_pause(bubble, config.bubble_pause_seconds))
             send_text(reply_handle, bubble)
-        for meme in memes[: config.max_memes]:
+        for index, meme in enumerate(memes[: config.max_memes]):
+            if bubbles or index:
+                time.sleep(bubble_pause("", config.bubble_pause_seconds))
             send_file(reply_handle, meme)
         log.info(
             "turn done: contact=%s bubbles=%d memes=%d chars=%d (%.1fs)",
@@ -863,26 +1084,37 @@ class ContactWorker(threading.Thread):
 
 
 class SelfReloader:
-    """脚本文件被改动且能编译通过时,空闲下来就用新代码替换本进程。"""
+    """脚本目录里的 .py(本脚本与 imessage_commands.py)被改动且都能编译通过时,
+    空闲下来就用新代码替换本进程。"""
 
     def __init__(self) -> None:
         self.path = os.path.abspath(__file__)
-        self.mtime = os.stat(self.path).st_mtime
+        self.mtimes = self._scan()
+
+    @staticmethod
+    def _scan() -> dict:
+        found = {}
+        for name in os.listdir(SCRIPT_DIR):
+            if name.endswith(".py"):
+                path = os.path.join(SCRIPT_DIR, name)
+                try:
+                    found[path] = os.stat(path).st_mtime
+                except OSError:
+                    pass
+        return found
 
     def changed(self) -> bool:
-        try:
-            mtime = os.stat(self.path).st_mtime
-        except OSError:
+        mtimes = self._scan()
+        if mtimes == self.mtimes:
             return False
-        if mtime == self.mtime:
-            return False
-        try:
-            with open(self.path, encoding="utf-8") as f:
-                compile(f.read(), self.path, "exec")
-        except (SyntaxError, ValueError, OSError) as error:
-            log.error("script changed but does not compile, keeping old code: %s", error)
-            self.mtime = mtime
-            return False
+        for path in mtimes:
+            try:
+                with open(path, encoding="utf-8") as f:
+                    compile(f.read(), path, "exec")
+            except (SyntaxError, ValueError, OSError) as error:
+                log.error("script changed but does not compile, keeping old code: %s", error)
+                self.mtimes = mtimes
+                return False
         return True
 
     def exec(self) -> None:
@@ -1050,12 +1282,15 @@ def main() -> int:
                 contact = config.handle_to_contact.get(message.handle)
                 if not config.enabled or contact is None:
                     continue
-                watermark.claim(message.rowid)
                 worker = workers.get(contact)
                 if worker is None:
                     worker = ContactWorker(contact, watcher, watermark)
                     worker.start()
                     workers[contact] = worker
+                if message.reaction:
+                    worker.add_note(message.reaction)
+                    continue
+                watermark.claim(message.rowid)
                 worker.inbox.put(message)
             watermark.seen = top
             watermark.flush()
