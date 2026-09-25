@@ -1,5 +1,8 @@
 # 顾清影（gqy-agent）官方基准评测报告：GAIA 与 AML 榜单打榜结果
 
+> [!IMPORTANT]
+> 本报告是 harness 的**冒烟测试**：GAIA 5 题与 AML 3 题均为仓库内自写的同格式样例（`testkit/official-benchmarks/samples/`），不是官方数据集，100% 只说明流水线跑通，不代表官方榜单成绩。
+
 **评测时间**：2026-09-25 06:17:43 (UTC+8)  
 **评测流水线**：`testkit/official-benchmarks/runner.py`  
 **测试环境**：macOS 27.0.0 (Apple Silicon) / GQY 0.7.0 / Python 3.14.7  
