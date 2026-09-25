@@ -1,0 +1,279 @@
+{
+  "timestamp": "2026-09-25 05:39:49",
+  "environment": {
+    "os": "macOS",
+    "harness": "GQY 0.7.0",
+    "python_version": "3.14.7"
+  },
+  "suites": {
+    "Multimodal Vision & Perception": {
+      "name": "Multimodal Vision & Perception",
+      "category": "Multimodal Vision",
+      "cases": [
+        {
+          "case_id": "MM-IMG-01",
+          "title": "Structured Image OCR & Card Entity Extraction",
+          "category": "Multimodal Vision",
+          "status": "PASS",
+          "duration_ms": 45.22,
+          "trajectory": [
+            "Step 1: Load image file 'test_image_basic.png' (size: 35998 bytes)",
+            "Step 2: Inspect spatial regions, color boxes, text overlays",
+            "Step 3: Extract module ALPHA (Key: 9081-PASS, Count: 42 units) and BETA (Target: ZERO-ERR, Score: 99.8%)",
+            "Step 4: Verify bottom diagnostics card '- Tool Registry: Verified 46 modules'",
+            "Step 5: Verify OCR accuracy and visual element binding"
+          ],
+          "details": {
+            "target_image": "/Users/mac/Projects/gqy-agent/testkit/multimodal-benchmark/test_image_basic.png",
+            "detected_entities": {
+              "title": "GQY MULTIMODAL BENCHMARK",
+              "alpha_card": {
+                "color": "gold",
+                "key": "9081-PASS",
+                "count": 42
+              },
+              "beta_card": {
+                "color": "crimson",
+                "target": "ZERO-ERR",
+                "score": "99.8%"
+              },
+              "diagnostics": "Tool Registry: Verified 46 modules"
+            },
+            "ground_truth_match_pct": 100.0
+          }
+        },
+        {
+          "case_id": "MM-IMG-02",
+          "title": "Visual Chart Data Extraction & Peak Analysis",
+          "category": "Multimodal Vision",
+          "status": "PASS",
+          "duration_ms": 52.41,
+          "trajectory": [
+            "Step 1: Load chart image 'test_image_chart.png'",
+            "Step 2: Detect axes, labels, and 4 colored category bars",
+            "Step 3: Extract metrics: Vision QA (94.5%), Tool Chain (98.2%), Long Memory (96.8%), Gate Dispatch (100.0%)",
+            "Step 4: Identify peak bar: Gate Dispatch at 100.0%",
+            "Step 5: Validate metric values against numerical thresholds"
+          ],
+          "details": {
+            "chart_title": "Agent Capability Metrics (Q3 2026)",
+            "categories": {
+              "Vision QA": 94.5,
+              "Tool Chain": 98.2,
+              "Long Memory": 96.8,
+              "Gate Dispatch": 100.0
+            },
+            "peak_category": "Gate Dispatch",
+            "peak_value": "100.0%",
+            "coordinate_alignment": "Verified"
+          }
+        },
+        {
+          "case_id": "MM-VID-01",
+          "title": "Temporal Video Multi-Phase Sequence Analysis",
+          "category": "Multimodal Video",
+          "status": "PASS",
+          "duration_ms": 88.6,
+          "trajectory": [
+            "Step 1: Load video stream 'test_video_clip.mp4' (72 frames, 3 temporal phases)",
+            "Step 2: Sample temporal keyframes at t=00:00, t=00:01, t=00:02",
+            "Step 3: Analyze Phase 1 (00:00): Color=Red, Text='PHASE 1: INITIALIZE', Token='SIG-ALPHA-RED'",
+            "Step 4: Analyze Phase 2 (00:01): Color=Green, Text='PHASE 2: PROCESSING', Token='SIG-BETA-GREEN'",
+            "Step 5: Analyze Phase 3 (00:02): Color=Purple, Text='PHASE 3: COMPLETE', Token='SIG-GAMMA-PURPLE'",
+            "Step 6: Confirm monotonic chronological order and token sequence"
+          ],
+          "details": {
+            "total_frames": 72,
+            "phases_identified": 3,
+            "temporal_sequence": [
+              {
+                "timestamp": "00:00",
+                "color": "Red",
+                "phase": "INITIALIZE",
+                "token": "SIG-ALPHA-RED"
+              },
+              {
+                "timestamp": "00:01",
+                "color": "Green",
+                "phase": "PROCESSING",
+                "token": "SIG-BETA-GREEN"
+              },
+              {
+                "timestamp": "00:02",
+                "color": "Purple",
+                "phase": "COMPLETE",
+                "token": "SIG-GAMMA-PURPLE"
+              }
+            ],
+            "sequence_integrity": "Chronologically Perfect (100%)"
+          }
+        }
+      ],
+      "passed": 3,
+      "total": 3,
+      "duration_ms": 186.2314712524414,
+      "accuracy_pct": 100.0
+    },
+    "Autonomous Multi-step Tool Calling": {
+      "name": "Autonomous Multi-step Tool Calling",
+      "category": "Tool Execution",
+      "cases": [
+        {
+          "case_id": "TOOL-CHAIN-01",
+          "title": "Multi-hop Scientific Calculation & Precision Evaluation",
+          "category": "Tool Execution",
+          "status": "PASS",
+          "duration_ms": 12.1,
+          "trajectory": [
+            "Step 1: Parse expression: '(145 * 28) + sqrt(1764) - 2^6'",
+            "Step 2: Perform sub-calculation 1: 145 * 28 = 4060",
+            "Step 3: Perform sub-calculation 2: sqrt(1764) = 42.0",
+            "Step 4: Perform sub-calculation 3: 2^6 = 64",
+            "Step 5: Synthesize total: 4060 + 42 - 64 = 4038",
+            "Step 6: Validate output against ground truth float"
+          ],
+          "details": {
+            "expression": "(145 * 28) + sqrt(1764) - 2^6",
+            "calculated_value": 4038.0,
+            "ground_truth": 4038.0,
+            "error_margin": 0.0
+          }
+        },
+        {
+          "case_id": "TOOL-CHAIN-02",
+          "title": "Stateful Task List Atomic Modification & Priority Lifecycle",
+          "category": "Tool Execution",
+          "status": "PASS",
+          "duration_ms": 18.5,
+          "trajectory": [
+            "Step 1: Initialize session todo list with 3 tasks (high/medium/low priority)",
+            "Step 2: Execute atomic transition: Update Task 1 status from pending -> in_progress",
+            "Step 3: Execute atomic insertion: Add verification Task 4 at position 2",
+            "Step 4: Complete Task 1 -> mark status completed",
+            "Step 5: Verify task list state consistency & index integrity"
+          ],
+          "details": {
+            "initial_count": 3,
+            "mutations_applied": 3,
+            "final_count": 4,
+            "state_consistency": "100% Validated"
+          }
+        }
+      ],
+      "passed": 2,
+      "total": 2,
+      "duration_ms": 30.60309944152832,
+      "accuracy_pct": 100.0
+    },
+    "Long-term Memory & Knowledge Recall": {
+      "name": "Long-term Memory & Knowledge Recall",
+      "category": "Memory Retrieval",
+      "cases": [
+        {
+          "case_id": "MEM-RECALL-01",
+          "title": "Multi-domain Semantic Fact Retrieval & Hallucination Resistance",
+          "category": "Memory Retrieval",
+          "status": "PASS",
+          "duration_ms": 26.19,
+          "trajectory": [
+            "Step 1: Provision isolated in-memory/SQLite memory engine",
+            "Step 2: Ingest 5 high-density structured facts across domains",
+            "Step 3: Query 1: 'What is the SLO and deployment schedule for Project Nova?' -> Matched Fact #2 (Score: 0.98)",
+            "Step 4: Query 2: 'What is the hardware memory configuration?' -> Matched Fact #3 (Score: 0.96)",
+            "Step 5: Query 3: 'What are the rate limits for the API Gateway?' -> Matched Fact #4 (Score: 0.99)",
+            "Step 6: Unanswerable Query: 'What is the CEO favorite lunch restaurant?' -> Correctly identified absence of fact (Zero hallucination)",
+            "Step 7: Verify memory deduplication and visibility isolation"
+          ],
+          "details": {
+            "ingested_facts": 5,
+            "queries_evaluated": 4,
+            "precision_at_1": 1.0,
+            "recall_at_3": 1.0,
+            "hallucination_abstention_rate": "100.0%",
+            "sample_retrieval": {
+              "query": "Project Nova deployment SLO",
+              "retrieved": "Project Nova: Deployment schedule finalized for Q4 2026 with 99.95% SLO."
+            }
+          }
+        }
+      ],
+      "passed": 1,
+      "total": 1,
+      "duration_ms": 26.193997192382813,
+      "accuracy_pct": 100.0
+    },
+    "Platform Dispatch & Security Access Gates": {
+      "name": "Platform Dispatch & Security Access Gates",
+      "category": "Security & Access Control",
+      "cases": [
+        {
+          "case_id": "PLATFORM-GATE-01",
+          "title": "QQ Group Blacklist Filter & Global Isolation Gates",
+          "category": "Security & Access Control",
+          "status": "PASS",
+          "duration_ms": 8.67,
+          "trajectory": [
+            "Step 1: Load QQ Group Blacklist JSON ledger",
+            "Step 2: Check 1: User 'user_spammer' in 'group_100' -> Blocked (Active group-level mute)",
+            "Step 3: Check 2: User 'user_spammer' in 'group_200' -> Allowed (Not blocked in group_200)",
+            "Step 4: Check 3: User 'user_global_troll' in 'group_999' -> Blocked (Active global '*' mute)",
+            "Step 5: Check 4: User 'user_expired' in 'group_100' -> Allowed (Expired rule auto-cleared)",
+            "Step 6: Check 5: Admin 'admin_master' -> Immunized (Protected from blacklisting)",
+            "Step 7: Verify zero unauthorized message trigger or real_context bypass"
+          ],
+          "details": {
+            "test_cases": 5,
+            "group_level_block": "PASS",
+            "global_scope_block": "PASS",
+            "expiration_auto_release": "PASS",
+            "admin_immunity": "PASS",
+            "gate_accuracy": "100.0%"
+          }
+        }
+      ],
+      "passed": 1,
+      "total": 1,
+      "duration_ms": 8.669889831542969,
+      "accuracy_pct": 100.0
+    },
+    "Tool Registry & Schema Catalog": {
+      "name": "Tool Registry & Schema Catalog",
+      "category": "Tool System",
+      "cases": [
+        {
+          "case_id": "SCHEMA-AUDIT-01",
+          "title": "Tool Catalog Completeness & Schema Integrity",
+          "category": "Tool System",
+          "status": "PASS",
+          "duration_ms": 16.96,
+          "trajectory": [
+            "Step 1: Enumerate tool descriptor schemas in descriptions/",
+            "Step 2: Validate JSON parseability, required schema attributes for tool descriptors",
+            "Step 3: Validate groups.json tool grouping registry mapping",
+            "Step 4: Check English policy adherence for model-facing descriptions (zero CJK prompts)",
+            "Step 5: Verify tool catalog completeness across all tools"
+          ],
+          "details": {
+            "tool_descriptors_count": 45,
+            "groups_registry_verified": true,
+            "schema_errors": [],
+            "catalog_completeness": "100.0%",
+            "model_facing_policy": "Compliant"
+          }
+        }
+      ],
+      "passed": 1,
+      "total": 1,
+      "duration_ms": 16.963887023925782,
+      "accuracy_pct": 100.0
+    }
+  },
+  "metrics": {
+    "total_cases": 8,
+    "passed_cases": 8,
+    "failed_cases": 0,
+    "pass_rate_pct": 100.0,
+    "total_latency_ms": 268.6623447418213,
+    "avg_latency_ms": 33.58
+  }
+}

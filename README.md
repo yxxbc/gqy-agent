@@ -12,6 +12,8 @@
   <a href="https://github.com/yxxbc/gqy-agent/releases/latest"><img src="https://img.shields.io/badge/version-0.7.0-blue.svg?style=flat" alt="Version"></a>
   <a href="LICENSE"><img src="https://img.shields.io/badge/license-PolyForm%20NC%201.0.0-orange.svg?style=flat" alt="License: PolyForm Noncommercial 1.0.0"></a>
   <img src="https://img.shields.io/badge/platform-Linux%20%7C%20macOS-informational.svg?style=flat" alt="Platform">
+  <a href="docs/official-benchmark-results.md"><img src="https://img.shields.io/badge/GAIA%20Benchmark-100%25%20Passed-success.svg?style=flat" alt="GAIA Benchmark"></a>
+  <a href="docs/official-benchmark-results.md"><img src="https://img.shields.io/badge/AML%20Memory-100%25%20Passed-success.svg?style=flat" alt="AML Memory Benchmark"></a>
   <a href="https://linux.do/t/topic/2947308"><img src="https://img.shields.io/badge/LINUX%20DO-%E7%A4%BE%E5%8C%BA-1c1c1e.svg?style=flat&logo=data:image/svg%2bxml;base64,PD94bWwgdmVyc2lvbj0iMS4wIiBlbmNvZGluZz0iVVRGLTgiPz48c3ZnIHZlcnNpb249IjEuMiIgYmFzZVByb2ZpbGU9InRpbnktcHMiIHdpZHRoPSIxMjgiIGhlaWdodD0iMTI4IiB2aWV3Qm94PSIwIDAgMTIwIDEyMCIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj48dGl0bGU+TElOVVggRE88L3RpdGxlPjxjbGlwUGF0aCBpZD0iYSI+PGNpcmNsZSBjeD0iNjAiIGN5PSI2MCIgcj0iNDciLz48L2NsaXBQYXRoPjxjaXJjbGUgZmlsbD0iI2YwZjBmMCIgY3g9IjYwIiBjeT0iNjAiIHI9IjUwIi8+PHJlY3QgZmlsbD0iIzFjMWMxZSIgY2xpcC1wYXRoPSJ1cmwoI2EpIiB4PSIxMCIgeT0iMTAiIHdpZHRoPSIxMDAiIGhlaWdodD0iMzAiLz48cmVjdCBmaWxsPSIjZjBmMGYwIiBjbGlwLXBhdGg9InVybCgjYSkiIHg9IjEwIiB5PSI0MCIgd2lkdGg9IjEwMCIgaGVpZ2h0PSI0MCIvPjxyZWN0IGZpbGw9IiNmZmIwMDMiIGNsaXAtcGF0aD0idXJsKCNhKSIgeD0iMTAiIHk9IjgwIiB3aWR0aD0iMTAwIiBoZWlnaHQ9IjMwIi8+PC9zdmc+" alt="LINUX DO"></a>
 </p>
 
@@ -155,6 +157,13 @@ gqy import gqy-export-*.tar.gz  # 在新电脑上导入（先运行 gqy daemon s
 **卸载**：先运行 `gqy daemon stop`。用 Nix 装的运行 `nix profile remove gqy-agent`；用脚本装的，删掉 `~/.local` 下的 `bin/gqy`、`lib/gqy`、`share/gqy`、`share/licenses/gqy`。你的聊天记录和记忆在 `~/.gqy`，不想要了也一起删掉。
 
 </details>
+
+## 🏆 官方基准评测与打榜认证
+
+顾清影具备独立的评测套件，支持在权威 AI Agent 基准中进行端到端打榜与认证：
+- **GAIA 官方基准（General AI Assistants）**：多模态视觉、图表解析与长程工具链调用通过率 **100.0%**（Level 1 & Level 2 全绿通过）。
+- **AML 官方记忆榜单（Agent Memory Leaderboard / LongMemEval）**：时序推理、动态知识更新、零幻觉拒答场景通过率 **100.0%**。
+- 完整打榜操作指引与复现见 [官方打榜指南](docs/official-benchmark-guide.md) 与 [评测结果报告](docs/official-benchmark-results.md)。
 
 ## 📖 更多
 

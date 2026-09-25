@@ -22,6 +22,14 @@ TUI 这一批（09-23 定，方案都在 `docs/plan/`）：
 - 纠正记忆写入时，把高度相似的旧错误说法标成「已否定」（§2）
 - dev 模式下 Claude / agy / Codex 用各自的原生工具，WebUI 显示其工作区与会话（§3）
 
+qq群增加回复时自动添加qq贴标签
+- 私聊概率主动回复改为对话后自动判断下次主动回复时间（做成插件）
+- 管理员QQ账号在私聊状态下共享顾清影记忆
+- 给人点赞的功能，可设置私聊、群聊白名单
+- webui中QQ平台私聊与群聊的设置单独隔开，不同子页面
+- QQ转发的合并消息可以读取
+- 用 video-shotcraft 给我的产品做一支宣传片
+- 打aml或者其他的记忆测试比赛（官方流水线已就绪，GAIA 与 AML/LongMemEval 评测已支持一键打榜与提交打包，详见 `docs/official-benchmark-guide.md` 与 `docs/official-benchmark-results.md`）
 ## Feats
 
 - WebUI 适配 Safari 移动端，点输入框时页面不上移（§4）

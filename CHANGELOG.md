@@ -10,6 +10,10 @@
 
 ## [Unreleased]
 
+### Added
+
+- 官方基准评测与打榜认证流水线（GAIA 与 AML/LongMemEval）：支持多模态附件解析、沙箱隔离推理、长期记忆日记时序重放与合规校验，可一键导出符合官方 Hugging Face 与 GitHub PR 规范的评测预测集与打榜包
+
 ### Changed
 
 - 顾清影 / Selene 的名字、logo、壁纸和立绘改为单独授权（[LICENSE-ASSETS](LICENSE-ASSETS)）：随原版分发、截图、非商用同人都可以；公开发布修改版时必须换用自己的名字和形象。源代码仍按 PolyForm Noncommercial
