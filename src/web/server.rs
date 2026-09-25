@@ -184,12 +184,15 @@ pub async fn run(paths: GqyPaths, args: WebArgs) -> Result<()> {
         println!("GQY WebUI: {url}");
     }
     if !state.state_store.has_admin_account().unwrap_or(true) {
+        // 用户名和密码取自常量：这句提示原先手写了「密码 gqy」，常量改成 GQY520 后没跟上。
         eprintln!(
             "{}",
             t(
-                "First visit: sign in as the built-in account (username `gqy`, password `gqy`) and create the admin account; the built-in account stops working afterwards.",
-                "首次访问：用内置账号登录（用户名 gqy，密码 gqy）并创建管理员账号，建完号内置账号即失效。"
+                "First visit: sign in as the built-in account (username `{username}`, password `{password}`) and create the admin account; the built-in account stops working afterwards.",
+                "首次访问：用内置账号登录（用户名 {username}，密码 {password}）并创建管理员账号，建完号内置账号即失效。"
             )
+            .replace("{username}", BUILTIN_SETUP_USERNAME)
+            .replace("{password}", BUILTIN_SETUP_PASSWORD)
         );
     }
     match crate::tools::sandbox::probe() {

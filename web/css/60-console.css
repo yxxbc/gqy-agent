@@ -135,6 +135,7 @@ body[data-theme="linen"] {
 .u-bar-x span { flex: 1; min-width: 0; text-align: center; font-size: var(--fs-micro); color: var(--text-faint);
   font-family: var(--font-mono); overflow: visible; white-space: nowrap; }
 .u-empty { padding: 26px 0; text-align: center; color: var(--text-faint); font-size: var(--fs-ui); }
+.u-bars > .u-empty { width: 100%; }
 
 .u-chart-tip { position: fixed; z-index: var(--z-toast); pointer-events: none; background: var(--surface-3);
   border: 1px solid var(--line-strong); border-radius: var(--radius); padding: 8px 11px;
@@ -144,6 +145,9 @@ body[data-theme="linen"] {
 .u-chart-tip .row em { font-style: normal; font-family: var(--font-mono); color: var(--text);
   font-variant-numeric: tabular-nums; }
 .u-chart-tip .row i { display: inline-block; width: 8px; height: 8px; border-radius: var(--radius-sm); margin-right: 5px; }
+.u-chart-tip .row i.s1 { background: var(--chart-1); }
+.u-chart-tip .row i.s2 { background: var(--chart-2); }
+.u-chart-tip .row i.s3 { background: var(--chart-3); }
 
 .u-model-body { display: flex; align-items: flex-start; gap: 26px; flex-wrap: wrap; }
 /* 来源内细项条(主动回复判断等):整行占满,排在环形图与表格之下。 */
@@ -187,6 +191,9 @@ body[data-theme="linen"] {
 .u-model-name b { display: block; font-weight: 500; }
 .u-model-name small { color: var(--text-faint); font-size: var(--fs-micro); }
 .u-dot { display: inline-block; width: 9px; height: 9px; border-radius: var(--radius-sm); margin-right: 7px; }
+/* 供应商那一行的占位点：和上一行的模型色点等宽，让两行文字左缘对齐。 */
+.u-dot.is-spacer { visibility: hidden; }
+.u-share { color: var(--text-faint); font-weight: 400; }
 .u-cache-pill { font-size: var(--fs-micro); padding: 1px 8px; border-radius: var(--radius);
   background: color-mix(in srgb, var(--online) 16%, transparent); color: var(--online); }
 .u-records-table td { padding: 11px 10px; }

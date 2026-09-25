@@ -85,34 +85,8 @@ window.GqySettings = (() => {
     return el(`span.st-chip${cls ? `.${cls}` : ""}`, { text });
   }
 
-  function getPath(object, path, fallback) {
-    let value = object;
-    for (const key of String(path).split(".")) {
-      if (value == null || typeof value !== "object" || !(key in value)) return fallback;
-      value = value[key];
-    }
-    return value;
-  }
-
-  function setPath(object, path, value) {
-    const keys = String(path).split(".");
-    let target = object;
-    for (const key of keys.slice(0, -1)) {
-      if (!target[key] || typeof target[key] !== "object") target[key] = {};
-      target = target[key];
-    }
-    target[keys[keys.length - 1]] = value;
-  }
-
-  function deletePath(object, path) {
-    const keys = String(path).split(".");
-    let target = object;
-    for (const key of keys.slice(0, -1)) {
-      if (!target?.[key] || typeof target[key] !== "object") return;
-      target = target[key];
-    }
-    delete target[keys[keys.length - 1]];
-  }
+  // 按点路径读写配置草稿；纯函数，在 core/util.js（经 core/expose.js 给旧脚本）。
+  const { getPath, setPath, deletePath } = window.GqyCore;
 
   function cfg(path, fallback) { return getPath(S().configDraft, path, fallback); }
   function setCfg(path, value) { setPath(S().configDraft, path, value); dirty(); }
@@ -2078,9 +2052,19 @@ window.GqySettings = (() => {
     return generalBinding(field);
   }
 
+  /* 全局页十几个分区、八屏长：按分区的 tab 字段分进顶部分页条（和平台页同一套：左侧管大类，
+     顶部管大类里的分页）。没写 tab 的分区落进「其他」。 */
+  let generalTab = null;
   function renderGeneralPage(root) {
     root.append(el("div.st-page-head", null, el("div", null, el("h2", { text: "全局" }), el("p.st-page-desc", { text: "工具、上下文、记忆这些跟供应商无关的行为。数字类参数收在每张卡的「高级参数」里。" }))));
-    const sections = (schema().general || []).filter((section) => section.id !== "mcp");
+    const all = (schema().general || []).filter((section) => section.id !== "mcp");
+    const tabs = [...new Set(all.map((section) => section.tab || "其他"))];
+    if (!tabs.includes(generalTab)) generalTab = tabs[0];
+    root.append(el("div.platform-tabs.st-subtabs", { role: "tablist", "aria-label": "全局设置分页" }, tabs.map((tab) => el(`button${tab === generalTab ? ".active" : ""}`, {
+      type: "button", role: "tab", "aria-selected": String(tab === generalTab), text: tab,
+      onclick: () => { generalTab = tab; rerender("general"); root.closest(".settings-content")?.scrollTo({ top: 0 }); }
+    }))));
+    const sections = all.filter((section) => (section.tab || "其他") === generalTab);
     sections.forEach((section, index) => {
       const rows = fieldRows(section.fields, generalBindingFor);
       if (Array.isArray(section.advanced) && section.advanced.length) {

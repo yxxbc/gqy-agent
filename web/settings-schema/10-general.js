@@ -5,6 +5,7 @@ const general = [
   {
     id: "tools",
     title: "工具",
+    tab: "工具",
     fields: [
       { path: "tools.enabled", label: "工具启用", kind: "toggle", default: true },
       {
@@ -80,6 +81,7 @@ const general = [
   {
     id: "skills",
     title: "Skills",
+    tab: "工具",
     fields: [
       { path: "skills.enabled", label: "Skills 启用", kind: "toggle", default: true },
       {
@@ -108,6 +110,7 @@ const general = [
   {
     id: "display",
     title: "显示",
+    tab: "对话",
     fields: [
       {
         path: "display.language",
@@ -208,6 +211,7 @@ const general = [
   {
     id: "context",
     title: "上下文",
+    tab: "对话",
     fields: [
       {
         path: "context.on_overflow",
@@ -356,6 +360,7 @@ const general = [
   {
     id: "memory",
     title: "记忆",
+    tab: "记忆",
     // 注意:AppConfig.memory 是 skip_serializing,WebUI 编辑 plugins.memory.*
     fields: [
       { path: "plugins.memory.enabled", label: "启用", kind: "toggle", default: true },
@@ -571,6 +576,7 @@ const general = [
   {
     id: "voice",
     title: "语音功能",
+    tab: "语音与通知",
     description:
       "麦克风常开的唤醒词对话与听写。识别在本机独立的 gqy-voice 进程里跑,关着时零占用;" +
       "首次启用会下载约 190MB 识别模型。改动需重载配置生效。",
@@ -897,6 +903,7 @@ const general = [
   {
     id: "notifications",
     title: "通知",
+    tab: "语音与通知",
     fields: [
       {
         path: "notifications.enabled",
@@ -923,6 +930,7 @@ const general = [
   {
     id: "prompt",
     title: "人格提醒",
+    tab: "对话",
     fields: [
       {
         path: "prompt.persona_reminder",
@@ -946,6 +954,7 @@ const general = [
   {
     id: "embedding",
     title: "Embedding",
+    tab: "记忆",
     fields: [
       {
         path: "embedding.enabled",
@@ -1017,6 +1026,7 @@ const general = [
   {
     id: "cache",
     title: "缓存",
+    tab: "记忆",
     fields: [
       {
         path: "cache.request_log",
@@ -1070,6 +1080,7 @@ const general = [
   {
     id: "accounts",
     title: "成员账号",
+    tab: "账号与平台",
     fields: [
       {
         path: "accounts.member_personas",
@@ -1091,6 +1102,7 @@ const general = [
   {
     id: "platforms",
     title: "通讯平台",
+    tab: "账号与平台",
     fields: [
       {
         path: "platforms.command_prefix",

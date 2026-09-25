@@ -52,6 +52,13 @@
   color: var(--md-sys-color-on-primary-container);
 }
 
+/* 设置页大类里的分页条（全局页）：沿用平台页分页条的样子，贴在滚动区顶部。
+   它在 .st-root 的网格里，左右不再额外留白。 */
+.platform-tabs.st-subtabs {
+  padding: 8px 0 10px;
+  margin-bottom: 2px;
+}
+
 .platform-pane.st-page {
   padding: 16px 26px 26px;
 }
