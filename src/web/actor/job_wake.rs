@@ -591,7 +591,7 @@ pub(in crate::web) async fn wake_platform_session_for_job(
     let persona = state.manager.lock().unwrap().config.active_persona_scope();
     let binding = state
         .state_store
-        .platform_session_bindings(&persona, "onebot")
+        .platform_session_bindings_all_platforms(&persona)
         .ok()
         .and_then(|bindings| {
             bindings

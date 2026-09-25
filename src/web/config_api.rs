@@ -81,17 +81,17 @@ pub(in crate::web) async fn update_config(
     validate_prompt_documents(&candidate, &request.prompts)?;
     // candidate 随后被 move 进 ActorCommand,改名对要先算出来。
     let renames = crate::config::detect_provider_renames(&current.providers, &candidate.providers);
-    let qq_listener = state
+    let platform_listeners = state
         .platforms
-        .qq_listener
-        .prepare(&state, Some(&current.platforms.qq), &candidate.platforms.qq)
+        .prepare_all(&state, Some(&current), &candidate)
         .await
-        .map_err(|error| {
+        .map_err(|failure| {
             ApiError::new(
                 StatusCode::BAD_REQUEST,
                 format!(
-                    "Tencent QQ listener configuration failed: {}",
-                    safe_error_message(error)
+                    "{} listener configuration failed: {}",
+                    failure.display_name,
+                    safe_error_message(failure.error)
                 ),
             )
         })?;
@@ -117,7 +117,7 @@ pub(in crate::web) async fn update_config(
         ));
     }
     match receiver.await {
-        Ok(Ok(())) => qq_listener.commit(),
+        Ok(Ok(())) => platform_listeners.commit(),
         Ok(Err(AdminFailure::Invalid(message))) => {
             return Err(ApiError::new(StatusCode::BAD_REQUEST, message));
         }

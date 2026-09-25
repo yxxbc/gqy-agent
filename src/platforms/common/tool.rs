@@ -16,7 +16,7 @@ pub(crate) fn register(registry: &mut ToolRegistry, context: Arc<PlatformTurnCon
     }
     register_usage_query(registry, context.clone());
     // 赞助记账。写限管理员(软拒绝),看开放;懒加载,full 模式照样全量给出。
-    super::sponsor_tool::register(registry, context.clone());
+    crate::platforms::sponsor_tool::register(registry, context.clone());
     if crate::web::voice_bridge::tts_available() {
         register_voice_message(registry, context.clone());
     }

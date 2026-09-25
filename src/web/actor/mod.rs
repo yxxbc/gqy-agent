@@ -565,7 +565,7 @@ pub(in crate::web) fn reset_actor_persona_state(
 ) -> std::result::Result<(), AdminFailure> {
     let mut reset = || -> Result<ContextSnapshot> {
         let persona = reset_config.active_persona_scope();
-        let cleared_sessions = state_store.reset_persona_contexts(&persona, "onebot")?;
+        let cleared_sessions = state_store.reset_persona_contexts_all_platforms(&persona)?;
         for session_id in &cleared_sessions {
             crate::llm::forget_relay_sessions(session_id);
         }

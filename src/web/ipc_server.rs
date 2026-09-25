@@ -301,23 +301,19 @@ pub(in crate::web) async fn handle_ipc_connection(
                     return Ok(());
                 }
             };
-            let qq_listener = match state
+            let platform_listeners = match state
                 .platforms
-                .qq_listener
-                .prepare(
-                    &state,
-                    Some(&current_config.platforms.qq),
-                    &next_config.platforms.qq,
-                )
+                .prepare_all(&state, Some(&current_config), &next_config)
                 .await
             {
-                Ok(listener) => listener,
-                Err(error) => {
+                Ok(prepared) => prepared,
+                Err(failure) => {
                     ipc::send(
                         &mut stream,
                         &IpcFrame::error(format!(
-                            "Tencent QQ listener configuration failed: {}",
-                            safe_error_message(error)
+                            "{} listener configuration failed: {}",
+                            failure.display_name,
+                            safe_error_message(failure.error)
                         )),
                     )
                     .await?;
@@ -357,7 +353,7 @@ pub(in crate::web) async fn handle_ipc_connection(
             }
             match receiver.await {
                 Ok(Ok(())) => {
-                    qq_listener.commit();
+                    platform_listeners.commit();
                     let next_voice = state.manager.lock().unwrap().config.voice.clone();
                     voice_bridge::on_config_reload(&state, &current_config.voice, &next_voice);
                     match session_state(&state.manager, &state.state_store) {

@@ -423,6 +423,11 @@ impl BotGroupRole {
 }
 
 /// Protocol adapter capability used by the platform-neutral output pipeline.
+/// 接入的平台标识（与 `PlatformConversation::platform`、会话绑定表的 platform 列一致）。
+/// 「这个人格的全部平台会话」一类的查询遍历它；平台驱动的 `id()` 必须在这里
+/// （`PlatformRuntime::new` 里有 debug 断言）。放在最底层，runtime / state 也能用。
+pub(crate) const PLATFORM_IDS: &[&str] = &["onebot"];
+
 pub(crate) trait PlatformAdapter: Send + Sync {
     fn send<'a>(&'a self, message: OutboundMessage) -> BoxFuture<'a, Result<SendReceipt>>;
 

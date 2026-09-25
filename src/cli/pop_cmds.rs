@@ -643,7 +643,7 @@ pub(in crate::cli) async fn run_wipe(paths: &GqyPaths, assume_yes: bool) -> Resu
         let config = AppConfig::load_or_default(paths)?;
         let state = StateStore::new(paths)?;
         let persona = config.active_persona_scope();
-        let bindings = state.platform_session_bindings(&persona, "onebot")?;
+        let bindings = state.platform_session_bindings_all_platforms(&persona)?;
         let plugins = crate::platforms::plugins::PlatformPluginRegistry::built_in()?;
         plugins
             .after_persona_reset(&crate::platforms::plugins::PlatformPersonaResetContext {
@@ -652,7 +652,7 @@ pub(in crate::cli) async fn run_wipe(paths: &GqyPaths, assume_yes: bool) -> Resu
                 bindings: &bindings,
             })
             .await?;
-        let cleared_sessions = state.reset_persona_contexts(&persona, "onebot")?;
+        let cleared_sessions = state.reset_persona_contexts_all_platforms(&persona)?;
         for session_id in &cleared_sessions {
             crate::llm::forget_relay_sessions(session_id);
         }

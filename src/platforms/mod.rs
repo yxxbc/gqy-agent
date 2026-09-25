@@ -6,36 +6,26 @@
 //! later platforms (Telegram, QQ official, WeChat) add submodules and
 //! reuse everything here without touching the web core.
 
-mod activity;
-mod inflight;
-mod live_turns;
-mod logging;
-mod reply;
-mod scheduling;
-mod turn_context;
-mod turn_order;
-mod turn_run;
-pub(crate) use activity::*;
-pub(crate) use logging::*;
-pub(crate) use reply::*;
-pub(crate) use scheduling::*;
-pub(crate) use turn_context::*;
-pub(crate) use turn_order::*;
-pub(crate) use turn_run::*;
-mod access_control;
-mod assets;
+// 平台中立的回合机器在 common/；这里按原名再导出，`crate::platforms::scheduling::…`、
+// `platforms::PlatformTurnContext` 这类旧路径一个字都不用改。
+mod common;
+pub(crate) use common::*;
+use common::{access_control, activity, assets, inflight, live_turns, tool, turn_context};
+pub(crate) use common::{commands, file_reader};
+
+mod driver;
+mod policy;
+pub(crate) use driver::*;
+pub(crate) use policy::*;
+
 pub(crate) mod avatar;
-pub(crate) mod commands;
-pub(crate) mod file_reader;
 pub(crate) mod onebot;
 pub(crate) mod plugins;
 mod sponsor_fx;
 mod sponsor_tool;
-mod tool;
 // 平台层的纯数据类型下沉到 crate::platform_types：tools / memory / agent 都
 // 要用它们（图片引用、主体身份、会话标识），但不该为此依赖整个平台运行时。
 // 这里原样再导出，`platforms::PlatformPrincipal` 这类写法一个字都不用改。
-mod tool_context;
 
 pub(crate) use crate::platform_types::{
     BotGroupRole, BotSendAvailability, ConversationKind, ForwardNode, OutboundBody,
@@ -73,6 +63,8 @@ pub(crate) struct PlatformRuntime {
     http: Arc<OnceLock<std::result::Result<reqwest::Client, String>>>,
     pub(crate) onebot: Arc<Mutex<onebot::ConnectionRegistry>>,
     pub(crate) qq_listener: onebot::QqListenerManager,
+    /// 接入的平台，起停与配置重载遍历它（见 driver.rs）。加平台 = 在 `new` 里多挂一个。
+    drivers: Arc<Vec<Arc<dyn PlatformDriver>>>,
     pub(crate) rate: Arc<Mutex<RateWindow>>,
     plugins: Arc<OnceLock<std::result::Result<Arc<plugins::PlatformPluginRegistry>, String>>>,
     pub(crate) assets: assets::AssetLeaseStore,
@@ -87,10 +79,18 @@ pub(crate) struct PlatformRuntime {
 
 impl PlatformRuntime {
     pub(crate) fn new() -> Result<Self> {
+        let drivers: Vec<Arc<dyn PlatformDriver>> = vec![Arc::new(onebot::OneBotDriver)];
+        debug_assert!(
+            drivers
+                .iter()
+                .all(|driver| crate::platform_types::PLATFORM_IDS.contains(&driver.id())),
+            "every platform driver id must be listed in platform_types::PLATFORM_IDS"
+        );
         Ok(Self {
             http: Arc::new(OnceLock::new()),
             onebot: Arc::new(Mutex::new(onebot::ConnectionRegistry::default())),
             qq_listener: onebot::QqListenerManager::default(),
+            drivers: Arc::new(drivers),
             rate: Arc::new(Mutex::new(RateWindow::new())),
             plugins: Arc::new(OnceLock::new()),
             assets: assets::AssetLeaseStore::new(),

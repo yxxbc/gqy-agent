@@ -71,11 +71,11 @@ pub(crate) async fn reset_platform_persona_state(
     let persona = config.active_persona_scope();
     let session_ids = state
         .state_store
-        .persona_reset_session_ids(&persona, "onebot")
+        .persona_reset_session_ids_all_platforms(&persona)
         .map_err(|error| PlatformPersonaResetError::Internal(safe_error_message(error)))?;
     let bindings = state
         .state_store
-        .platform_session_bindings(&persona, "onebot")
+        .platform_session_bindings_all_platforms(&persona)
         .map_err(|error| PlatformPersonaResetError::Internal(safe_error_message(error)))?;
     let targets = session_ids
         .iter()

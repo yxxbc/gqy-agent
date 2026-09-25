@@ -157,12 +157,17 @@ pub async fn run(paths: GqyPaths, args: WebArgs) -> Result<()> {
         turn_engine,
         platforms: PlatformRuntime::new()?,
     };
-    let initial_qq = state.manager.lock().unwrap().config.platforms.qq.clone();
+    let initial_config = state.manager.lock().unwrap().config.clone();
     state
         .platforms
-        .qq_listener
-        .prepare(&state, None, &initial_qq)
-        .await?
+        .prepare_all(&state, None, &initial_config)
+        .await
+        .map_err(|failure| {
+            failure.error.context(format!(
+                "{} listener configuration failed",
+                failure.display_name
+            ))
+        })?
         .commit();
     let (ipc_lease, ipc_task) = start_ipc_server(&state)?;
     install_background_job_hook(&state);
@@ -219,7 +224,7 @@ pub async fn run(paths: GqyPaths, args: WebArgs) -> Result<()> {
     let _ = actor_tx.send(ActorCommand::Shutdown);
     tools::jobs::shutdown_all();
     voice_bridge::shutdown();
-    state.platforms.qq_listener.shutdown(&state).await;
+    state.platforms.shutdown_all(&state).await;
     ipc_task.abort();
     let _ = ipc_task.await;
     let actor_result = tokio::task::spawn_blocking(move || actor_join.join())

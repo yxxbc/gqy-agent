@@ -286,6 +286,18 @@ impl PreparedSend {
 pub(crate) trait PlatformPlugin: Send + Sync {
     fn descriptor(&self) -> PluginDescriptor;
 
+    /// 这个插件服务哪些平台（与 `PlatformConversation::platform` 对照）；空 = 所有平台。
+    /// 缺省只服务 QQ：现有插件大多直接调 OneBot 接口或读 `platforms.qq`，接新平台时
+    /// 逐个确认能通用了再放开，而不是默认让它们跑到别的平台上。
+    fn platforms(&self) -> &'static [&'static str] {
+        &[crate::platforms::access_control::ONEBOT_PLATFORM]
+    }
+
+    fn serves(&self, platform: &str) -> bool {
+        let platforms = self.platforms();
+        platforms.is_empty() || platforms.contains(&platform)
+    }
+
     /// Archives a transport message before admission, command handling, and
     /// reply-queue limits. Implementations must keep this hook lightweight.
     fn observe_ingress<'a>(
@@ -496,15 +508,13 @@ impl PlatformPluginRegistry {
         config: &AppConfig,
         event: &PlatformInboundEvent,
     ) {
+        let policy = crate::platforms::policy_for(config, &event.conversation.platform);
         for plugin in self.plugins.iter().filter(|plugin| {
             let descriptor = plugin.descriptor();
-            config
-                .platforms
-                .qq
-                .plugins
-                .get(descriptor.id)
-                .and_then(|instance| instance.enabled)
-                .unwrap_or(descriptor.default_enabled)
+            plugin.serves(&event.conversation.platform)
+                && policy
+                    .plugin_enabled(descriptor.id)
+                    .unwrap_or(descriptor.default_enabled)
         }) {
             if let Err(error) = plugin.observe_ingress(paths, config, event).await {
                 tracing::warn!(
@@ -849,7 +859,8 @@ impl PlatformPluginRegistry {
     ) -> impl Iterator<Item = &'a Arc<dyn PlatformPlugin>> + 'a {
         self.plugins.iter().filter(move |plugin| {
             let descriptor = plugin.descriptor();
-            context.plugin_enabled(descriptor.id, descriptor.default_enabled)
+            plugin.serves(&context.conversation.platform)
+                && context.plugin_enabled(descriptor.id, descriptor.default_enabled)
         })
     }
 }

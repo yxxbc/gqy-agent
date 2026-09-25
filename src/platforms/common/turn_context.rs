@@ -297,14 +297,13 @@ impl PlatformTurnContext {
         self.reply_rate_available.load(Ordering::Acquire)
     }
 
+    /// 本会话所属平台的策略（见 policy.rs）。
+    pub(crate) fn policy(&self) -> &dyn PlatformPolicy {
+        policy_for(&self.config, &self.conversation.platform)
+    }
+
     pub(crate) fn plugin_enabled(&self, id: &str, default_enabled: bool) -> bool {
-        self.config
-            .platforms
-            .qq
-            .plugins
-            .get(id)
-            .and_then(|plugin| plugin.enabled)
-            .unwrap_or(default_enabled)
+        self.policy().plugin_enabled(id).unwrap_or(default_enabled)
     }
 
     /// 平台生图豁免：管理员，或私聊白名单成员（静态配置 ∪ 动态授权）。
@@ -322,15 +321,7 @@ impl PlatformTurnContext {
         if self.conversation.kind != ConversationKind::Private {
             return false;
         }
-        let statically_whitelisted = self.sender_id.parse::<i64>().ok().is_some_and(|sender| {
-            self.config
-                .platforms
-                .qq
-                .private_chats
-                .whitelist
-                .contains(&sender)
-        });
-        statically_whitelisted
+        self.policy().private_whitelisted(&self.sender_id)
             || access_control::has_dynamic_access(
                 &self.state_store,
                 &self.conversation.account_id,
@@ -346,16 +337,10 @@ impl PlatformTurnContext {
         self.is_admin && self.conversation.kind == ConversationKind::Private
     }
 
-    /// 主人本人的私聊（`platforms.qq.owner_users`）：记忆与终端 / WebUI 共享，
-    /// 写入算主人自己的，并带上用户资料。只认配置里写的号，不认动态授予的管理员。
+    /// 主人本人的私聊（QQ 是 `platforms.qq.owner_users`）：记忆与终端 / WebUI 共享，
+    /// 写入算主人自己的，并带上用户资料。只认配置里写的主人，不认动态授予的管理员。
     pub(crate) fn owner_bound(&self) -> bool {
-        self.privileged_memory()
-            && self.conversation.platform == "onebot"
-            && self
-                .sender_id
-                .parse::<i64>()
-                .ok()
-                .is_some_and(|sender| self.config.platforms.qq.owner_users.contains(&sender))
+        self.privileged_memory() && self.policy().is_owner(&self.sender_id)
     }
 
     pub(crate) fn host_tools_allowed(&self) -> bool {
@@ -363,21 +348,14 @@ impl PlatformTurnContext {
             return true;
         }
         self.conversation.kind == ConversationKind::Private
-            && self.config.platforms.qq.allow_non_admin_host_tools
-            && self.sender_id.parse::<i64>().ok().is_some_and(|sender| {
-                self.config
-                    .platforms
-                    .qq
-                    .private_chats
-                    .whitelist
-                    .contains(&sender)
-                    || access_control::has_dynamic_access(
-                        &self.state_store,
-                        &self.conversation.account_id,
-                        access_control::AccessPermission::PrivateWhitelist,
-                        &self.sender_id,
-                    )
-            })
+            && self.policy().allow_non_admin_host_tools()
+            && (self.policy().private_whitelisted(&self.sender_id)
+                || access_control::has_dynamic_access(
+                    &self.state_store,
+                    &self.conversation.account_id,
+                    access_control::AccessPermission::PrivateWhitelist,
+                    &self.sender_id,
+                ))
     }
 
     pub(crate) async fn handle_command(&self, text: &str) -> Option<OutboundMessage> {

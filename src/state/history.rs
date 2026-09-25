@@ -375,6 +375,15 @@ impl StateStore {
         Ok(session_ids)
     }
 
+    /// 所有接入平台（`platform_types::PLATFORM_IDS`）的 [`Self::reset_persona_contexts`]。
+    pub fn reset_persona_contexts_all_platforms(&self, persona: &str) -> Result<Vec<String>> {
+        let mut session_ids = Vec::new();
+        for platform in crate::platform_types::PLATFORM_IDS {
+            session_ids.extend(self.reset_persona_contexts(persona, platform)?);
+        }
+        Ok(session_ids)
+    }
+
     /// Clears only the pinned session's conversation state. Platform commands
     /// use this instead of `reset_conversation` so they cannot reset the
     /// daemon-wide usage counters or another client's current session.

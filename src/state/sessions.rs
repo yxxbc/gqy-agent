@@ -289,6 +289,27 @@ impl StateStore {
         self.conv_db.persona_reset_session_ids(persona, platform)
     }
 
+    /// 所有接入平台（`platform_types::PLATFORM_IDS`）的 [`Self::persona_reset_session_ids`]。
+    pub fn persona_reset_session_ids_all_platforms(&self, persona: &str) -> Result<Vec<String>> {
+        let mut ids = Vec::new();
+        for platform in crate::platform_types::PLATFORM_IDS {
+            ids.extend(self.persona_reset_session_ids(persona, platform)?);
+        }
+        Ok(ids)
+    }
+
+    /// 所有接入平台的会话绑定。
+    pub fn platform_session_bindings_all_platforms(
+        &self,
+        persona: &str,
+    ) -> Result<Vec<PlatformSessionBinding>> {
+        let mut bindings = Vec::new();
+        for platform in crate::platform_types::PLATFORM_IDS {
+            bindings.extend(self.platform_session_bindings(persona, platform)?);
+        }
+        Ok(bindings)
+    }
+
     pub fn platform_session_bindings(
         &self,
         persona: &str,

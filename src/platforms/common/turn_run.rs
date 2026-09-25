@@ -54,11 +54,9 @@ pub(crate) async fn run_platform_turn(
     let (cancel_tx, cancel_rx) = tokio::sync::watch::channel(false);
     let platform_context = profile.platform.clone();
     let intermediate_replies = platform_context.as_ref().is_some_and(|context| {
-        let qq = &context.config.platforms.qq;
-        match context.conversation.kind {
-            ConversationKind::Group => qq.group_intermediate_messages,
-            ConversationKind::Private => qq.private_intermediate_messages,
-        }
+        context
+            .policy()
+            .intermediate_messages(context.conversation.kind)
     });
     let platform_followup = platform_context
         .as_ref()
