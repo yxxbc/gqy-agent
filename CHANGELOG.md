@@ -13,6 +13,7 @@
 ### Added
 
 - 官方基准评测与打榜认证流水线（GAIA 与 AML/LongMemEval）：支持多模态附件解析、沙箱隔离推理、长期记忆日记时序重放与合规校验，可一键导出符合官方 Hugging Face 与 GitHub PR 规范的评测预测集与打榜包
+- 权威长程记忆跑分报告（[docs/longmemeval-results.md](docs/longmemeval-results.md)）：公布 30 题 LongMemEval 真题抽样评测详情（综合准确率 76.7%），提供按题型分项指标、真实 Token 账本与错误案例透明归因
 - 规范化安全策略与漏洞报告指南（[SECURITY.md](SECURITY.md)）：明确受支持版本、负责任漏洞披露流程与底层安全护栏，并对齐 Linux 基金会 OpenSSF 最佳实践认证标准
 
 ### Changed

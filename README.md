@@ -13,7 +13,7 @@
   <a href="LICENSE"><img src="https://img.shields.io/badge/license-PolyForm%20NC%201.0.0-orange.svg?style=flat" alt="License: PolyForm Noncommercial 1.0.0"></a>
   <img src="https://img.shields.io/badge/platform-Linux%20%7C%20macOS-informational.svg?style=flat" alt="Platform">
   <a href="docs/official-benchmark-guide.md"><img src="https://img.shields.io/badge/GAIA%20Harness-Verified-blue.svg?style=flat" alt="GAIA Benchmark Harness"></a>
-  <a href="docs/official-benchmark-guide.md"><img src="https://img.shields.io/badge/AML%20Eval-Verified-blue.svg?style=flat" alt="AML Memory Eval Harness"></a>
+  <a href="docs/longmemeval-results.md"><img src="https://img.shields.io/badge/LongMemEval-76.7%25%20(23%2F30)-success.svg?style=flat" alt="LongMemEval Benchmark"></a>
   <a href="SECURITY.md"><img src="https://img.shields.io/badge/Security-Policy%20Enabled-green.svg?style=flat" alt="Security Policy"></a>
   <a href="https://linux.do/t/topic/2947308"><img src="https://img.shields.io/badge/LINUX%20DO-%E7%A4%BE%E5%8C%BA-1c1c1e.svg?style=flat&logo=data:image/svg%2bxml;base64,PD94bWwgdmVyc2lvbj0iMS4wIiBlbmNvZGluZz0iVVRGLTgiPz48c3ZnIHZlcnNpb249IjEuMiIgYmFzZVByb2ZpbGU9InRpbnktcHMiIHdpZHRoPSIxMjgiIGhlaWdodD0iMTI4IiB2aWV3Qm94PSIwIDAgMTIwIDEyMCIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj48dGl0bGU+TElOVVggRE88L3RpdGxlPjxjbGlwUGF0aCBpZD0iYSI+PGNpcmNsZSBjeD0iNjAiIGN5PSI2MCIgcj0iNDciLz48L2NsaXBQYXRoPjxjaXJjbGUgZmlsbD0iI2YwZjBmMCIgY3g9IjYwIiBjeT0iNjAiIHI9IjUwIi8+PHJlY3QgZmlsbD0iIzFjMWMxZSIgY2xpcC1wYXRoPSJ1cmwoI2EpIiB4PSIxMCIgeT0iMTAiIHdpZHRoPSIxMDAiIGhlaWdodD0iMzAiLz48cmVjdCBmaWxsPSIjZjBmMGYwIiBjbGlwLXBhdGg9InVybCgjYSkiIHg9IjEwIiB5PSI0MCIgd2lkdGg9IjEwMCIgaGVpZ2h0PSI0MCIvPjxyZWN0IGZpbGw9IiNmZmIwMDMiIGNsaXAtcGF0aD0idXJsKCNhKSIgeD0iMTAiIHk9IjgwIiB3aWR0aD0iMTAwIiBoZWlnaHQ9IjMwIi8+PC9zdmc+" alt="LINUX DO"></a>
 </p>
@@ -162,8 +162,8 @@ gqy import gqy-export-*.tar.gz  # 在新电脑上导入（先运行 gqy daemon s
 ## 🏆 官方基准评测与打榜套件
 
 顾清影具备独立的评测与打榜套件，支持在权威 AI Agent 基准中进行端到端复现与验证：
+- **LongMemEval（ICLR 2025 长程记忆官方基准）**：30 题真题分层抽样实跑得分 **76.7% (23/30)**，在长跨度时序推理与防幻觉拒答上表现优秀，详见 [LongMemEval 真实跑分报告](docs/longmemeval-results.md)。
 - **GAIA 官方基准（General AI Assistants）**：多模态视觉、图表解析与长程工具链调用沙箱隔离评测，支持一键生成符合 Hugging Face Leaderboard 规范的提交包。
-- **AML 官方记忆榜单（Agent Memory Leaderboard / LongMemEval）**：会话时序日记重放、动态偏好版本识别与防幻觉拒答评测。
 - 完整打榜操作指引与离线样本复现见 [官方打榜指南](docs/official-benchmark-guide.md) 与 [样本评测报告](docs/official-benchmark-results.md)。
 
 ## 📖 更多
