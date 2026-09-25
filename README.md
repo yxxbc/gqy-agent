@@ -12,8 +12,9 @@
   <a href="https://github.com/yxxbc/gqy-agent/releases/latest"><img src="https://img.shields.io/badge/version-0.7.0-blue.svg?style=flat" alt="Version"></a>
   <a href="LICENSE"><img src="https://img.shields.io/badge/license-PolyForm%20NC%201.0.0-orange.svg?style=flat" alt="License: PolyForm Noncommercial 1.0.0"></a>
   <img src="https://img.shields.io/badge/platform-Linux%20%7C%20macOS-informational.svg?style=flat" alt="Platform">
-  <a href="docs/official-benchmark-guide.md"><img src="https://img.shields.io/badge/GAIA%20Harness-Verified-blue.svg?style=flat" alt="GAIA Benchmark Harness"></a>
+  <a href="https://www.bestpractices.dev/projects/14831"><img src="https://www.bestpractices.dev/projects/14831/badge" alt="OpenSSF Best Practices"></a>
   <a href="docs/longmemeval-results.md"><img src="https://img.shields.io/badge/LongMemEval-76.7%25%20(23%2F30)-success.svg?style=flat" alt="LongMemEval Benchmark"></a>
+  <a href="docs/official-benchmark-guide.md"><img src="https://img.shields.io/badge/GAIA%20Harness-Verified-blue.svg?style=flat" alt="GAIA Benchmark Harness"></a>
   <a href="SECURITY.md"><img src="https://img.shields.io/badge/Security-Policy%20Enabled-green.svg?style=flat" alt="Security Policy"></a>
   <a href="https://linux.do/t/topic/2947308"><img src="https://img.shields.io/badge/LINUX%20DO-%E7%A4%BE%E5%8C%BA-1c1c1e.svg?style=flat&logo=data:image/svg%2bxml;base64,PD94bWwgdmVyc2lvbj0iMS4wIiBlbmNvZGluZz0iVVRGLTgiPz48c3ZnIHZlcnNpb249IjEuMiIgYmFzZVByb2ZpbGU9InRpbnktcHMiIHdpZHRoPSIxMjgiIGhlaWdodD0iMTI4IiB2aWV3Qm94PSIwIDAgMTIwIDEyMCIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj48dGl0bGU+TElOVVggRE88L3RpdGxlPjxjbGlwUGF0aCBpZD0iYSI+PGNpcmNsZSBjeD0iNjAiIGN5PSI2MCIgcj0iNDciLz48L2NsaXBQYXRoPjxjaXJjbGUgZmlsbD0iI2YwZjBmMCIgY3g9IjYwIiBjeT0iNjAiIHI9IjUwIi8+PHJlY3QgZmlsbD0iIzFjMWMxZSIgY2xpcC1wYXRoPSJ1cmwoI2EpIiB4PSIxMCIgeT0iMTAiIHdpZHRoPSIxMDAiIGhlaWdodD0iMzAiLz48cmVjdCBmaWxsPSIjZjBmMGYwIiBjbGlwLXBhdGg9InVybCgjYSkiIHg9IjEwIiB5PSI0MCIgd2lkdGg9IjEwMCIgaGVpZ2h0PSI0MCIvPjxyZWN0IGZpbGw9IiNmZmIwMDMiIGNsaXAtcGF0aD0idXJsKCNhKSIgeD0iMTAiIHk9IjgwIiB3aWR0aD0iMTAwIiBoZWlnaHQ9IjMwIi8+PC9zdmc+" alt="LINUX DO"></a>
 </p>

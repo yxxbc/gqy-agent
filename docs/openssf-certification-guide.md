@@ -69,13 +69,15 @@
 
 ---
 
-## 3. 获得认证后的官方徽章接入
+## 3. 官方认证主页与徽章接入
 
-在官网完成提交并获得项目 ID（假设为 `12345`）后，直接将以下代码替换至 `README.md` 徽章区：
+项目在 Linux 基金会 OpenSSF 官方注册成功，项目 ID 为 **`14831`**：
+- **官方认证主页**：[https://www.bestpractices.dev/projects/14831](https://www.bestpractices.dev/projects/14831)
+- **官方动态徽章**：
 
 ```html
-<a href="https://www.bestpractices.dev/projects/12345">
-  <img src="https://www.bestpractices.dev/projects/12345/badge" alt="OpenSSF Best Practices">
+<a href="https://www.bestpractices.dev/projects/14831">
+  <img src="https://www.bestpractices.dev/projects/14831/badge" alt="OpenSSF Best Practices">
 </a>
 ```
 
