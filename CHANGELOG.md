@@ -12,8 +12,8 @@
 
 ### Added
 
-- 官方基准评测与打榜认证流水线（GAIA 与 AML/LongMemEval）：支持多模态附件解析、沙箱隔离推理、长期记忆日记时序重放与合规校验，可一键导出符合官方 Hugging Face 与 GitHub PR 规范的评测预测集与打榜包
-- 权威长程记忆跑分报告（[docs/longmemeval-results.md](docs/longmemeval-results.md)）：公布 30 题 LongMemEval 真题抽样评测详情（综合准确率 76.7%），提供按题型分项指标、真实 Token 账本与错误案例透明归因
+- 评测工具：`testkit/official-benchmarks/` 提供 GAIA / AML（LongMemEval）格式的评测流水线，包括沙箱隔离运行、附件解析、答案归一化和提交包导出。目前只用仓库里自己写的同格式样例做过冒烟测试，还没有在官方数据集上跑过分
+- LongMemEval 抽样跑分报告（[docs/longmemeval-results.md](docs/longmemeval-results.md)）：从官方题库抽 30 题，答对 23 题（76.7%），附分题型结果、Token 用量和错题分析。答题和判分都用 gemini-flash（论文用 gpt-4o 判分），也没有「不用顾清影」的对照组，只能作内部参考，不能和论文里的分数直接比较
 - 规范化安全策略与漏洞报告指南（[SECURITY.md](SECURITY.md)）：明确受支持版本、负责任漏洞披露流程与底层安全护栏，并对齐 Linux 基金会 OpenSSF 最佳实践认证标准
 - 接入 Linux 基金会 OpenSSF 官方在线最佳实践认证（项目 ID 14831）：主页挂载可公开查验的官方认证动态徽章，直通认证主页与全套达标对照表（[docs/openssf-certification-guide.md](docs/openssf-certification-guide.md)）
 - 项目主页双语支持：[README.md](README.md) 改写为英文为主、中文为辅的国际化规范文档，全面直链中文文档库；原完整中文文档保存为 [README_zh.md](README_zh.md) 并提供顶部一键切换栏
@@ -36,6 +36,11 @@
 - WebUI 看板脚本面板的单行输入框字号失效、比周围文字还小，现在和账本表单一样用正文字号
 - WebUI 数据统计里每个模型前的色点、柱状图悬停提示里的色块都没有颜色（被页面安全策略拦掉），现在正常显示
 - 首次启动 WebUI 时终端提示的内置密码写成了 gqy，实际是 GQY520
+
+### Security
+
+- 修复依赖里的两个安全公告：rustls 在 TLS 1.3 握手中接受了跨加密层级的消息（RUSTSEC-2026-0285），crossbeam-epoch 的无效指针解引用（RUSTSEC-2026-0204）
+- 预编译包附带 SLSA 构建来源证明（Sigstore 签名）：运行 `gh attestation verify gqy-<平台>.tar.gz -R yxxbc/gqy-agent` 可以确认下载的包确实由本仓库的发布流程从对应提交编译
 
 ## [0.7.0] - 2026-09-24
 
