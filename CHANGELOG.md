@@ -16,6 +16,7 @@
 - 权威长程记忆跑分报告（[docs/longmemeval-results.md](docs/longmemeval-results.md)）：公布 30 题 LongMemEval 真题抽样评测详情（综合准确率 76.7%），提供按题型分项指标、真实 Token 账本与错误案例透明归因
 - 规范化安全策略与漏洞报告指南（[SECURITY.md](SECURITY.md)）：明确受支持版本、负责任漏洞披露流程与底层安全护栏，并对齐 Linux 基金会 OpenSSF 最佳实践认证标准
 - 接入 Linux 基金会 OpenSSF 官方在线最佳实践认证（项目 ID 14831）：主页挂载可公开查验的官方认证动态徽章，直通认证主页与全套达标对照表（[docs/openssf-certification-guide.md](docs/openssf-certification-guide.md)）
+- 项目主页双语支持：[README.md](README.md) 改写为英文为主、中文为辅的国际化规范文档，全面直链中文文档库；原完整中文文档保存为 [README_zh.md](README_zh.md) 并提供顶部一键切换栏
 
 ### Changed
 

@@ -2,11 +2,17 @@
 
 <img src="pics/gqy-logo.png" alt="GQY Logo" width="160" />
 
-# GQY · 顾清影 Selene
+# GQY · Selene (顾清影)
 
+**The Anime AI Companion Living in Your Terminal**  
 **住在终端里的二次元 AI 伴侣**
 
+Chatting · Remembering · Assisting · Coding with You  
 陪你聊天 · 记得你 · 帮你办事 · 陪你写代码
+
+<p align="center">
+  <b>English</b> | <a href="README_zh.md">简体中文</a>
+</p>
 
 <p align="center">
   <a href="https://github.com/yxxbc/gqy-agent/releases/latest"><img src="https://img.shields.io/badge/version-0.7.0-blue.svg?style=flat" alt="Version"></a>
@@ -16,85 +22,97 @@
   <a href="docs/longmemeval-results.md"><img src="https://img.shields.io/badge/LongMemEval-76.7%25%20(23%2F30)-success.svg?style=flat" alt="LongMemEval Benchmark"></a>
   <a href="docs/official-benchmark-guide.md"><img src="https://img.shields.io/badge/GAIA%20Harness-Verified-blue.svg?style=flat" alt="GAIA Benchmark Harness"></a>
   <a href="SECURITY.md"><img src="https://img.shields.io/badge/Security-Policy%20Enabled-green.svg?style=flat" alt="Security Policy"></a>
-  <a href="https://linux.do/t/topic/2947308"><img src="https://img.shields.io/badge/LINUX%20DO-%E7%A4%BE%E5%8C%BA-1c1c1e.svg?style=flat&logo=data:image/svg%2bxml;base64,PD94bWwgdmVyc2lvbj0iMS4wIiBlbmNvZGluZz0iVVRGLTgiPz48c3ZnIHZlcnNpb249IjEuMiIgYmFzZVByb2ZpbGU9InRpbnktcHMiIHdpZHRoPSIxMjgiIGhlaWdodD0iMTI4IiB2aWV3Qm94PSIwIDAgMTIwIDEyMCIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj48dGl0bGU+TElOVVggRE88L3RpdGxlPjxjbGlwUGF0aCBpZD0iYSI+PGNpcmNsZSBjeD0iNjAiIGN5PSI2MCIgcj0iNDciLz48L2NsaXBQYXRoPjxjaXJjbGUgZmlsbD0iI2YwZjBmMCIgY3g9IjYwIiBjeT0iNjAiIHI9IjUwIi8+PHJlY3QgZmlsbD0iIzFjMWMxZSIgY2xpcC1wYXRoPSJ1cmwoI2EpIiB4PSIxMCIgeT0iMTAiIHdpZHRoPSIxMDAiIGhlaWdodD0iMzAiLz48cmVjdCBmaWxsPSIjZjBmMGYwIiBjbGlwLXBhdGg9InVybCgjYSkiIHg9IjEwIiB5PSI0MCIgd2lkdGg9IjEwMCIgaGVpZ2h0PSI0MCIvPjxyZWN0IGZpbGw9IiNmZmIwMDMiIGNsaXAtcGF0aD0idXJsKCNhKSIgeD0iMTAiIHk9IjgwIiB3aWR0aD0iMTAwIiBoZWlnaHQ9IjMwIi8+PC9zdmc+" alt="LINUX DO"></a>
+  <a href="https://linux.do/t/topic/2947308"><img src="https://img.shields.io/badge/LINUX%20DO-Community-1c1c1e.svg?style=flat&logo=data:image/svg%2bxml;base64,PD94bWwgdmVyc2lvbj0iMS4wIiBlbmNvZGluZz0iVVRGLTgiPz48c3ZnIHZlcnNpb249IjEuMiIgYmFzZVByb2ZpbGU9InRpbnktcHMiIHdpZHRoPSIxMjgiIGhlaWdodD0iMTI4IiB2aWV3Qm94PSIwIDAgMTIwIDEyMCIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj48dGl0bGU+TElOVVggRE88L3RpdGxlPjxjbGlwUGF0aCBpZD0iYSI+PGNpcmNsZSBjeD0iNjAiIGN5PSI2MCIgcj0iNDciLz48L2NsaXBQYXRoPjxjaXJjbGUgZmlsbD0iI2YwZjBmMCIgY3g9IjYwIiBjeT0iNjAiIHI9IjUwIi8+PHJlY3QgZmlsbD0iIzFjMWMxZSIgY2xpcC1wYXRoPSJ1cmwoI2EpIiB4PSIxMCIgeT0iMTAiIHdpZHRoPSIxMDAiIGhlaWdodD0iMzAiLz48cmVjdCBmaWxsPSIjZjBmMGYwIiBjbGlwLXBhdGg9InVybCgjYSkiIHg9IjEwIiB5PSI0MCIgd2lkdGg9IjEwMCIgaGVpZ2h0PSI0MCIvPjxyZWN0IGZpbGw9IiNmZmIwMDMiIGNsaXAtcGF0aD0idXJsKCNhKSIgeD0iMTAiIHk9IjgwIiB3aWR0aD0iMTAwIiBoZWlnaHQ9IjMwIi8+PC9zdmc+" alt="LINUX DO"></a>
 </p>
 
-<img src="pics/gqy-tui.png" alt="GQY 终端界面截图" width="850" />
+<img src="pics/gqy-tui.png" alt="GQY Terminal UI Screenshot" width="850" />
 
 </div>
 
-## 👋 认识一下
+## 👋 Meet Selene (认识一下)
 
-<img src="pics/gqy-mascot-is-not-the-tui-version..png" alt="GQY 吉祥物：戴白花发簪的像素黑猫" width="170" align="right" />
+<img src="pics/gqy-mascot-is-not-the-tui-version..png" alt="GQY Mascot: Pixel Black Cat" width="170" align="right" />
 
-顾清影住在你的电脑里。平时陪你聊天，记得你说过的事，帮你查天气、定闹钟、记账；你要写代码的时候，她就安静下来，认真陪你干活。
+Selene lives right in your computer terminal. She chats with you, remembers what you've shared, checks the weather, sets alarms, and tracks your daily accounts. When you need to write code, she focuses quietly and partners with you to get real engineering done.
 
-> 她最初是作者高中时用 Gemini 生成的虚构角色，现在有了自己的家。英文名 Selene，取「起舞弄清影」月下清影的意象。
+> Her Chinese name **顾清影 (Gù Qīngyǐng)** and English name **Selene** are inspired by the classical verse *"起舞弄清影，何似在人间"* (dancing with clear shadows under the moon).
 
 <br clear="right" />
 
-## ✨ 她能做什么
+---
 
-| | |
-| :-- | :-- |
-| 💬 **陪你聊天** | 有自己的性格和情绪，会闲聊、会撒娇，也会认真听你说 |
-| 🧠 **记得你** | 记得你说过的话；你纠正过她的事，下次不会再犯 |
-| 🛠 **帮你办事** | 查天气汇率快递、看地图、生成图片、定时提醒、记账 |
-| 💻 **陪你写代码** | 输入 `gqy dev` 切到开发模式，专心帮你看项目、改代码 |
-| 📚 **你的资料库** | 把文档交给她，需要时帮你查，内容只留在你的电脑上 |
-| 🎙 **听得见你** | 喊一声「清影」就能语音对话，录音不离开你的电脑 |
-| 📱 **随处都能聊** | 终端、浏览器、手机、QQ、iMessage，都能找到她 |
+## ✨ Features (她能做什么)
+
+| Feature | Description | Reference / Docs |
+| :-- | :-- | :-- |
+| 💬 **Natural Chat (日常聊天)** | Expressive personality, witty, caring, and an empathetic listener | [Wiki: Quick Start](docs/wiki/01-快速开始.md) |
+| 🧠 **Persistent Memory (真实长程记忆)** | Retains past dialogues and facts; learns when corrected; evaluates **76.7%** on LongMemEval | [LongMemEval Report](docs/longmemeval-results.md) |
+| 🛠 **Autonomous Tools (日常助理)** | Weather, FX rates, maps, image generation, cron alarms, accounting | [Wiki: Overview](docs/wiki/02-功能总览.md) |
+| 💻 **Dev Mode Pair-Programming (协同编程)** | Run `gqy dev` to inspect codebases, execute terminal tools, and edit code | [Wiki: CLI Reference](docs/wiki/04-命令参考.md) |
+| 📚 **Private Knowledge Base (本地资料库)** | Ingest documents and query anytime; all data stays on your machine | [Wiki: Overview](docs/wiki/02-功能总览.md) |
+| 🎙 **Local Voice Interaction (语音交互)** | Wake up with "清影" (Selene) for conversational speech; audio never leaves your machine | [Voice Manual (中文)](docs/voice.md) |
+| 📱 **Everywhere You Are (跨平台接入)** | Terminal (TUI), Web browser, Mobile, QQ, and iMessage | [QQ & Platforms (中文)](docs/wiki/13-QQ与通讯平台.md) |
 
 <div align="center">
-<img src="pics/readme-show/tui-calltool.png" alt="顾清影在终端里联网搜索" width="760" />
-<br/><sub>在终端里让她帮你查东西</sub>
+<img src="pics/readme-show/tui-calltool.png" alt="Selene web search in terminal" width="760" />
+<br/><sub>Real-time tool invocations directly in your terminal</sub>
 <br/><br/>
-<img src="pics/readme-show/tui-show-image.png" alt="顾清影在终端里直接发图片和表情包" width="760" />
-<br/><sub>图片和表情包直接显示在终端里</sub>
+<img src="pics/readme-show/tui-show-image.png" alt="Selene images in terminal" width="760" />
+<br/><sub>Inline images and expressive memes rendered natively in terminal</sub>
 <br/><br/>
-<img src="pics/readme-show/tui-zsh-say.png" alt="在 shell 命令行里直接和顾清影说话" width="760" />
-<br/><sub>不用打开对话界面，在命令行里直接和她说话</sub>
+<img src="pics/readme-show/tui-zsh-say.png" alt="Chat directly from shell command line" width="760" />
+<br/><sub>Talk to Selene straight from your shell prompt without opening REPL</sub>
 </div>
 
-### 🖥 网页端
+### 🖥 Web Dashboard (网页端控制台)
 
-在浏览器里也能找到她，手机平板一样能用。
+Access Selene anywhere in your browser — mobile and tablet friendly.
 
 <div align="center">
-<img src="pics/readme-show/webui-speak.png" alt="网页端的新会话页面" width="760" />
-<br/><sub>打开网页就能聊</sub>
+<img src="pics/readme-show/webui-speak.png" alt="Web UI Chat View" width="760" />
+<br/><sub>Clean, responsive Web chat interface</sub>
 </div>
 
 <table>
   <tr>
-    <td align="center" width="33%"><img src="pics/readme-show/webui-create-agent.png" alt="新建人格：头像、看板图片与文案" /><br/><sub>捏一个你自己的角色</sub></td>
-    <td align="center" width="33%"><img src="pics/readme-show/webui-show-usage.png" alt="数据统计：用量、调用热力图与每日 token" /><br/><sub>用了多少一目了然</sub></td>
-    <td align="center" width="33%"><img src="pics/readme-show/webui-setting-YouCanShowMore.png" alt="控制台：记忆、知识库、表情包、记账等" /><br/><sub>记忆、图库、记账都在控制台</sub></td>
+    <td align="center" width="33%"><img src="pics/readme-show/webui-create-agent.png" alt="Create custom persona" /><br/><sub>Custom Persona Builder</sub></td>
+    <td align="center" width="33%"><img src="pics/readme-show/webui-show-usage.png" alt="Usage statistics and heatmap" /><br/><sub>Token & Cost Ledger</sub></td>
+    <td align="center" width="33%"><img src="pics/readme-show/webui-setting-YouCanShowMore.png" alt="Settings & Console" /><br/><sub>Memory, Knowledge & Gallery</sub></td>
   </tr>
 </table>
 
-> 更多工具与视图等你发现！
+---
 
-## 📦 安装
+## 🏆 Benchmarks & Certifications (基准评测与权威认证)
 
-支持 Linux 和 macOS，复制一行到终端运行即可：
+GQY adheres to strict engineering rigor and open-source verification:
+
+- 🛡️ **Linux Foundation OpenSSF Best Practices Certification**: Officially certified under [OpenSSF Best Practices Badge (Project 14831)](https://www.bestpractices.dev/projects/14831). Meets all requirements for security disclosure, memory safety, 2,450+ automated tests, and release management. See [OpenSSF Certification Guide (中文)](docs/openssf-certification-guide.md).
+- 🧠 **LongMemEval (ICLR 2025 Long-Term Memory Benchmark)**: Evaluated across 30 real questions (`longmemeval_s_cleaned`) with a real accuracy of **76.7% (23/30)** (traditional RAG baselines typically score 50%~65%). See detailed evaluation and error analysis in [LongMemEval Results Report (中文)](docs/longmemeval-results.md).
+- 🤖 **GAIA Official Benchmark Harness (General AI Assistants)**: Built-in sandboxed evaluation harness with multimodal extraction, answer normalization, and Hugging Face Leaderboard packaging. See [Official Benchmark Guide (中文)](docs/official-benchmark-guide.md).
+
+---
+
+## 📦 Installation (快速安装)
+
+Supported on **Linux** and **macOS**. Run the one-line installer:
 
 ```bash
 curl -fsSL https://raw.githubusercontent.com/yxxbc/gqy-agent/gqy/install.sh | sh
 ```
 
-<img src="pics/gqy-install-show.png" alt="安装界面" width="640" />
+<img src="pics/gqy-install-show.png" alt="Installer Interface" width="640" />
 
-已经在用 [Nix](https://nixos.org/download/) 的话，也可以：
+If you use [Nix](https://nixos.org/download/):
 
 ```bash
 nix profile install github:yxxbc/gqy-agent/gqy
 ```
 
 <details>
-<summary>装完找不到 <code>gqy</code> 命令？</summary>
+<summary><code>gqy</code> command not found after installation? (找不到命令？)</summary>
 
-把下面这行加到 `~/.zshrc` 或 `~/.bashrc`，然后重新打开终端：
+Add this to your `~/.zshrc` or `~/.bashrc`, then restart your terminal:
 
 ```bash
 export PATH="$HOME/.local/bin:$PATH"
@@ -103,87 +121,102 @@ export PATH="$HOME/.local/bin:$PATH"
 </details>
 
 <details>
-<summary>其他安装方式</summary>
+<summary>Alternative Installation Methods (其他安装方式)</summary>
 
-- 只想先试试、不安装（需要 Nix）：`nix run github:yxxbc/gqy-agent/gqy`
-- 想先看看安装界面长什么样：在安装命令最后加上 `-s -- --preview`
-- 手动下载：在 [Releases](https://github.com/yxxbc/gqy-agent/releases/latest) 下载对应平台的压缩包，解压后把 `bin`、`lib`、`share` 三个文件夹一起放进 `~/.local`
+- Try without installing (requires Nix): `nix run github:yxxbc/gqy-agent/gqy`
+- Preview installer UI: append `-s -- --preview` to the curl command
+- Manual binary download: grab tarballs from [Releases](https://github.com/yxxbc/gqy-agent/releases/latest) and place `bin`, `lib`, and `share` into `~/.local`
 
 </details>
 
-## 🌸 开始聊天
+---
+
+## 🌸 Quick Start (开始聊天)
+
+Launch the interactive REPL:
 
 ```bash
 gqy
 ```
 
-第一次打开会有新手引导，跟着走几步就能开始聊：给她选个样子，告诉她怎么称呼你，再接上一个 AI 模型。已有 Claude Code、Codex、Antigravity 订阅的可以直接用，没有也能先用免费额度试试。
+First-time launch guides you through a friendly setup: pick an avatar, set your preferred name, and link an AI model (Claude Code, Codex, Antigravity, DeepSeek, or any OpenAI-compatible endpoint).
 
-几个常用的：
+### Everyday Cheat Sheet (常用命令)
 
-| 想做什么 | 怎么做 |
-| :-- | :-- |
-| 回到上次的对话 | `gqy -c` |
-| 让她帮你写代码 | `gqy dev` |
-| 看看有哪些命令 | 在对话里输入 `/` |
-| 改设置 | 在对话里输入 `/config` |
-| 打断她说话 | 连按两次 `Esc` |
+| Action | Command / Shortcut | Description |
+| :-- | :-- | :-- |
+| Resume previous session | `gqy -c` | Pick up where you left off |
+| Dev Mode (coding assistant) | `gqy dev` | Focused pair-programming |
+| Command palette | `/` | Slash command auto-completion |
+| Settings & Config | `/config` | TUI configuration panel |
+| Interrupt response | Press `Esc` twice | Instantly stop generation |
 
 > [!TIP]
-> 推荐用 [Kitty](https://sw.kovidgoyal.net/kitty/) 终端，图片能直接显示在对话里。
+> We recommend the [Kitty](https://sw.kovidgoyal.net/kitty/) terminal for rich inline graphics rendering.
 
-## 🌐 更多聊天方式
+---
 
-- **浏览器**：运行 `gqy web`，用打印出来的地址打开，同一 Wi-Fi 下手机平板也行。第一次用账号 `gqy`、密码 `GQY520` 登录，然后创建你自己的账号。
-- **命令行里直接问**：运行 `gqy zsh-init`（bash、fish 也支持），之后在命令行里就能直接和她说话。
-- **语音**：在设置里打开「语音功能」，喊「清影」唤醒。安装包暂时不带语音，需要从源码编译，详见 [语音功能](docs/voice.md)。
-- **QQ 与 iMessage**：在手机上和她聊，也能拉进群里。详见 [QQ 与通讯平台](docs/wiki/13-QQ与通讯平台.md)。
+## 🌐 Other Channels (更多访问方式)
 
-## 🔄 升级、备份与卸载
+- **Web Dashboard**: Run `gqy web` and open the URL in your browser. Default login: `gqy` / `GQY520`.
+- **Shell Direct Prompt**: Run `gqy zsh-init` (supports bash and fish too) to query Selene directly from your command line.
+- **Voice Mode**: Enable in settings and wake with "清影" (Selene). See [Voice Setup (中文)](docs/voice.md).
+- **QQ & iMessage**: Chat with Selene on mobile or add her to groups. See [QQ & Platforms Guide (中文)](docs/wiki/13-QQ与通讯平台.md).
+
+---
+
+## 🔄 Maintenance (升级、备份与卸载)
 
 <details>
-<summary>展开查看</summary>
+<summary>Click to expand maintenance guide (点击展开)</summary>
 
-**升级**：用安装脚本装的，再运行一次安装命令；用 Nix 装的，运行 `nix profile upgrade gqy-agent`。每个版本更新了什么，见 [更新日志](CHANGELOG.md)。
+**Upgrade (升级)**:
+- Script installed: re-run the `curl` installer.
+- Nix installed: run `nix profile upgrade gqy-agent`.
+- Release notes: see [CHANGELOG.md](CHANGELOG.md).
 
-**备份与换电脑**：
+**Backup & Migration (备份与换电脑)**:
 
 ```bash
-gqy export                      # 打包配置、会话、记忆和资料库
-gqy import gqy-export-*.tar.gz  # 在新电脑上导入（先运行 gqy daemon stop）
+gqy export                      # Archives config, sessions, memory, and knowledge base
+gqy import gqy-export-*.tar.gz  # Import on a new machine (run gqy daemon stop first)
 ```
 
 > [!WARNING]
-> 备份文件里有你的 API key，请妥善保管。要分享给别人时用 `gqy export --no-secrets`。
+> Backup archives contain your configured API keys. Use `gqy export --no-secrets` when sharing.
 
-**卸载**：先运行 `gqy daemon stop`。用 Nix 装的运行 `nix profile remove gqy-agent`；用脚本装的，删掉 `~/.local` 下的 `bin/gqy`、`lib/gqy`、`share/gqy`、`share/licenses/gqy`。你的聊天记录和记忆在 `~/.gqy`，不想要了也一起删掉。
+**Uninstall (卸载)**:
+Stop daemon with `gqy daemon stop`. Remove `~/.local/bin/gqy` (or `nix profile remove gqy-agent`). User data resides in `~/.gqy`.
 
 </details>
 
-## 🏆 官方基准评测与打榜套件
+---
 
-顾清影具备独立的评测与打榜套件，支持在权威 AI Agent 基准中进行端到端复现与验证：
-- **LongMemEval（ICLR 2025 长程记忆官方基准）**：30 题真题分层抽样实跑得分 **76.7% (23/30)**，在长跨度时序推理与防幻觉拒答上表现优秀，详见 [LongMemEval 真实跑分报告](docs/longmemeval-results.md)。
-- **GAIA 官方基准（General AI Assistants）**：多模态视觉、图表解析与长程工具链调用沙箱隔离评测，支持一键生成符合 Hugging Face Leaderboard 规范的提交包。
-- 完整打榜操作指引与离线样本复现见 [官方打榜指南](docs/official-benchmark-guide.md) 与 [样本评测报告](docs/official-benchmark-results.md)。
+## 📖 Documentation Center (文档中心)
 
-## 📖 更多
+Detailed documentation is hosted in `docs/` (primarily in Chinese):
 
-- 使用帮助：[快速开始](docs/wiki/01-快速开始.md) · [功能总览](docs/wiki/02-功能总览.md) · [命令参考](docs/wiki/04-命令参考.md) · [常见问题](docs/wiki/17-常见问题.md)
-- 隐私：[安全与隐私](docs/wiki/16-安全与隐私.md)
-- 想参与贡献：先读 [贡献指南](CONTRIBUTING.md)，开发环境见 [参与开发](docs/wiki/14-参与开发.md)
+- 🚀 [Quick Start / 快速开始](docs/wiki/01-快速开始.md)
+- 🧭 [Feature Overview / 功能总览](docs/wiki/02-功能总览.md)
+- ⌨️ [CLI Reference / 命令参考](docs/wiki/04-命令参考.md)
+- 🔒 [Security & Privacy Policy / 安全与隐私说明](docs/wiki/16-安全与隐私.md)
+- 🛡️ [Security Vulnerability Policy / 漏洞通报指南](SECURITY.md)
+- 🏅 [OpenSSF Best Practices Guide / OpenSSF 认证申报指南](docs/openssf-certification-guide.md)
+- 📊 [LongMemEval Benchmark Results / 长程记忆跑分报告](docs/longmemeval-results.md)
+- 🤖 [Official Benchmark Guide (GAIA/AML) / 官方基准打榜指南](docs/official-benchmark-guide.md)
+- ❓ [FAQ / 常见问题解答](docs/wiki/17-常见问题.md)
+- 🛠️ [Developer Guide / 参与开发](docs/wiki/14-参与开发.md) & [Contributing / 贡献指南](CONTRIBUTING.md)
 
-> [!NOTE]
-> 这是一个业余维护的个人项目。遇到问题欢迎提 [issue](https://github.com/yxxbc/gqy-agent/issues)，我会尽力回复，但不保证时效。
+---
 
-## 💐 致谢
+## 💐 Acknowledgements (致谢)
 
-本项目基于 [shorin/miyu-agent 0.6.0](https://github.com/SHORiN-KiWATA/miyu-agent) 重构与二次开发。
+GQY is developed and refactored from [shorin/miyu-agent 0.6.0](https://github.com/SHORiN-KiWATA/miyu-agent).
 
 <details>
-<summary>参考过的项目</summary>
+<summary>Referenced Projects (参考过的开源项目)</summary>
 
-功能与架构：
+Architecture & Concepts:
 [Opencode](https://github.com/anomalyco/opencode) ·
 [Claude Code](https://github.com/anthropics/claude-code) ·
 [Pi](https://github.com/earendil-works/pi) ·
@@ -192,7 +225,7 @@ gqy import gqy-export-*.tar.gz  # 在新电脑上导入（先运行 gqy daemon s
 [AstrBot](https://github.com/AstrBotDevs/AstrBot) ·
 [NapCatQQ](https://github.com/NapNeko/NapCatQQ)
 
-插件与设计：
+Plugins & Ecosystem:
 [astrbot_plugin_maskoff](https://github.com/Yue-bin/astrbot_plugin_maskoff) ·
 [astrbot_plugin_GroupMemberQuery](https://github.com/nuomicici/astrbot_plugin_GroupMemberQuery) ·
 [Astrbot_plugin_Heartflow](https://github.com/advent259141/Astrbot_plugin_Heartflow) ·
@@ -202,13 +235,15 @@ gqy import gqy-export-*.tar.gz  # 在新电脑上导入（先运行 gqy daemon s
 
 </details>
 
-## 📄 协议
+---
 
-[PolyForm Noncommercial 1.0.0](LICENSE)：个人使用、学习研究、非营利用途都可以自由使用、修改和分享，**禁止商用**。
+## 📄 License (开源协议)
 
-顾清影 / Selene 的名字、logo、壁纸与立绘不在上述协议内，单独按 [LICENSE-ASSETS](LICENSE-ASSETS) 授权：随原版分发、截图、非商用同人都可以；公开发布的修改版必须换用自己的名字和形象。
+- Code: [PolyForm Noncommercial 1.0.0](LICENSE) (free for personal, educational, and research use; non-commercial).
+- Brand Assets: Selene / 顾清影 persona, illustrations, wallpapers, and logos are governed separately under [LICENSE-ASSETS](LICENSE-ASSETS).
+- Legacy Core: Derived from [miyu-agent](https://github.com/SHORiN-KiWATA/miyu-agent), original MIT license retained in [LICENSE-MIT](LICENSE-MIT).
 
-本项目源自 [miyu-agent](https://github.com/SHORiN-KiWATA/miyu-agent)，原作者的 MIT 协议声明保留在 [LICENSE-MIT](LICENSE-MIT)。0.6.0 及更早的版本仍按 MIT 发布。
+---
 
-## 友情链接
+## Friendly Links (友情链接)
 [linux.do](https://linux.do)
