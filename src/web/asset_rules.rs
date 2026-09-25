@@ -7,10 +7,13 @@
 pub(crate) const WEB_SPECIAL_FILES: &[&str] = &["index.html", "fence-frame.html"];
 
 /// 扫描时跳过的目录：`vendor/` 手工提供（gzip 原样发出与 CORS 预检），
-/// `css/` 不逐个提供，而是拼成一份 `/styles.css`。
+/// `css/` 与 `settings-schema/` 不逐个提供，而是各自拼成一份（见下）。
 pub(crate) fn web_skip_dir(name: &std::ffi::OsStr) -> bool {
-    name == "vendor" || name == "css"
+    name == "vendor" || name == "css" || name == WEB_SETTINGS_SCHEMA_DIR
 }
+
+/// 设置页字段表的分段目录，拼成一份 `/settings-schema.js` 提供。
+pub(crate) const WEB_SETTINGS_SCHEMA_DIR: &str = "settings-schema";
 
 /// 递归收集 `dir` 下的文件（跳过 [`web_skip_dir`] 的目录）。
 pub(crate) fn web_collect_files(
@@ -30,18 +33,35 @@ pub(crate) fn web_collect_files(
     Ok(())
 }
 
-/// `css/*.css` 按文件名顺序逐字节拼接：文件顺序就是层叠顺序。各段自带结尾换行，
+/// `dir` 下扩展名为 `ext` 的文件按文件名顺序逐字节拼接。各段自带结尾换行，
 /// 中间不插任何东西。
-pub(crate) fn web_concat_css(dir: &std::path::Path) -> std::io::Result<Vec<u8>> {
+fn web_concat_parts(dir: &std::path::Path, ext: &str) -> std::io::Result<Vec<u8>> {
     let mut parts = std::fs::read_dir(dir)?
         .map(|entry| entry.map(|entry| entry.path()))
         .collect::<std::io::Result<Vec<_>>>()?;
-    parts.retain(|path| path.extension().is_some_and(|ext| ext == "css"));
+    parts.retain(|path| path.extension().is_some_and(|found| found == ext));
     parts.sort();
     let mut out = Vec::new();
     for part in parts {
         out.extend(std::fs::read(&part)?);
     }
+    Ok(out)
+}
+
+/// `css/*.css` 拼成 `/styles.css`：文件顺序就是层叠顺序。
+pub(crate) fn web_concat_css(dir: &std::path::Path) -> std::io::Result<Vec<u8>> {
+    web_concat_parts(dir, "css")
+}
+
+/// `settings-schema/*.js` 拼成 `/settings-schema.js`，外面包一层 IIFE。各段只写
+/// 顶层 `const`，拼进同一个函数作用域后互相可见，又不漏成全局变量。
+/// `src/web/tests/settings_schema.rs` 读的也是拼好的这一份。
+pub(crate) fn web_concat_settings_schema(dir: &std::path::Path) -> std::io::Result<Vec<u8>> {
+    let mut out = b"// Generated from web/settings-schema/*.js; edit the parts, not this file.\n\
+\"use strict\";\n\n(function () {\n"
+        .to_vec();
+    out.extend(web_concat_parts(dir, "js")?);
+    out.extend_from_slice(b"})();\n");
     Ok(out)
 }
 

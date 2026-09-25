@@ -392,7 +392,7 @@ export function renderUsageBars(stats) {
   bars.innerHTML = ""; xs.innerHTML = ""; ys.innerHTML = "";
   const max = Math.max(...slice.map((day) => day.total), 0);
   if (!max) {
-    bars.innerHTML = `<div class="u-empty" style="width:100%">该范围内没有调用记录</div>`;
+    bars.innerHTML = `<div class="u-empty">该范围内没有调用记录</div>`;
     return;
   }
   const HEIGHT = 200;
@@ -431,9 +431,9 @@ export function renderUsageBars(stats) {
     slot.appendChild(column);
     column.addEventListener("mousemove", (event) => usageTipShow(
       `<b>${day.date.slice(5)}${weekly ? " 起当周" : ""}</b>
-         <div class="row"><span><i style="background:var(--chart-1)"></i>新输入</span><em>${usageFmt(fresh)}</em></div>
-         <div class="row"><span><i style="background:var(--chart-2)"></i>输出</span><em>${usageFmt(day.completion)}</em></div>
-         <div class="row"><span><i style="background:var(--chart-3)"></i>缓存命中</span><em>${usageFmt(day.cache_read)}</em></div>
+         <div class="row"><span><i class="s1"></i>新输入</span><em>${usageFmt(fresh)}</em></div>
+         <div class="row"><span><i class="s2"></i>输出</span><em>${usageFmt(day.completion)}</em></div>
+         <div class="row"><span><i class="s3"></i>缓存命中</span><em>${usageFmt(day.cache_read)}</em></div>
          <div class="row"><span>请求</span><em>${day.requests}</em></div>
          <div class="row"><span>合计</span><em>${usageFmt(day.total)}</em></div>${usageFmtCost(day.cost) ? `
          <div class="row"><span>消费</span><em>≈${usageFmtCost(day.cost)}</em></div>` : ""}`, event));

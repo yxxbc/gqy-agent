@@ -229,7 +229,7 @@ export function buildUsageSourceCard(title, hint, source, stats, platformTabs) {
     : null;
   const sourceHit = usageCacheRate(aggregate.cache_read || 0, aggregate.prompt || 0);
   tfoot.innerHTML = `<tr><td>合计${globalShare == null ? "" :
-    ` <small style="color:var(--text-faint);font-weight:400">占全局 ${globalShare}%</small>`}</td>
+    ` <small class="u-share">占全局 ${globalShare}%</small>`}</td>
       <td></td><td class="num">${requests}</td>
       <td class="num">${usageFmt(aggregate.prompt || 0)}</td>
       <td class="num">${usageFmt(aggregate.completion || 0)}</td>
@@ -251,19 +251,19 @@ export function buildUsageSourceCard(title, hint, source, stats, platformTabs) {
     const hit = usageCacheRate(model.cache_read || 0, model.prompt || 0);
     const row = document.createElement("tr");
     // 细项行:同模型同色(全页同色规则),用虚线点与徽章区分用途。
-    const dot = model.kindLabel
-      ? `<i class="u-dot u-dot-kind" style="background:${color}"></i>`
-      : `<i class="u-dot" style="background:${color}"></i>`;
+    // 颜色是算出来的，不能写成 style 属性（CSP 的 style-src 'self' 会拦），插进去之后再赋值。
+    const dot = model.kindLabel ? `<i class="u-dot u-dot-kind"></i>` : `<i class="u-dot"></i>`;
     row.innerHTML = `<td class="u-model-name"><b>${dot}${baseName}${
         model.kindLabel ? `<span class="u-kind-tag">${model.kindLabel}</span>` : ""
       }</b>
-          <small><i class="u-dot" style="visibility:hidden"></i>${model.provider || "—"}</small></td>
+          <small><i class="u-dot is-spacer"></i>${model.provider || "—"}</small></td>
         <td class="num">${Math.round(share * 100)}%</td>
         <td class="num">${model.requests}</td>
         <td class="num">${usageFmt(model.prompt || 0)}</td>
         <td class="num">${usageFmt(model.completion || 0)}</td>
         <td class="num">${usageFmtCost(model.cost) ? `≈${usageFmtCost(model.cost)}` : "—"}</td>
         <td>${hit == null ? "—" : `<span class="u-cache-pill">${hit}%</span>`}</td>`;
+    row.querySelector(".u-model-name b > .u-dot").style.background = color;
     tbody.appendChild(row);
 
     const length = Math.max(0.5, share * CIRCUM - GAP);

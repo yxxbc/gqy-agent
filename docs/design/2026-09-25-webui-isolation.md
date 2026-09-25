@@ -23,7 +23,7 @@
 | `index.html` 版本号改写 | `embedded.rs` `versioned_index` | 交付方式，可替换 |
 | 沙箱宿主页 | `src/web/mod.rs` `FENCE_FRAME_HTML` + `assets.rs` 专用 CSP | 交付方式，CSP 必须保留 |
 | vendor 预压缩库 | `src/web/mod.rs`（echarts、mermaid、KaTeX、Prism） | 交付方式；第三方库，基本不改 |
-| 设置字段表与 Rust 默认值比对 | `src/web/tests/settings_schema.rs` 读 `web/settings-schema.js` | **测试期**耦合，运行时无关 |
+| 设置字段表与 Rust 默认值比对 | `src/web/tests/settings_schema.rs` 读 `web/settings-schema/` 拼成的 `/settings-schema.js` | **测试期**耦合，运行时无关 |
 | 页面引用完整性 | `src/web/tests/embedded_assets.rs` | 测试期耦合 |
 | HTTP API（JSON 形状、SSE 事件名） | `server.rs` 路由 ↔ `web/**` 调用 | **真正的契约**，任何方案都绕不开 |
 | 主题覆盖 | `/theme.css` 读 `~/.gqy/config/webui-theme.css` | 已经是运行时加载（先例） |

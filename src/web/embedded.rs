@@ -4,6 +4,7 @@
 //! handler：`index.html`（引用要加版本号）、`fence-frame.html`（沙箱 CSP）、
 //! `vendor/`（gzip 原样发出与 CORS 预检）。
 //! `css/` 不逐个提供：build.rs 按文件名顺序拼成一份 `/styles.css`，文件顺序就是层叠顺序。
+//! `settings-schema/` 同理拼成一份 `/settings-schema.js`，外面包一层 IIFE。
 //!
 //! 开发期可以用 `GQY_WEB_DIR` 让 daemon 现读仓库目录（只在 debug 构建，见 dev_assets.rs）；
 //! 下面几个 `dev_*` 函数在发布版里恒为 None，那条路径不存在。

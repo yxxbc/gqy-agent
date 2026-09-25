@@ -1,44 +1,45 @@
-.composer-info .ctx-ring {
+.composer-context .ctx-ring {
   width: 16px;
   height: 16px;
   flex: none;
   transform: rotate(-90deg);
 }
-.composer-info .ctx-ring-bg {
+.composer-context .ctx-ring-bg {
   fill: none;
   stroke: color-mix(in srgb, var(--text) 14%, transparent);
   stroke-width: 3;
 }
-.composer-info .ctx-ring-fg {
+.composer-context .ctx-ring-fg {
   fill: none;
   stroke: var(--accent);
   stroke-width: 3;
   stroke-linecap: round;
   transition: stroke-dashoffset 0.4s ease, stroke 0.3s ease;
 }
-.composer-info .composer-context.is-high .ctx-ring-fg {
+.composer-context.is-high .ctx-ring-fg {
   stroke: var(--gold, #e9b64a);
 }
-.composer-info .composer-context.is-critical .ctx-ring-fg {
+.composer-context.is-critical .ctx-ring-fg {
   stroke: var(--danger);
 }
-.composer-info .ctx-nums {
+.composer-context .ctx-nums {
   display: inline-flex;
   gap: 5px;
   align-items: baseline;
 }
-.composer-info .ctx-nums #contextNumbers {
+.composer-context .ctx-nums #contextNumbers {
   font-family: var(--font-mono);
   /* 和「上下文」三个字同色(#130),整行统一。 */
   color: inherit;
   font-variant-numeric: tabular-nums;
 }
-/* 窄屏:累计/速度可省,模型和上下文优先(#2 手机端要能看到模型)。 */
+/* 窄屏:累计/速度可省;框内上下文只留圆环和数字,让出位置给模型名(#2 手机端要能看到模型)。 */
 @media (max-width: 640px) {
   .composer-cumulative,
   .composer-speed { display: none; }
   .composer-info { gap: 8px; }
-  .composer-info .model-button { max-width: 60vw; }
+  .composer-inbox-bar .model-button { max-width: 42vw; }
+  .composer-context .ctx-nums .k { display: none; }
 }
 
 .attachment-tray {

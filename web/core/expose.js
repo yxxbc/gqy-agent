@@ -6,5 +6,6 @@
 import { ApiError, apiRequest } from "./api.js";
 import { ICONS, SVG_NS } from "./icons.js";
 import { showToast } from "./toast.js";
+import { deletePath, getPath, setPath } from "./util.js";
 
-window.GqyCore = Object.freeze({ ApiError, ICONS, SVG_NS, apiRequest, showToast });
+window.GqyCore = Object.freeze({ ApiError, ICONS, SVG_NS, apiRequest, deletePath, getPath, setPath, showToast });
