@@ -33,6 +33,9 @@ pub(crate) mod net_guard;
 mod patch_preview;
 pub(crate) mod platform_outreach;
 mod registry;
+// 只给 lib.rs 的 fuzz_api 用
+#[cfg(fuzzing)]
+pub(crate) use registry::coerce_declared_shapes;
 mod scripts;
 mod skills;
 mod subagent;

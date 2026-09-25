@@ -145,6 +145,7 @@ Nix 版的程序在 `/nix/store/<hash>-gqy-<版本>/` 下，**每次升级路径
    - 用 `release.py prepare` 把 `[Unreleased]` 定稿为 `[0.7.0] - 今天`，上面留一个空的 `[Unreleased]`，并同步 `Cargo.toml`、`Cargo.lock`、README 的版本徽章；`[Unreleased]` 是空的就直接失败；
    - 以 `github-actions[bot]` 提交 `release: v0.7.0` 到 `gqy` 分支，并打 tag `v0.7.0`；
    - 编译 4 个平台并发布到 Releases，正文取自 CHANGELOG 里 `[0.7.0]` 那一段，后面自动附上安装说明；
+   - 给每个包签发 SLSA 构建来源证明（Sigstore 签名，存进仓库 attestations），签名包另存为 Release 附件 `gqy-provenance.sigstore.json` 和 `gqy-provenance.intoto.jsonl`；
    - 再往 `gqy` 分支提交一个 `chore(nix): 预编译包更新到 v0.7.0`，更新 `nix/release.json`。
 
    bot 推的 tag 不会再触发工作流（GitHub 对 `GITHUB_TOKEN` 的限制），所以定稿和编译发布在同一个工作流里串着跑，不会重复发布。
@@ -157,6 +158,11 @@ Nix 版的程序在 `/nix/store/<hash>-gqy-<版本>/` 下，**每次升级路径
    GQY_HOME=$(mktemp -d) nix run github:yxxbc/gqy-agent/gqy --refresh -- --version   # 应该输出新版本号
    ```
    用户那边运行 `nix profile upgrade gqy-agent` 就能升到新版。
+   再抽一个包确认来源证明签上了：
+   ```bash
+   gh release download v0.7.0 -R yxxbc/gqy-agent -p 'gqy-aarch64-apple-darwin.tar.gz' -D /tmp
+   gh attestation verify /tmp/gqy-aarch64-apple-darwin.tar.gz -R yxxbc/gqy-agent
+   ```
 
 同一个版本号再运行一次工作流（tag 已存在）就是重新编译发布这个 tag，不会再改 CHANGELOG。
 

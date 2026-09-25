@@ -1,0 +1,46 @@
+name: OpenSSF Scorecard
+
+# 供应链安全自动评分，结果发布到 https://scorecard.dev/viewer/?uri=github.com/yxxbc/gqy-agent
+# 并上传到仓库 Security 页的 Code scanning。README 的 Scorecard 徽章读的就是这里发布的结果。
+# Scorecard 只评默认分支，所以只在默认分支 push、每周定时和手动时跑。
+
+on:
+  push:
+    branches: [gqy]
+  schedule:
+    - cron: '17 3 * * 1'
+  workflow_dispatch:
+  # 分支保护规则变了就重新评一次
+  branch_protection_rule:
+
+permissions: read-all
+
+jobs:
+  analysis:
+    name: Scorecard analysis
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    permissions:
+      security-events: write
+      # publish_results 需要 OIDC 身份
+      id-token: write
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - uses: ossf/scorecard-action@2d1146689b8cda280b9bc96326124645441f03bc # v2.4.4
+        with:
+          results_file: results.sarif
+          results_format: sarif
+          publish_results: true
+
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: scorecard-sarif
+          path: results.sarif
+          retention-days: 7
+
+      - uses: github/codeql-action/upload-sarif@2892aa5e19bbd11bc0cff5427e3b750a04d9e3c2 # v4.38.2
+        with:
+          sarif_file: results.sarif

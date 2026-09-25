@@ -1,0 +1,68 @@
+name: Fuzz
+
+# cargo-fuzz 跑 fuzz/ 下的目标，每个目标限时。找到崩溃时把复现用例传成 artifact，
+# 本地用 `cargo +nightly fuzz run <目标> <用例文件>` 复现。
+# 编译一次要十几分钟，所以不挂在每次 push 上：每周定时、手动，以及任意分支改到被测代码时跑。
+
+on:
+  schedule:
+    - cron: '23 4 * * 1'
+  workflow_dispatch:
+    inputs:
+      seconds:
+        description: 每个目标跑多少秒
+        type: string
+        default: '120'
+  # 任意分支改到被测代码就跑（新工作流进默认分支前不能手动触发，验收分支靠这条）
+  push:
+    paths:
+      - 'fuzz/**'
+      - 'src/json_extract.rs'
+      - 'src/tools/registry/lazy.rs'
+      - 'src/platforms/plugins/real_context/targeting.rs'
+      - '.github/workflows/fuzz.yml'
+
+permissions:
+  contents: read
+
+concurrency:
+  group: fuzz-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  fuzz:
+    name: Fuzz targets
+    runs-on: ${{ vars.LINUX_X64_RUNNER || 'ubuntu-24.04' }}
+    timeout-minutes: 90
+    env:
+      SECONDS_PER_TARGET: ${{ inputs.seconds || '120' }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Install build dependencies
+        uses: ./.github/actions/setup-build
+
+      - name: Install nightly toolchain and cargo-fuzz
+        run: |
+          rustup toolchain install nightly --profile minimal
+          cargo +nightly install cargo-fuzz --locked
+
+      - name: Run each target
+        shell: bash
+        run: |
+          set -euo pipefail
+          for target in $(cargo +nightly fuzz list); do
+            echo "::group::${target}"
+            cargo +nightly fuzz run "$target" -- -max_total_time="${SECONDS_PER_TARGET}" -rss_limit_mb=4096
+            echo "::endgroup::"
+          done
+
+      - name: Preserve crash reproducers
+        if: failure()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: fuzz-artifacts
+          path: fuzz/artifacts
+          if-no-files-found: ignore

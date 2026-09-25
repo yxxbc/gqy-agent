@@ -1,0 +1,42 @@
+# cargo-fuzz 目标（需要 nightly）。本地跑：
+#   cargo install cargo-fuzz
+#   cargo +nightly fuzz run extract_json_object -- -max_total_time=60
+# CI 在 .github/workflows/fuzz.yml 里每周跑一轮，每个目标限时。
+[package]
+name = "gqy-fuzz"
+version = "0.0.0"
+publish = false
+edition = "2021"
+
+[package.metadata]
+cargo-fuzz = true
+
+[dependencies]
+libfuzzer-sys = "0.4"
+serde_json = "1"
+gqy = { path = ".." }
+
+# 独立 workspace，不并入主 crate 的构建
+[workspace]
+members = ["."]
+
+[[bin]]
+name = "extract_json_object"
+path = "fuzz_targets/extract_json_object.rs"
+test = false
+doc = false
+bench = false
+
+[[bin]]
+name = "coerce_declared_shapes"
+path = "fuzz_targets/coerce_declared_shapes.rs"
+test = false
+doc = false
+bench = false
+
+[[bin]]
+name = "safe_prompt_field"
+path = "fuzz_targets/safe_prompt_field.rs"
+test = false
+doc = false
+bench = false

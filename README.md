@@ -19,6 +19,8 @@ Chatting · Remembering · Assisting · Coding with You
   <a href="LICENSE"><img src="https://img.shields.io/badge/license-PolyForm%20NC%201.0.0-orange.svg?style=flat" alt="License: PolyForm Noncommercial 1.0.0"></a>
   <img src="https://img.shields.io/badge/platform-Linux%20%7C%20macOS-informational.svg?style=flat" alt="Platform">
   <a href="https://www.bestpractices.dev/projects/14831"><img src="https://www.bestpractices.dev/projects/14831/badge" alt="OpenSSF Best Practices"></a>
+  <a href="https://scorecard.dev/viewer/?uri=github.com/yxxbc/gqy-agent"><img src="https://api.scorecard.dev/projects/github.com/yxxbc/gqy-agent/badge" alt="OpenSSF Scorecard"></a>
+  <a href="https://slsa.dev/spec/v1.0/levels#build-l2"><img src="https://slsa.dev/images/gh-badge-level2.svg" alt="SLSA Build L2"></a>
   <a href="docs/longmemeval-results.md"><img src="https://img.shields.io/badge/LongMemEval-76.7%25%20(23%2F30)-success.svg?style=flat" alt="LongMemEval Benchmark"></a>
   <a href="docs/official-benchmark-guide.md"><img src="https://img.shields.io/badge/GAIA%20Harness-Verified-blue.svg?style=flat" alt="GAIA Benchmark Harness"></a>
   <a href="SECURITY.md"><img src="https://img.shields.io/badge/Security-Policy%20Enabled-green.svg?style=flat" alt="Security Policy"></a>
@@ -88,6 +90,7 @@ Access Selene anywhere in your browser — mobile and tablet friendly.
 GQY adheres to strict engineering rigor and open-source verification:
 
 - 🛡️ **Linux Foundation OpenSSF Best Practices Certification**: Officially certified under [OpenSSF Best Practices Badge (Project 14831)](https://www.bestpractices.dev/projects/14831). Meets all requirements for security disclosure, memory safety, 2,450+ automated tests, and release management. See [OpenSSF Certification Guide (中文)](docs/openssf-certification-guide.md).
+- 🔐 **Supply-chain security (供应链安全)**: continuously scored by [OpenSSF Scorecard](https://scorecard.dev/viewer/?uri=github.com/yxxbc/gqy-agent); every release tarball ships with Sigstore-signed SLSA build provenance (`gh attestation verify gqy-<platform>.tar.gz -R yxxbc/gqy-agent`); CodeQL SAST, cargo-deny (RustSec advisories / licenses / sources) and cargo-fuzz run in CI. See [section 4 of the OpenSSF guide (中文)](docs/openssf-certification-guide.md#4-自动化供应链与安全认证持续运行).
 - 🧠 **LongMemEval (ICLR 2025 Long-Term Memory Benchmark)**: Evaluated across 30 real questions (`longmemeval_s_cleaned`) with a real accuracy of **76.7% (23/30)** (traditional RAG baselines typically score 50%~65%). See detailed evaluation and error analysis in [LongMemEval Results Report (中文)](docs/longmemeval-results.md).
 - 🤖 **GAIA Official Benchmark Harness (General AI Assistants)**: Built-in sandboxed evaluation harness with multimodal extraction, answer normalization, and Hugging Face Leaderboard packaging. See [Official Benchmark Guide (中文)](docs/official-benchmark-guide.md).
 

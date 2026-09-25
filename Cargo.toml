@@ -105,6 +105,10 @@ fst = "0.4"
 jieba-rs = "0.7"
 tiktoken-rs = "0.12"
 
+# cargo-fuzz 编译时带 --cfg fuzzing（见 fuzz/），这里登记免得普通构建报 unexpected_cfgs
+[lints.rust]
+unexpected_cfgs = { level = "warn", check-cfg = ['cfg(fuzzing)'] }
+
 [profile.release]
 lto = "thin"
 strip = "symbols"

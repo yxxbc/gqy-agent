@@ -205,6 +205,9 @@ jobs:
     runs-on: ubuntu-24.04
     permissions:
       contents: write
+      # 构建来源证明（SLSA provenance）：用 OIDC 身份经 Sigstore 签名，存进仓库的 attestations
+      id-token: write
+      attestations: write
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -228,6 +231,23 @@ jobs:
           ( cd dist && sha256sum gqy-*.tar.gz > SHA256SUMS )
           ls -la dist
           cat dist/SHA256SUMS
+
+      # 给每个包签发 SLSA 构建来源证明，证明它是这个仓库的这个工作流从 ${SHA} 编出来的。
+      # 用户校验：gh attestation verify gqy-<平台>.tar.gz -R <仓库>
+      # 签名包另存一份进 Release（*.sigstore.json 与 *.intoto.jsonl），离线也能校验，OpenSSF Scorecard 的 Signed-Releases 按这两个后缀认。
+      - name: 签发构建来源证明
+        id: attest
+        uses: actions/attest-build-provenance@4d101475d8b20a2381f78447822ac1eab6504dd8 # v4.2.2
+        with:
+          subject-path: dist/gqy-*.tar.gz
+
+      - name: 把签名包放进 Release 附件
+        env:
+          BUNDLE: ${{ steps.attest.outputs.bundle-path }}
+        run: |
+          cp "$BUNDLE" dist/gqy-provenance.sigstore.json
+          # 同一份已签名的 in-toto 声明（DSSE 信封），按 SLSA 惯例的 .intoto.jsonl 再放一份
+          jq -c '.dsseEnvelope' "$BUNDLE" > dist/gqy-provenance.intoto.jsonl
 
       - name: 创建或更新 Release
         env:
@@ -258,6 +278,12 @@ jobs:
           ## 手动下载
 
           下载对应平台的 \`gqy-<平台>.tar.gz\`，解压后把整个目录里的 \`bin\`、\`lib\`、\`share\` 放到同一个前缀下（例如 \`~/.local\`）。校验和见 \`SHA256SUMS\`。
+
+          每个包都带 SLSA 构建来源证明（Sigstore 签名），可以确认它确实由本仓库的发布工作流从上面的提交编译：
+
+          \`\`\`bash
+          gh attestation verify gqy-<平台>.tar.gz -R ${GITHUB_REPOSITORY}
+          \`\`\`
 
           语音前端 \`gqy-voice\` 暂不在预编译包里，需要的话请从源码编译：\`cargo build --release --features voice\`。
 

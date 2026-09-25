@@ -51,6 +51,24 @@ mod transfer;
 pub mod voice;
 mod web;
 
+/// cargo-fuzz 的入口（`fuzz/`）。只在 `--cfg fuzzing` 下编译，正常构建里不存在，
+/// 模块私有性不受影响。收的都是处理模型输出或用户可控文本的纯函数。
+#[cfg(fuzzing)]
+#[doc(hidden)]
+pub mod fuzz_api {
+    pub fn extract_json_object(content: &str) -> Option<&str> {
+        crate::json_extract::extract_json_object(content)
+    }
+
+    pub fn coerce_declared_shapes(parameters: &serde_json::Value, args: &mut serde_json::Value) {
+        crate::tools::coerce_declared_shapes(parameters, args)
+    }
+
+    pub fn safe_prompt_field(value: &str) -> String {
+        crate::platforms::plugins::real_context::safe_prompt_field(value)
+    }
+}
+
 use anyhow::Result;
 
 pub async fn run() -> Result<()> {
