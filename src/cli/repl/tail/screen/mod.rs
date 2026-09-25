@@ -156,6 +156,9 @@ pub(in crate::cli) struct Screen {
     input_selection: Option<((u16, u16), (u16, u16))>,
     /// 鼠标还按着没有。只有按着的时候拖动才改选区。
     input_dragging: bool,
+    /// 刚在输入框里**原地点了一下**（按下又松开、没拖动）的落点。松开时用来把
+    /// 光标放到那一个字上；拖动过（选区复制）就是 `None`。
+    input_click: Option<(u16, u16)>,
     /// 浮在输入框上方的一句话通知。
     toast: Option<toast::Toast>,
     /// Ctrl+L 顶上去的那一屏：视口至少能滚到这一行。
@@ -228,6 +231,7 @@ impl Screen {
             input_rows: Vec::new(),
             input_selection: None,
             input_dragging: false,
+            input_click: None,
             toast: None,
             floor: 0,
             row_keys: Vec::new(),
@@ -304,6 +308,7 @@ impl Screen {
             input_rows: Vec::new(),
             input_selection: None,
             input_dragging: false,
+            input_click: None,
             toast: None,
             floor: 0,
             row_keys: Vec::new(),
@@ -461,6 +466,16 @@ impl Screen {
             .map(|(_, text)| text.as_str())
     }
 
+    /// 输入框文字行的终端行号，从上到下（和折行后的一行行对应）。
+    pub(in crate::cli) fn input_text_rows(&self) -> Vec<u16> {
+        self.input_rows.iter().map(|(row, _)| *row).collect()
+    }
+
+    /// 刚才是不是在输入框里原地点了一下（没拖动）。取走即清空。
+    pub(in crate::cli) fn take_input_click(&mut self) -> Option<(u16, u16)> {
+        self.input_click.take()
+    }
+
     /// 在输入区里按下。返回真表示这一下归输入区。
     pub(in crate::cli) fn input_select_begin(&mut self, column: u16, row: u16) -> bool {
         if self.input_row_text(row).is_none() {
@@ -468,6 +483,7 @@ impl Screen {
         }
         self.input_selection = Some(((row, column), (row, column)));
         self.input_dragging = true;
+        self.input_click = None;
         self.invalidate();
         true
     }
@@ -505,6 +521,8 @@ impl Screen {
         };
         self.invalidate();
         if anchor == cursor {
+            // 没拖动 = 原地点了一下。记下落点，让调用方把光标放到那一个字上。
+            self.input_click = Some(anchor);
             self.input_selection = None;
             return true;
         }
@@ -1108,11 +1126,18 @@ impl super::LiveReplTail {
                     }
                 }
                 MouseEventKind::Up(MouseButton::Left) => {
-                    if self
+                    let finished_input = self
                         .screen
                         .as_mut()
-                        .is_some_and(super::screen::Screen::input_select_finish)
-                    {
+                        .is_some_and(super::screen::Screen::input_select_finish);
+                    if finished_input {
+                        // 在输入框里原地点一下 = 把光标放到那个字上（拖动过的是
+                        // 选区复制，不动光标）。09-24 验收问题 10：文字折行后点
+                        // 第二行，光标看着跳到点击处又跳回句尾。
+                        let click = self.screen.as_mut().and_then(|screen| screen.take_input_click());
+                        if let Some((row, column)) = click {
+                            self.place_input_caret(row, column);
+                        }
                         self.repaint_screen()?;
                         self.flush_clipboard()?;
                         return Ok(true);

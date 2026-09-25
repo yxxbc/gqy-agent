@@ -261,7 +261,11 @@ pub(crate) fn scan_scripts(dirs: &[&Path]) -> Result<ScriptScanResult> {
             let mut entry = indexed_entry;
             indexed_ids.insert(entry.id.clone());
             entry.path = path.to_string_lossy().to_string();
-            merge_header_defaults(&mut entry, &metadata_from_script(&path));
+            let header = metadata_from_script(&path);
+            if !header.runs_here() {
+                continue;
+            }
+            merge_header_defaults(&mut entry, &header);
             if entry.description.trim().is_empty() {
                 entries.remove(&entry.id);
                 unregistered.insert(
@@ -447,6 +451,10 @@ pub(crate) fn inspect_script(path: &Path) -> Option<DetectedScript> {
     }
     let stem = path.file_stem()?.to_str()?.to_string();
     let metadata = extract_metadata(&raw);
+    // 声明了别的系统的脚本(比如只在 macOS 上能跑的)在这里就当不存在
+    if !metadata.runs_here() {
+        return None;
+    }
     let id = metadata
         .id
         .as_deref()

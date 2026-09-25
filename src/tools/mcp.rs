@@ -119,6 +119,21 @@ fn cached_listing(key: &ListingKey) -> Option<std::result::Result<Arc<Vec<McpToo
     }
 }
 
+/// 管理面（WebUI「扩展」抽屉）用：这个 server 在本进程里最近一次列举的结果，
+/// Ok 是 (工具名, 描述)，Err 是失败原因；None = 还没列举过（没开、或还没轮到用）。
+pub(crate) fn listing_status(
+    server: &McpServerConfig,
+) -> Option<std::result::Result<Vec<(String, String)>, String>> {
+    let cache = listing_cache().lock().unwrap();
+    match cache.get(&ListingKey::of(server))? {
+        CachedListing::Tools(tools) => Some(Ok(tools
+            .iter()
+            .map(|tool| (tool.name.clone(), tool.description.clone()))
+            .collect())),
+        CachedListing::Failed { error, .. } => Some(Err(error.clone())),
+    }
+}
+
 fn store_listing(key: ListingKey, entry: CachedListing) {
     listing_cache().lock().unwrap().insert(key, entry);
 }

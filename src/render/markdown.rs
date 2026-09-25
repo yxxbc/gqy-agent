@@ -447,13 +447,8 @@ pub(crate) fn render_inline(text: &str) -> String {
             }
         }
         if chars[index] == '`' {
-            if let Some(end) = find_marker(&chars, index + 1, '`') {
-                output.push_str(&INLINE_CODE_STYLE);
-                output.extend(chars[index + 1..end].iter());
-                output.push_str(RESET);
-                index = end + 1;
-                continue;
-            }
+            index = render_code_span(&chars, index, &mut output);
+            continue;
         }
         if index + 1 < chars.len() && chars[index] == '~' && chars[index + 1] == '~' {
             if let Some(end) = find_double_marker(&chars, index + 2, '~') {
@@ -497,12 +492,12 @@ pub(crate) fn render_inline(text: &str) -> String {
             if let Some(label_end) = find_marker(&chars, index + 1, ']') {
                 if chars.get(label_end + 1) == Some(&'(') {
                     if let Some(url_end) = find_marker(&chars, label_end + 2, ')') {
-                        let label = chars[index + 1..label_end].iter().collect::<String>();
                         let url = chars[label_end + 2..url_end].iter().collect::<String>();
-                        // 标签不再往下解析：整段要挂同一个 OSC 8，里面再嵌一层
-                        // 链接转义只会互相打架，而标签里出现 Markdown 的情况罕见。
+                        // 标签里只把行内代码的反引号吃掉，其余分支不往下递归：整段
+                        // 要挂同一个 OSC 8，里面再嵌一层转义只会互相打架。
                         let inner = format!(
-                            "{LINK_LABEL_STYLE}{label}{RESET} {}",
+                            "{LINK_LABEL_STYLE}{}{RESET} {}",
+                            render_link_label(&chars[index + 1..label_end]),
                             render_url_wrapped(&url)
                         );
                         output.push_str(&hyperlink(url.trim(), &inner));
@@ -535,6 +530,64 @@ pub(crate) fn render_inline(text: &str) -> String {
                 index += url.chars().count();
                 continue;
             }
+        }
+        output.push(chars[index]);
+        index += 1;
+    }
+    output
+}
+
+/// 反引号串包住的行内代码：内容连样式一起写进 `output`，返回下一个位置。
+///
+/// 闭合必须是**等长**的一串：`` ``a`b`` `` 里开头那串自己的第二个反引号不能当
+/// 闭合，否则得到的是一个空着色段加一堆漏在屏幕上的反引号。这一行找不到等长串
+/// 就把开头这串原样吐出来——吞掉半行比留几个反引号糟得多。
+fn render_code_span(chars: &[char], index: usize, output: &mut String) -> usize {
+    let run = backtick_run(chars, index);
+    let Some(close) = find_backtick_run(chars, index + run, run) else {
+        output.extend(chars[index..index + run].iter());
+        return index + run;
+    };
+    output.push_str(&INLINE_CODE_STYLE);
+    output.extend(chars[index + run..close].iter());
+    output.push_str(RESET);
+    close + run
+}
+
+/// `index` 处那一串反引号有多长。
+fn backtick_run(chars: &[char], index: usize) -> usize {
+    let mut end = index;
+    while chars.get(end) == Some(&'`') {
+        end += 1;
+    }
+    end - index
+}
+
+/// `start` 之后第一个长度恰好是 `run` 的反引号串起点（更长的串整串跳过）。
+fn find_backtick_run(chars: &[char], start: usize, run: usize) -> Option<usize> {
+    let mut index = start;
+    while index < chars.len() {
+        if chars[index] != '`' {
+            index += 1;
+            continue;
+        }
+        let width = backtick_run(chars, index);
+        if width == run {
+            return Some(index);
+        }
+        index += width;
+    }
+    None
+}
+
+/// 链接标签：只处理行内代码，别的分支一律原样留着（见调用处的注释）。
+fn render_link_label(chars: &[char]) -> String {
+    let mut output = String::new();
+    let mut index = 0;
+    while index < chars.len() {
+        if chars[index] == '`' {
+            index = render_code_span(chars, index, &mut output);
+            continue;
         }
         output.push(chars[index]);
         index += 1;

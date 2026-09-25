@@ -533,6 +533,50 @@ fn wrapped_input_rows_keep_prefix_outside_content_width() {
     );
 }
 
+/// 输入框占几行必须按**画它的那套几何**算：窄框宽 + 四列行首装饰。按终端全宽
+/// 估会少留行，多出来的那一行正好压在底栏上（09-24 验收问题 10：底栏变两行）。
+#[test]
+fn lobby_width_box_reserves_every_row_it_draws() {
+    let input = "字".repeat(40); // 显示宽度 80 列
+    // 30 列的窄框：去掉右框和 `│ ❯ ` 只剩 24 列，80 列折成 4 行，加上下框线与底栏 3 行。
+    assert_eq!(repl_input_rendered_rows(&input, 0, false, false, 30), 7);
+    // 同一句输入按终端全宽估，会少留两行——这就是原来错的地方。
+    assert_eq!(repl_input_rendered_rows(&input, 0, false, false, 100), 4);
+}
+
+/// 点在折行后的第二行上，光标就落在那一行的字之间；不能跳回句尾。
+#[test]
+fn click_in_a_wrapped_input_row_lands_the_caret_there() {
+    let input = "abcdefghij";
+    let positions = repl_cursor_layout_positions_for_cols(
+        INPUT_BOX_TEXT_INDENT,
+        input,
+        input_box_wrap_cols(12),
+    );
+    let rows = [10u16, 11];
+    let text_left = INPUT_BOX_TEXT_INDENT.len();
+    // 第二行（终端第 11 行）的第 2 格之后 = g h i j 四个字的末尾。
+    assert_eq!(
+        repl_caret_index_at_click(&positions, &rows, text_left, 11, 8),
+        Some(10)
+    );
+    // 第二行开头。
+    assert_eq!(
+        repl_caret_index_at_click(&positions, &rows, text_left, 11, 4),
+        Some(6)
+    );
+    // 点在这一行文字右边之外：钉在这一行末尾，不是整句末尾。
+    assert_eq!(
+        repl_caret_index_at_click(&positions, &rows, text_left, 10, 60),
+        Some(5)
+    );
+    // 不是输入框的行不归它管。
+    assert_eq!(
+        repl_caret_index_at_click(&positions, &rows, text_left, 99, 3),
+        None
+    );
+}
+
 #[test]
 fn history_browsing_requires_empty_or_clean_history_input() {
     let history = vec![

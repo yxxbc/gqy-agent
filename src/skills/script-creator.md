@@ -52,6 +52,7 @@ Comment lines right after the shebang, written as `# Key: value`. Unknown commen
 - `Parameters` is a JSON Schema object with `type: object`. Give every property a `description`. Omit the block for free-form tools.
 - `Id` overrides the tool name derived from the file name. `battery-care.py` becomes `battery_care` without it.
 - `Group` places the tool in a `load_tools` group. `Argv: flags` turns on argv expansion. `Timeout` is in seconds.
+- `Platform: macos` or `Platform: linux` registers the tool only on that system. Use it when the script depends on something one OS has, such as Reminders or systemd. Omit it for scripts that run everywhere.
 - `index.json` in the scripts directory can override any header field per `id`. `manage_script` writes there only the fields you pass explicitly.
 
 ## Skeletons

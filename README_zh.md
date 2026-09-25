@@ -17,8 +17,8 @@
   <a href="LICENSE"><img src="https://img.shields.io/badge/license-PolyForm%20NC%201.0.0-orange.svg?style=flat" alt="License: PolyForm Noncommercial 1.0.0"></a>
   <img src="https://img.shields.io/badge/platform-Linux%20%7C%20macOS-informational.svg?style=flat" alt="Platform">
   <a href="https://www.bestpractices.dev/projects/14831"><img src="https://www.bestpractices.dev/projects/14831/badge" alt="OpenSSF Best Practices"></a>
-  <a href="docs/longmemeval-results.md"><img src="https://img.shields.io/badge/LongMemEval-76.7%25%20(23%2F30)-success.svg?style=flat" alt="LongMemEval Benchmark"></a>
-  <a href="docs/official-benchmark-guide.md"><img src="https://img.shields.io/badge/GAIA%20Harness-Verified-blue.svg?style=flat" alt="GAIA Benchmark Harness"></a>
+  <a href="docs/longmemeval-results.md"><img src="https://img.shields.io/badge/LongMemEval-76.7%25%20(30--question%20sample)-lightgrey.svg?style=flat" alt="LongMemEval Benchmark"></a>
+  <a href="docs/official-benchmark-guide.md"><img src="https://img.shields.io/badge/GAIA%20Harness-smoke%20test-lightgrey.svg?style=flat" alt="GAIA-format Harness (smoke test)"></a>
   <a href="SECURITY.md"><img src="https://img.shields.io/badge/Security-Policy%20Enabled-green.svg?style=flat" alt="Security Policy"></a>
   <a href="https://linux.do/t/topic/2947308"><img src="https://img.shields.io/badge/LINUX%20DO-%E7%A4%BE%E5%8C%BA-1c1c1e.svg?style=flat&logo=data:image/svg%2bxml;base64,PD94bWwgdmVyc2lvbj0iMS4wIiBlbmNvZGluZz0iVVRGLTgiPz48c3ZnIHZlcnNpb249IjEuMiIgYmFzZVByb2ZpbGU9InRpbnktcHMiIHdpZHRoPSIxMjgiIGhlaWdodD0iMTI4IiB2aWV3Qm94PSIwIDAgMTIwIDEyMCIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj48dGl0bGU+TElOVVggRE88L3RpdGxlPjxjbGlwUGF0aCBpZD0iYSI+PGNpcmNsZSBjeD0iNjAiIGN5PSI2MCIgcj0iNDciLz48L2NsaXBQYXRoPjxjaXJjbGUgZmlsbD0iI2YwZjBmMCIgY3g9IjYwIiBjeT0iNjAiIHI9IjUwIi8+PHJlY3QgZmlsbD0iIzFjMWMxZSIgY2xpcC1wYXRoPSJ1cmwoI2EpIiB4PSIxMCIgeT0iMTAiIHdpZHRoPSIxMDAiIGhlaWdodD0iMzAiLz48cmVjdCBmaWxsPSIjZjBmMGYwIiBjbGlwLXBhdGg9InVybCgjYSkiIHg9IjEwIiB5PSI0MCIgd2lkdGg9IjEwMCIgaGVpZ2h0PSI0MCIvPjxyZWN0IGZpbGw9IiNmZmIwMDMiIGNsaXAtcGF0aD0idXJsKCNhKSIgeD0iMTAiIHk9IjgwIiB3aWR0aD0iMTAwIiBoZWlnaHQ9IjMwIi8+PC9zdmc+" alt="LINUX DO"></a>
 </p>
@@ -41,8 +41,9 @@
 
 | | |
 | :-- | :-- |
-| 💬 **陪你聊天** | 有自己的性格和情绪，会闲聊、会撒娇，也会认真听你说 |
-| 🧠 **记得你** | 记得你说过的话；你纠正过她的事，下次不会再犯 |
+| 💬 **陪你聊天** | 有自己的性格和情绪，会闲聊、会斗嘴，也会认真听你说；你们是什么关系、她怎么称呼你，按你告诉她的来 |
+| 🧠 **记得你** | 记得你说过的话；你纠正过她的事，下次不会再犯；聊完还会自己复盘 |
+| 🧩 **装扩展** | 技能、脚本工具、MCP 服务器、pm 包，都能在网页端设置里开关、查看和更新 |
 | 🛠 **帮你办事** | 查天气汇率快递、看地图、生成图片、定时提醒、记账 |
 | 💻 **陪你写代码** | 输入 `gqy dev` 切到开发模式，专心帮你看项目、改代码 |
 | 📚 **你的资料库** | 把文档交给她，需要时帮你查，内容只留在你的电脑上 |
@@ -81,19 +82,19 @@
 
 ## 📦 安装
 
-支持 Linux 和 macOS，复制一行到终端运行即可：
+支持 Linux 和 macOS。推荐用 [Nix](https://nixos.org/download/) 安装（Linux 与 Apple 芯片 Mac），下载的是云端编译好的包：
+
+```bash
+nix profile install github:yxxbc/gqy-agent/gqy
+```
+
+没有 Nix，或者是 Intel Mac，复制一行到终端运行即可（装到 `~/.local`，不需要 root；已经用 Nix 装过会拒绝重复安装）：
 
 ```bash
 curl -fsSL https://raw.githubusercontent.com/yxxbc/gqy-agent/gqy/install.sh | sh
 ```
 
 <img src="pics/gqy-install-show.png" alt="安装界面" width="640" />
-
-已经在用 [Nix](https://nixos.org/download/) 的话，也可以：
-
-```bash
-nix profile install github:yxxbc/gqy-agent/gqy
-```
 
 <details>
 <summary>装完找不到 <code>gqy</code> 命令？</summary>
@@ -121,34 +122,35 @@ export PATH="$HOME/.local/bin:$PATH"
 gqy
 ```
 
-第一次打开会有新手引导，跟着走几步就能开始聊：给她选个样子，告诉她怎么称呼你，再接上一个 AI 模型。已有 Claude Code、Codex、Antigravity 订阅的可以直接用，没有也能先用免费额度试试。
+每次打开都是一个新会话。第一次打开会有新手引导，跟着走几步就能开始聊：选人格（用顾清影，或者自己捏一个），告诉她你是谁、怎么称呼你，再接上一个 AI 模型。已有 Claude Code、Codex、Antigravity 订阅的可以直接用，没有也能先用免费额度试试。
 
 几个常用的：
 
 | 想做什么 | 怎么做 |
 | :-- | :-- |
 | 回到上次的对话 | `gqy -c` |
+| 打开指定的会话 | `gqy --session 名字` |
 | 让她帮你写代码 | `gqy dev` |
-| 看看有哪些命令 | 在对话里输入 `/` |
+| 看看有哪些命令 | 在对话里输入 `/`，上下键选 |
 | 改设置 | 在对话里输入 `/config` |
-| 打断她说话 | 连按两次 `Esc` |
+| 打断她说话 | 回复时连按两次 `Esc` |
 
 > [!TIP]
 > 推荐用 [Kitty](https://sw.kovidgoyal.net/kitty/) 终端，图片能直接显示在对话里。
 
 ## 🌐 更多聊天方式
 
-- **浏览器**：运行 `gqy web`，用打印出来的地址打开，同一 Wi-Fi 下手机平板也行。第一次用账号 `gqy`、密码 `GQY520` 登录，然后创建你自己的账号。
+- **浏览器**：运行 `gqy web`，用打印出来的地址打开，同一 Wi-Fi 下手机平板也行。第一次用账号 `gqy`、密码 `GQY520` 登录，然后创建你自己的账号。设置在「控制台 → 设置」里；「界面 → 配色方案」可以换配色，也可以让她照你的描述写一套新的。
 - **命令行里直接问**：运行 `gqy zsh-init`（bash、fish 也支持），之后在命令行里就能直接和她说话。
 - **语音**：在设置里打开「语音功能」，喊「清影」唤醒。安装包暂时不带语音，需要从源码编译，详见 [语音功能](docs/voice.md)。
-- **QQ 与 iMessage**：在手机上和她聊，也能拉进群里。详见 [QQ 与通讯平台](docs/wiki/13-QQ与通讯平台.md)。
+- **QQ 与 iMessage**：在手机上和她聊，QQ 还能拉进群里。QQ 在网页端控制台的「平台」页设置；iMessage（仅 macOS）是仓库里 `scripts/imessage/` 的独立桥接。详见 [QQ 与通讯平台](docs/wiki/13-QQ与通讯平台.md) 与 [iMessage 桥接说明](scripts/imessage/README.md)。
 
 ## 🔄 升级、备份与卸载
 
 <details>
 <summary>展开查看</summary>
 
-**升级**：用安装脚本装的，再运行一次安装命令；用 Nix 装的，运行 `nix profile upgrade gqy-agent`。每个版本更新了什么，见 [更新日志](CHANGELOG.md)。
+**升级**：用 Nix 装的，运行 `nix profile upgrade gqy-agent`（有问题可以 `nix profile rollback` 退回）；用安装脚本装的，再运行一次安装命令。每个版本更新了什么，见 [更新日志](CHANGELOG.md)。
 
 **备份与换电脑**：
 
@@ -166,9 +168,9 @@ gqy import gqy-export-*.tar.gz  # 在新电脑上导入（先运行 gqy daemon s
 
 ## 🏆 官方基准评测与打榜套件
 
-顾清影具备独立的评测与打榜套件，支持在权威 AI Agent 基准中进行端到端复现与验证：
-- **LongMemEval（ICLR 2025 长程记忆官方基准）**：30 题真题分层抽样实跑得分 **76.7% (23/30)**，在长跨度时序推理与防幻觉拒答上表现优秀，详见 [LongMemEval 真实跑分报告](docs/longmemeval-results.md)。
-- **GAIA 官方基准（General AI Assistants）**：多模态视觉、图表解析与长程工具链调用沙箱隔离评测，支持一键生成符合 Hugging Face Leaderboard 规范的提交包。
+仓库里带了评测脚本，目前的结果只作内部参考：
+- **LongMemEval（ICLR 2025 长程记忆基准）**：从 `longmemeval_s_cleaned` 抽了 30 题，由 gemini-flash 判定对错，23 题算对（**76.7%**）。样本很小，也没有在同样条件下跑过对照组，不能和榜单成绩直接比较。详见 [LongMemEval 跑分报告](docs/longmemeval-results.md)。
+- **GAIA 格式评测套件（General AI Assistants）**：沙箱隔离运行，能生成 Hugging Face Leaderboard 格式的提交包。目前只在几道自己写的 GAIA 风格样题上做过冒烟测试，还没有官方验证集上的成绩。
 - 完整打榜操作指引与离线样本复现见 [官方打榜指南](docs/official-benchmark-guide.md) 与 [样本评测报告](docs/official-benchmark-results.md)。
 
 ## 📖 更多

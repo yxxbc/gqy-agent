@@ -1,5 +1,5 @@
 //! 开屏欢迎框：Claude Code 式的小框，左边吉祥物，右边欢迎语、目录、模式、提示，
-//! 框下一行列最近的会话。取代原来的大号渐变艺术字 + 星空 + 扫光。
+//! 框下面一行是人格的碎碎念。取代原来的大号渐变艺术字 + 星空 + 扫光。
 //!
 //! 09-23 用户选定，方案见 `docs/plan/2026-09-23-tui-launch-and-lobby.md` §三。
 //! 这里只产行（带 SGR 的字符串），全屏大厅与 inline 都吃它。
@@ -26,8 +26,11 @@ pub(in crate::cli) struct WelcomeInfo {
     pub persona: String,
     /// 当前目录（家目录写成 `~`）。
     pub cwd: String,
-    /// 最近几条非空会话：标题、相对时间。
+    /// 最近几条非空会话：标题、相对时间。只用来决定说「欢迎回来」还是「初次见面」，
+    /// 不再列到框下面（那一行换成碎碎念了，09-24 验收问题 6）。
     pub recent: Vec<(String, String)>,
+    /// 框下面那行碎碎念：人格随口说一句。空串就不画。
+    pub murmur: String,
 }
 
 impl WelcomeInfo {
@@ -39,7 +42,7 @@ impl WelcomeInfo {
 }
 
 /// 画欢迎框：`width` 列宽、最多 `max_rows` 行（含上下框线），另附框下的
-/// 「最近」一行（有的话）。返回的每行宽度都正好是 `width`（最近那行除外）。
+/// 碎碎念一行（有的话）。返回的每行宽度都正好是 `width`（那行除外）。
 pub(in crate::cli) fn welcome_rows(
     info: &WelcomeInfo,
     mascot: &Mascot,
@@ -84,8 +87,8 @@ pub(in crate::cli) fn welcome_rows(
         format!("╰{}╯", "─".repeat(width - 2)),
         border,
     )]));
-    if let Some(recent) = recent_line(info, theme, width) {
-        rows.push(recent);
+    if let Some(murmur) = murmur_line(info, theme, width) {
+        rows.push(murmur);
     }
     rows
 }
@@ -221,18 +224,13 @@ fn stacked(art: &MascotRows, text: &[String], inner: usize) -> Vec<String> {
     rows
 }
 
-/// 框下那行：`最近：修 CI 报错（2 小时前）· 周末去哪（昨天）`，放不下的截掉。
-fn recent_line(info: &WelcomeInfo, theme: Theme, width: usize) -> Option<String> {
-    if info.recent.is_empty() {
+/// 框下面那行：`  茶凉了记得换一杯。` 人格随口说一句，淡色，超宽截掉。
+fn murmur_line(info: &WelcomeInfo, theme: Theme, width: usize) -> Option<String> {
+    let murmur = info.murmur.trim();
+    if murmur.is_empty() {
         return None;
     }
-    let items: Vec<String> = info
-        .recent
-        .iter()
-        .map(|(title, age)| format!("{title}（{age}）"))
-        .collect();
-    let line = format!("  {}{}", t("Recent: ", "最近："), items.join(" · "));
-    Some(clip(vec![Seg::new(line, theme.fg(FAINT))], width))
+    Some(clip(vec![Seg::new(format!("  {murmur}"), theme.fg(FAINT))], width))
 }
 
 fn clip(segs: Vec<Seg>, width: usize) -> String {
@@ -288,6 +286,7 @@ mod tests {
             } else {
                 Vec::new()
             },
+            murmur: String::new(),
         }
     }
 
@@ -311,7 +310,7 @@ mod tests {
     }
 
     #[test]
-    fn greeting_and_recent_follow_the_history() {
+    fn greeting_follows_the_history() {
         let fresh = welcome_rows(
             &info(false),
             &Mascot::Off,
@@ -333,7 +332,35 @@ mod tests {
         );
         let text: String = back.iter().map(|row| plain(row)).collect();
         assert!(text.contains("欢迎回来") || text.contains("Welcome back"));
-        assert!(text.contains("修 CI 报错"));
+    }
+
+    /// 框下面那一行是碎碎念；最近会话不再列出来（09-24 验收问题 6）。
+    #[test]
+    fn murmur_line_sits_under_the_box() {
+        let mut with_murmur = info(true);
+        with_murmur.murmur = "茶凉了记得换一杯。".into();
+        let rows = welcome_rows(
+            &with_murmur,
+            &Mascot::Off,
+            theme(),
+            AgentMode::Normal,
+            50,
+            20,
+        );
+        let text: String = rows.iter().map(|row| plain(row)).collect();
+        assert!(text.contains("茶凉了记得换一杯"));
+        assert!(!text.contains("修 CI 报错"));
+        assert!(plain(rows.last().unwrap()).starts_with("  茶"));
+
+        let empty = welcome_rows(
+            &info(true),
+            &Mascot::Off,
+            theme(),
+            AgentMode::Normal,
+            50,
+            20,
+        );
+        assert!(plain(empty.last().unwrap()).starts_with('╰'));
     }
 
     /// 矮终端：吉祥物放不下就只画字，行数不超过给的预算。

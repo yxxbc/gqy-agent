@@ -1,7 +1,7 @@
 :root {
   color-scheme: dark;
-  --font-ui: Inter, "Noto Sans SC", "Microsoft YaHei", system-ui, sans-serif;
-  --font-mono: "JetBrains Mono", "Cascadia Code", "SFMono-Regular", Consolas, "Liberation Mono", monospace;
+  --font-ui: system-ui, -apple-system, BlinkMacSystemFont, "PingFang SC", "Hiragino Sans GB", Inter, "Noto Sans SC", "Microsoft YaHei", sans-serif;
+  --font-mono: ui-monospace, "SF Mono", "JetBrains Mono", "Cascadia Code", Menlo, Consolas, "Liberation Mono", monospace;
   --serif: "Source Han Serif SC", "Noto Serif CJK SC", "Noto Serif SC", "Songti SC", "SimSun", Georgia, serif;
   --ui-scale: 1.1;
   --artifact-content-scale: calc(1.2 / var(--ui-scale));
@@ -24,10 +24,10 @@
    * 圆形 50% 是形状不是圆角，仍写死；气泡那一角刻意留尖（--radius-sm），
    * 是尾巴，不是没统一。
    * --radius-lg 只给输入框这种占满一行、里面还套着按钮的大容器：外框和内部
-   * 按钮都用 8px 时，外框看着和按钮一样「方」，层级分不出来。
+   * 按钮用同一档圆角时，外框看着和按钮一样「方」，层级分不出来。
    */
-  --radius: 8px;
-  --radius-lg: 16px;
+  --radius: 10px;
+  --radius-lg: 18px;
   --radius-sm: 3px;
   --radius-pill: 999px;
 
@@ -56,9 +56,9 @@
    * tertiary=丝带酒红,surface=傍晚蓝紫。
    */
   --md-sys-color-primary: #aebde8;
-  --md-sys-color-on-primary: #1f2c55;
-  --md-sys-color-primary-container: #394877;
-  --md-sys-color-on-primary-container: #dce3f9;
+  --md-sys-color-on-primary: #1a2446;
+  --md-sys-color-primary-container: #2e3957;
+  --md-sys-color-on-primary-container: #dfe6fb;
   --md-sys-color-secondary: #e4bf79;
   --md-sys-color-on-secondary: #402d02;
   --md-sys-color-secondary-container: #443716;
@@ -71,16 +71,16 @@
   --md-sys-color-on-error: #3f1210;
   --md-sys-color-error-container: #47231f;
   --md-sys-color-on-error-container: #f8dad4;
-  --md-sys-color-surface: #171821;
-  --md-sys-color-surface-container-lowest: #101117;
-  --md-sys-color-surface-container-low: #12131b;
-  --md-sys-color-surface-container: #1f212c;
-  --md-sys-color-surface-container-high: #282b38;
-  --md-sys-color-surface-container-highest: #323648;
-  --md-sys-color-on-surface: #e9e6ef;
-  --md-sys-color-on-surface-variant: #9993a5;
-  --md-sys-color-outline: #4c5065;
-  --md-sys-color-outline-variant: #303341;
+  --md-sys-color-surface: #141519;
+  --md-sys-color-surface-container-lowest: #0e0f12;
+  --md-sys-color-surface-container-low: #101115;
+  --md-sys-color-surface-container: #1c1d22;
+  --md-sys-color-surface-container-high: #24252b;
+  --md-sys-color-surface-container-highest: #2d2e35;
+  --md-sys-color-on-surface: #ececf0;
+  --md-sys-color-on-surface-variant: #9fa1ad;
+  --md-sys-color-outline: #454750;
+  --md-sys-color-outline-variant: #2b2c33;
   /* 扩展语义色:在线状态(不属于 MD3 标准 token) */
   --md-ext-color-online: #7ccb96;
 }
@@ -135,9 +135,10 @@ body[data-theme="linen"] {
   --link: #8fb6ec;
 
   /* 三档软阴影(阴影 rgba 常量按主题,允许保留) */
-  --bubble-shadow: 0 1px 4px rgba(0, 0, 0, 0.25);
-  --card-shadow: 0 2px 8px rgba(0, 0, 0, 0.22);
-  --float-shadow: 0 18px 50px rgba(0, 0, 0, 0.5), 0 4px 12px rgba(0, 0, 0, 0.35);
+  /* 细描边为主、阴影为辅：暗底上阴影几乎看不见，层级靠一圈 1px 的亮边分开。 */
+  --bubble-shadow: 0 0 0 1px rgba(255, 255, 255, 0.05);
+  --card-shadow: 0 0 0 1px rgba(255, 255, 255, 0.06), 0 1px 3px rgba(0, 0, 0, 0.28);
+  --float-shadow: 0 0 0 1px rgba(255, 255, 255, 0.07), 0 16px 44px rgba(0, 0, 0, 0.5), 0 4px 12px rgba(0, 0, 0, 0.3);
   --artifact-shadow: 0 0 10px rgba(0, 0, 0, 0.16), 0 2px 6px rgba(0, 0, 0, 0.1);
   --shadow: var(--float-shadow);
 
@@ -178,9 +179,9 @@ body[data-theme="linen"] {
   color-scheme: light;
 
   /* 晨光 (dawn) —— 亮色主题。primary=发影藤紫,底色=窗边奶油白。 */
-  --md-sys-color-primary: #7568b0;
+  --md-sys-color-primary: #6d61b0;
   --md-sys-color-on-primary: #ffffff;
-  --md-sys-color-primary-container: #e6e1f6;
+  --md-sys-color-primary-container: #e9e5f8;
   --md-sys-color-on-primary-container: #372e66;
   --md-sys-color-secondary: #8f6b1e;
   --md-sys-color-on-secondary: #ffffff;
@@ -194,16 +195,16 @@ body[data-theme="linen"] {
   --md-sys-color-on-error: #ffffff;
   --md-sys-color-error-container: #f6dcd6;
   --md-sys-color-on-error-container: #5f1d18;
-  --md-sys-color-surface: #f6f0e2;
-  --md-sys-color-surface-container-lowest: #fffdf6;
-  --md-sys-color-surface-container-low: #efe7d3;
-  --md-sys-color-surface-container: #fffdf6;
-  --md-sys-color-surface-container-high: #f1eada;
-  --md-sys-color-surface-container-highest: #e8dfc9;
-  --md-sys-color-on-surface: #34303a;
-  --md-sys-color-on-surface-variant: #797064;
-  --md-sys-color-outline: #c6b795;
-  --md-sys-color-outline-variant: #e3d8c1;
+  --md-sys-color-surface: #faf8f3;
+  --md-sys-color-surface-container-lowest: #ffffff;
+  --md-sys-color-surface-container-low: #f3f0e8;
+  --md-sys-color-surface-container: #ffffff;
+  --md-sys-color-surface-container-high: #efebe2;
+  --md-sys-color-surface-container-highest: #e6e1d6;
+  --md-sys-color-on-surface: #25222b;
+  --md-sys-color-on-surface-variant: #6b6571;
+  --md-sys-color-outline: #d1cabd;
+  --md-sys-color-outline-variant: #e6e1d7;
   --md-ext-color-online: #3e8e5c;
 
   /* 语法高亮的浅色一套(One Light)。注释比原版的 #a0a1a7 压暗了一档——那个值
@@ -236,9 +237,9 @@ body[data-theme="linen"] {
   --hl: color-mix(in srgb, var(--md-sys-color-primary) 78%, var(--md-sys-color-on-surface));
   /* 亮色那支要压得住奶油纸:实测 4.65:1(近白的 matugen 亮色板上 4.87:1)。 */
   --link: #3a6ea8;
-  --bubble-shadow: 0 1px 4px rgba(83, 64, 30, 0.07);
-  --card-shadow: 0 2px 8px rgba(83, 64, 30, 0.06);
-  --float-shadow: 0 18px 50px rgba(83, 64, 30, 0.2), 0 4px 12px rgba(83, 64, 30, 0.1);
+  --bubble-shadow: 0 0 0 1px rgba(40, 32, 18, 0.06);
+  --card-shadow: 0 0 0 1px rgba(40, 32, 18, 0.07), 0 1px 2px rgba(40, 32, 18, 0.04);
+  --float-shadow: 0 0 0 1px rgba(40, 32, 18, 0.08), 0 14px 40px rgba(40, 32, 18, 0.14), 0 3px 10px rgba(40, 32, 18, 0.06);
   --artifact-shadow: 0 0 10px rgba(83, 64, 30, 0.1), 0 2px 6px rgba(83, 64, 30, 0.06);
   --chip-think: color-mix(in srgb, var(--accent-soft) 55%, transparent);
   --chip-live: color-mix(in srgb, var(--accent-soft) 85%, transparent);

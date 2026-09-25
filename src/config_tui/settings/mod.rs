@@ -95,54 +95,10 @@ pub(crate) const SETTINGS_GROUPS: &[SettingsGroup] = &[
 ];
 
 pub(crate) fn settings_group(id: &str) -> Option<&'static SettingsGroup> {
-    SETTINGS_GROUPS
-        .iter()
-        .find(|group| group.id.eq_ignore_ascii_case(id.trim()))
-}
-
-/// 「全局参数设置」：先选一组，再进那一组的表单。
-pub(in crate::config_tui) fn edit_settings(
-    stdout: &mut io::Stdout,
-    config: &mut AppConfig,
-) -> Result<()> {
-    let mut selected = 0usize;
-    loop {
-        let options: Vec<String> = SETTINGS_GROUPS
-            .iter()
-            .map(|group| {
-                let count = (group.fields)(config).fields.len();
-                if is_zh() {
-                    format!("{}（{count} 项）", group.title())
-                } else {
-                    format!("{} ({count})", group.title())
-                }
-            })
-            .collect();
-        draw_menu(
-            stdout,
-            t(" GLOBAL SETTINGS ", " 全局设置 "),
-            &options,
-            selected,
-            t(
-                "[j/k]move [Enter]open [q]back",
-                "[j/k]移动 [Enter]进入 [q]返回",
-            ),
-        )?;
-        match read_key()? {
-            KeyCode::Esc | KeyCode::Char('q') => return Ok(()),
-            KeyCode::Up | KeyCode::Char('k') => selected = selected.saturating_sub(1),
-            KeyCode::Down | KeyCode::Char('j') => {
-                selected = (selected + 1).min(options.len() - 1);
-            }
-            KeyCode::Enter => {
-                if let Err(error) = edit_settings_group(stdout, config, &SETTINGS_GROUPS[selected])
-                {
-                    show_tui_error(stdout, &error)?;
-                }
-            }
-            _ => {}
-        }
-    }
+    let arg = id.trim();
+    SETTINGS_GROUPS.iter().find(|group| {
+        group.id.eq_ignore_ascii_case(arg) || group.zh == arg || group.en.eq_ignore_ascii_case(arg)
+    })
 }
 
 pub(in crate::config_tui) fn edit_settings_group(

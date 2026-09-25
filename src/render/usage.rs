@@ -25,6 +25,9 @@ pub struct TokenMeter {
     /// 猜的时候只显示带 `~` 的数、不出百分比——同 `cache_percent` 的规矩：
     /// 没有真实依据的比率不能渲染成一个看起来很确定的数字。
     pub context_window_assumed: bool,
+    /// 整个上下文那一栏不画（空会话的底栏：还没聊天，前缀估算值看着像已经用掉了）。
+    /// Σ 和速度照旧。
+    pub context_hidden: bool,
     /// Σ: session-lifetime total. `None` hides it on narrow terminals.
     pub cumulative_tokens: Option<u64>,
     pub cumulative_prompt_tokens: u64,
@@ -157,44 +160,70 @@ pub(crate) fn format_token_usage_inline_with(
         .filter(|_| !meter.context_window_assumed)
         .map(|context_window| meter.session_tokens as f64 / context_window as f64);
 
-    let mut session = match (usage_ratio, percent) {
-        (Some(usage_ratio), Some(percent)) => format!(
+    let mut session = if meter.context_hidden {
+        String::new()
+    } else if let (Some(usage_ratio), Some(percent)) = (usage_ratio, percent) {
+        format!(
             "{}/{}{}",
             format_compact_count(meter.session_tokens),
             context,
-            percent(usage_ratio),
-        ),
-        _ => format!("{}/{}", format_compact_count(meter.session_tokens), context),
+            percent(usage_ratio)
+        )
+    } else {
+        format!(
+            "{}/{}",
+            format_compact_count(meter.session_tokens),
+            context
+        )
     };
     let cumulative_shown = match meter.cumulative_tokens {
         Some(total) => Some(total.saturating_add(meter.live_extra_tokens)),
         None => (meter.live_extra_tokens > 0).then_some(meter.live_extra_tokens),
     };
     if let Some(cumulative_tokens) = cumulative_shown {
-        session.push_str(&format!(
-            " · Σ{}{}",
-            format_compact_count(cumulative_tokens),
-            cache_suffix(
-                meter.cumulative_cached_tokens,
-                meter.cumulative_prompt_tokens
+        append_usage_part(
+            &mut session,
+            &format!(
+                "Σ{}{}",
+                format_compact_count(cumulative_tokens),
+                cache_suffix(
+                    meter.cumulative_cached_tokens,
+                    meter.cumulative_prompt_tokens
+                ),
             ),
-        ));
+        );
     }
     // 速度紧跟本轮用量之后、上下文表之前:footer 里没有本轮用量,它就打头。
     let speed = show_speed
         .then(|| format_tokens_per_second(meter.generation_speed()))
         .flatten();
     if let Some(speed) = speed {
-        session = format!("{speed} · {session}");
+        session = match session.is_empty() {
+            true => speed,
+            false => format!("{speed} · {session}"),
+        };
     }
     if meter.turn_tokens == 0 {
         session
     } else {
-        format!(
-            "{}{} · {session}",
+        let turn = format!(
+            "{}{}",
             format_compact_count(meter.turn_tokens),
             cache_suffix(meter.turn_cached_tokens, meter.turn_prompt_tokens),
-        )
+        );
+        match session.is_empty() {
+            true => turn,
+            false => format!("{turn} · {session}"),
+        }
+    }
+}
+
+/// 拼一段用量文本：前面已经有内容才补分隔符，空的时候直接当第一段。
+fn append_usage_part(session: &mut String, part: &str) {
+    if session.is_empty() {
+        session.push_str(part);
+    } else {
+        session.push_str(&format!(" · {part}"));
     }
 }
 

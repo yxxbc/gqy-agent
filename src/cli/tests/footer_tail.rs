@@ -10,6 +10,29 @@ use crate::cli::repl::tail::{
 use crate::cli::repl::width::*;
 use crate::cli::*;
 use crate::llm::ChatStreamKind;
+/// 空会话（还在大厅里）底栏不报上下文占用：那个数是系统提示词 + 工具目录的
+/// 前缀估算，一句话没说就看到它像是还没聊就用掉了（09-24 验收问题 7）。
+#[test]
+fn empty_session_footer_hides_the_context_meter() {
+    let config = crate::config::AppConfig::default();
+    let mut footer = ReplFooterStatus::from_config(&config, 7_300, Default::default());
+    let token = crate::render::format_compact_count(7_300);
+    let shown = crate::cli::strip_terminal_control_sequences(&repl_footer_line(
+        crate::agent::AgentMode::Normal,
+        &footer,
+        80,
+    ));
+    assert!(shown.contains(&token), "非空会话要报上下文：{shown}");
+    footer.hide_context = true;
+    let hidden = crate::cli::strip_terminal_control_sequences(&repl_footer_line(
+        crate::agent::AgentMode::Normal,
+        &footer,
+        80,
+    ));
+    assert!(!hidden.contains(&token), "空会话不该报上下文：{hidden}");
+    assert!(!hidden.trim().is_empty(), "模式和模型还是要画的：{hidden}");
+}
+
 #[test]
 fn terminal_frame_tracks_ansi_and_wide_graphemes() {
     let layout = terminal_frame_layout("\x1b[32mAB\x1b[0m\n中👨‍👩‍👧‍👦".as_bytes(), (3, 2), 12, None);
@@ -505,6 +528,9 @@ fn spinner_does_not_resume_tail_during_external_output() {
         queued: Vec::new(),
         pending_chunks: Vec::new(),
         footer: ReplFooterStatus::from_config(&config, 0, TurnTokens::default()),
+        footer_left: 0,
+        footer_cols: 80,
+        input_layout: None,
         round_base_footer: None,
         footer_offset: None,
         footer_spinner_last: None,
@@ -550,6 +576,9 @@ fn live_tail_coalesces_adjacent_stream_chunks_and_can_discard_them() {
         queued: Vec::new(),
         pending_chunks: Vec::new(),
         footer: ReplFooterStatus::from_config(&config, 0, TurnTokens::default()),
+        footer_left: 0,
+        footer_cols: 80,
+        input_layout: None,
         round_base_footer: None,
         footer_offset: None,
         footer_spinner_last: None,

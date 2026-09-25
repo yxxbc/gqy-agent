@@ -323,6 +323,12 @@ pub(in crate::web) fn router(state: DaemonState) -> Router {
     with_web_assets(Router::new())
         .route("/", get(index_asset))
         .route("/theme.css", get(theme_css))
+        .route("/webui-themes/{file}", get(webui_theme_file))
+        .route("/api/webui-themes", get(webui_themes_list))
+        .route(
+            "/api/webui-themes/{name}",
+            axum::routing::delete(webui_theme_delete),
+        )
         .route("/fence-frame.html", get(fence_frame_asset))
         // artifact 的沙箱 iframe 也来这里取库,而它是不透明源——浏览器会为此强制
         // 发 OPTIONS 预检,所以每条都得配一个 options 分支,漏一条那个库就加载不上。
@@ -493,6 +499,35 @@ pub(in crate::web) fn router(state: DaemonState) -> Router {
             axum::routing::delete(dash_scripts_delete),
         )
         .route("/api/dash/scripts/register", post(dash_scripts_register))
+        .route("/api/extensions", get(extensions_overview))
+        .route(
+            "/api/extensions/skills",
+            post(extensions_skill_create).delete(extensions_skill_delete),
+        )
+        .route(
+            "/api/extensions/skills/toggle",
+            post(extensions_skill_toggle),
+        )
+        .route(
+            "/api/extensions/skills/source",
+            get(extensions_skill_source),
+        )
+        .route(
+            "/api/extensions/packages",
+            axum::routing::delete(extensions_package_remove),
+        )
+        .route(
+            "/api/extensions/packages/upgrade",
+            post(extensions_package_upgrade),
+        )
+        .route(
+            "/api/extensions/origin/check",
+            post(extensions_origin_check),
+        )
+        .route(
+            "/api/extensions/origin/update",
+            post(extensions_origin_update),
+        )
         .route("/api/dash/ledger/overview", get(dash_ledger_overview))
         .route(
             "/api/dash/ledger/entries",

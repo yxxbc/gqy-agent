@@ -10,7 +10,9 @@ import { state } from "../state/store.js";
 const appearanceState = {
   colorScheme: null,
   uiPrefs: {},
-  matugenAvailable: null
+  matugenAvailable: null,
+  // 主题库里的主题;null = 还没取到(登录前),此时不否决已选的主题。
+  themes: null
 };
 
 /*
@@ -43,6 +45,7 @@ export async function syncUiPrefs() {
   appearanceState.uiPrefs = { ...prefs };
   if (prefs.theme) setTheme(prefs.theme);
   if (prefs.colorScheme) setColorScheme(prefs.colorScheme);
+  loadWebuiThemes();
   if (prefs.chatFontSize) setChatFontSize(prefs.chatFontSize);
   if (prefs.reasoningExpanded) setReasoningExpanded(prefs.reasoningExpanded === "true");
   if (prefs.toolExpanded) setToolExpanded(prefs.toolExpanded === "true");
@@ -73,16 +76,29 @@ export function setTheme(theme, persist = true) {
 
 /*
  * 配色方案(与明暗正交):
- * - madobe  窗边预设(logo 派生 token,styles.css 内置)
- * - matugen 壁纸取色(后端 /theme.css 输出整套 MD3 token)
- * 通过禁用 /theme.css 的 <link> 切换,不改后端与 matugen 模板。
+ * - madobe       窗边预设(logo 派生 token,styles.css 内置)
+ * - matugen      壁纸取色(后端 /theme.css 输出整套 MD3 token)
+ * - theme:<名字>  主题库 ~/.gqy/config/webui-themes/<名字>.css(她用 webui-theme 技能写的)
+ * 同一个 <link> 换地址或禁用来切换,在默认样式之后加载,覆盖 token。
  */
+function themeHref(scheme) {
+  if (scheme === "matugen") return "/theme.css";
+  if (scheme.startsWith("theme:")) return `/webui-themes/${encodeURIComponent(scheme.slice(6))}.css`;
+  return null;
+}
+
 export function setColorScheme(scheme, persist = true) {
-  const requested = scheme === "madobe" ? "madobe" : "matugen";
-  const selected = requested === "matugen" && appearanceState.matugenAvailable === false ? "madobe" : requested;
+  const requested = scheme === "madobe" ? "madobe" : String(scheme || "").startsWith("theme:") ? scheme : "matugen";
+  let selected = requested;
+  if (requested === "matugen" && appearanceState.matugenAvailable === false) selected = "madobe";
+  if (requested.startsWith("theme:") && appearanceState.themes && !appearanceState.themes.some((theme) => `theme:${theme.name}` === requested)) selected = "madobe";
   appearanceState.colorScheme = selected;
-  elements.body.dataset.colorScheme = selected;
-  if (elements.matugenThemeLink) elements.matugenThemeLink.disabled = selected !== "matugen";
+  elements.body.dataset.colorScheme = selected.startsWith("theme:") ? "theme" : selected;
+  const href = themeHref(selected);
+  if (elements.matugenThemeLink) {
+    if (href && elements.matugenThemeLink.getAttribute("href") !== href) elements.matugenThemeLink.setAttribute("href", href);
+    elements.matugenThemeLink.disabled = !href;
+  }
   document.querySelectorAll("[data-scheme-choice]").forEach((button) => {
     const active = button.dataset.schemeChoice === selected;
     button.classList.toggle("selected", active);
@@ -93,6 +109,60 @@ export function setColorScheme(scheme, persist = true) {
   if (persist) {
     safeStorageSet("gqy.web.colorScheme", requested);
     saveUiPref("colorScheme", requested);
+  }
+}
+
+/* 主题库:登录后取列表,在「配色方案」里给每个主题一个选项(可删)。 */
+export async function loadWebuiThemes() {
+  let data;
+  try {
+    data = await (await apiRequest("/api/webui-themes")).json();
+  } catch (_) {
+    return;
+  }
+  appearanceState.themes = Array.isArray(data.themes) ? data.themes : [];
+  appearanceState.matugenAvailable = Boolean(data.matugen);
+  renderThemeChoices();
+  setColorScheme(appearanceState.colorScheme || safeStorageGet("gqy.web.colorScheme") || "madobe", false);
+}
+
+function renderThemeChoices() {
+  const group = document.querySelector('.theme-options[aria-label="配色方案"]');
+  if (!group) return;
+  group.querySelectorAll("[data-theme-entry]").forEach((node) => node.remove());
+  for (const theme of appearanceState.themes || []) {
+    const entry = document.createElement("div");
+    entry.className = "theme-entry";
+    entry.dataset.themeEntry = theme.name;
+    const choose = document.createElement("button");
+    choose.type = "button";
+    choose.dataset.schemeChoice = `theme:${theme.name}`;
+    choose.title = theme.description || theme.title;
+    const swatch = document.createElement("i");
+    swatch.className = "theme-swatch";
+    if (theme.accent) swatch.style.background = theme.accent;
+    const label = document.createElement("span");
+    label.textContent = theme.title;
+    choose.append(swatch, label);
+    choose.addEventListener("click", () => setColorScheme(choose.dataset.schemeChoice));
+    const remove = document.createElement("button");
+    remove.type = "button";
+    remove.className = "theme-remove";
+    remove.title = `删除主题「${theme.title}」`;
+    remove.setAttribute("aria-label", remove.title);
+    remove.append(createIcon("x"));
+    remove.addEventListener("click", async () => {
+      if (!window.confirm(`删除主题「${theme.title}」？主题文件会一起删掉。`)) return;
+      try {
+        await apiRequest(`/api/webui-themes/${encodeURIComponent(theme.name)}`, { method: "DELETE" });
+      } catch (_) {
+        return;
+      }
+      if (appearanceState.colorScheme === `theme:${theme.name}`) setColorScheme("madobe");
+      loadWebuiThemes();
+    });
+    entry.append(choose, remove);
+    group.append(entry);
   }
 }
 

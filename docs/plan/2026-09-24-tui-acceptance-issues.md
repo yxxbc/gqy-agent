@@ -56,3 +56,28 @@
 
 - **现象**：输入框里的文字自动换行后，鼠标点在文字上想移动光标：光标先跳到点击的位置，又跳回句尾；同时底栏（开发模式、模型那一行）变成两行。
 - **初步判断**：点击定位按未换行的列算，或者点击后的重画用了错误的行数，把底栏多画了一遍。09-23 改圆角输入框时动过装饰宽度（`INPUT_BOX_TEXT_INDENT`、`decoration_width`），嫌疑最大。
+
+## 施工记录（09-25）
+
+先复现、找根因，再动手。每条给出根因（带文件行号，均为改动前的代码位置）、改法、以及用户手测怎么看。测试口径见每条末尾，能自动化写的都写成「修复前会红」的用例（AGENTS §5.1）。
+
+| # | 根因（实测到的，不是猜的） | 改法 |
+|---|---|---|
+| 1 | 底栏那一行有两种画法：整帧画在窄框的左边距上（`input.rs:876`），而转轮 tick 和回合收尾是**单行覆写**，写死 `MoveTo(0)` + 终端全宽（`tail/mod.rs:771/997`）。goal 跑起来后两种画法交替出现在同一行，看着就是左右跳 | 把这一帧底栏的左边距与宽度记下来（`footer_left` / `footer_cols`），两条覆写路径共用一个 `repaint_footer_row`，按记下的几何画并只清自己那一段 |
+| 2 | `/goal` 的回执只有一行，`repl_note` 见短就走通知条（`toast.rs` 的 `MAX_TOAST_LINES=2`、2.2 秒后 `expire_toast`），两秒后正文里什么都没有。不是 `println!` 的问题 | 加 `repl_record`（session.rs，跳过通知条直接进正文），goal 回执走它。命令回执照旧不落库，只保证这一帧之后还在画面里、能回翻 |
+| 3 | `usage_overview_text` 整块几十行进正文 | `/usage` 改成覆盖层：内容登记成 overlay 块（`blocks::register_overlay`）再 `Screen::open_overlay`，Esc 关、滚轮翻；inline 没有覆盖层，回落到原来的印进正文 |
+| 4 | 六个分组藏在主菜单「全局参数设置」下一层 | `run_main_menu` 的选项表改成「文案 + 动作」两张表一起生成，六个分组直接铺在顶层，名字就是 `SettingsGroup::title()`；`settings_group()` 同时认 id / 中文名 / 英文名，界面上显示什么就能 `/config` 什么。视觉按约定不动 |
+| 5 | 行内代码解析器在 `markdown.rs:449` 只找**下一个**反引号：`` ``a`b`` `` 这种双反引号会被自己第二格闭合，反引号残留；未闭合的 span 会把整行吞成字面量；链接标签里不递归（`:503`） | 反引号按「成串」匹配（几格开就要几格闭），未闭合只吐这一串；链接标签内部递归一次（关掉 code / `$` 分支，避免嵌套 SGR 打断 OSC） |
+| 6 | 框下面那行是 `recent_line`，列最近 3 条会话 | 换成碎碎念：新增 `banner/murmurs.rs`，内置顾清影 10 句（中英各一份），人格目录下放 `murmurs.txt` 就用自己的（一行一句，`#` 注释）。随机只在 `BannerScene::load` 挑一次，之后整个会话不变 |
+| 7 | 那个 7.3k 是真的：`context_tokens_estimate()` 按系统提示词 + 工具目录估前缀（`agent/context_meter.rs:23`） | 空会话（还在大厅）不画上下文那一栏：`ReplFooterStatus::hide_context` → `TokenMeter::context_hidden`，`set_session_empty` / `set_footer` 两处同步；第一句话发出去就恢复 |
+| 8 | 黑猫 48×23，欢迎框并排最多给 43 列（`MAX_WIDTH=84` 决定），叠放要终端 ≳41 行，inline 上限 17 行——**任何尺寸都画不出来**，`cat()` 放不下就 `None`，没有降级 | 给黑猫加和立绘一样的宽度阶梯（`PORTRAIT_WIDTHS` 那一套），按能放下的最大一档画；48×23 原图仍是第一档 |
+| 9 | 点得开的前提是「登记了非空块」：`blocks::insert` 对空内容返回 `None`（`blocks.rs:84`），read/list/glob/grep/MCP 这些的 detail 是空的，行就没绑块 id（`timeline.rs:1277`），点击 `load_body` 静默 false | 渲染期从已存的输出+参数拼出展开内容（不动任何工具存进库的字节，AGENTS §2.3）；真的没内容时点击给一句提示，不再无声无息 |
+| 10 | 两件事叠在一起：(a) 输入框里按下只会开一段零宽选区（`screen/mod.rs:1091`），根本没有点击定位光标，反显那格看起来像光标跳过去又弹回来；(b) 预留行数按两格装饰 + 终端全宽算（`editor.rs:539`），实际画的是四格装饰 + 窄框宽，少留的行压在底栏上→底栏两行 | (a) 松手时区分点/拖：原点一下按 `repl_cursor_layout_positions_for_cols` 反查落点（新 `repl_caret_index_at_click`），拖动仍是复制；(b) `repl_input_rendered_rows` 与画的那条路径同一套口径（`INPUT_BOX_TEXT_INDENT` + `input_box_wrap_cols`），窄框宽度由大厅位置反推一次 |
+
+### 已经定下来的取舍
+
+- 问题 4 只做菜单层级，不做全套新视觉（另排）。
+- 问题 6 文案跟人格走：内置默认是顾清影的，换人格在人格目录放 `murmurs.txt`。
+- 问题 7 选「空会话直接隐藏」，不标注「基础占用」。WebUI 输入框的上下文圆环这次**没动**——要不要一起隐藏，等验收时定。
+- `wake.rs` 里流中途的 `/goal` 仍然静默执行（那是原本的设计：流的中断与重启本身就是反馈），只有空闲时的 `/goal` 改成留痕。
+

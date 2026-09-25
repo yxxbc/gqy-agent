@@ -170,6 +170,8 @@ textarea:disabled {
   grid-template-rows: auto minmax(0, 1fr) auto;
   min-width: 0;
   min-height: 0;
+  /* 和主区只差一档底色，加一条细线把边界画清楚（控制台侧栏同款） */
+  border-right: 1px solid color-mix(in srgb, var(--line) 70%, transparent);
   background: var(--sidebar-bg);
 }
 

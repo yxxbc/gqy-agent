@@ -22,6 +22,11 @@ use std::fs;
 use std::os::unix::fs::PermissionsExt;
 use std::path::{Component, Path, PathBuf};
 
+mod origin;
+mod upgrade;
+pub use origin::*;
+pub use upgrade::*;
+
 pub const MANIFEST_FILE: &str = "gqy-package.toml";
 /// 曾经内置、实际并不存在的索引仓库（改名时从 `miyu-packages` 顺手替换出来的，
 /// 09-24 查实 GitHub 上没有）。读取时滤掉，已经存进 `taps.json` 的也一并清理。

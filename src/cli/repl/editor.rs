@@ -527,6 +527,10 @@ pub(in crate::cli) fn picker_key(code: KeyCode, modifiers: KeyModifiers) -> Opti
     }
 }
 
+/// 输入区这一帧要占几行。**必须和画它的那条路径同一套口径**：同样的行首装饰
+/// (`INPUT_BOX_TEXT_INDENT`)、同样的折行宽度（`input_box_wrap_cols(框宽)`）。
+/// 以前这里按两格装饰 + 终端全宽估，画出来是四格装饰 + 大厅窄框，估少的那一行
+/// 正好落在底栏上——底栏看着像两行（09-24 验收问题 10）。
 pub(in crate::cli) fn repl_input_rendered_rows(
     input: &str,
     raw_pasted_lines: usize,
@@ -535,12 +539,20 @@ pub(in crate::cli) fn repl_input_rendered_rows(
     cols: usize,
 ) -> u16 {
     let lines = repl_input_lines(input);
-    let display_lines =
-        repl_visible_input_lines("  ", &lines, REPL_MAX_VISIBLE_INPUT_ROWS, raw_pasted_lines);
-    let input_rows = repl_wrapped_input_rows_for_cols("  ", &display_lines, cols)
-        .len()
-        .max(1)
-        .min(u16::MAX as usize) as u16;
+    let display_lines = repl_visible_input_lines(
+        INPUT_BOX_TEXT_INDENT,
+        &lines,
+        REPL_MAX_VISIBLE_INPUT_ROWS,
+        raw_pasted_lines,
+    );
+    let input_rows = repl_wrapped_input_rows_for_cols(
+        INPUT_BOX_TEXT_INDENT,
+        &display_lines,
+        input_box_wrap_cols(cols),
+    )
+    .len()
+    .max(1)
+    .min(u16::MAX as usize) as u16;
     input_rows.saturating_add(if show_shortcut_hint && !picker_open {
         4
     } else {

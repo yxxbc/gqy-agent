@@ -35,7 +35,14 @@ Non-color tokens also live in `css/00-tokens.css`: font sizes `--fs-chat/ui/meta
 
 Stylesheets live in `css/` and are concatenated in file-name order into one `/styles.css` at build time, so file order is cascade order.
 
-`index.html` loads `/theme.css` after `styles.css`; a matugen-generated override can be
-served there to recolor the whole UI from the desktop wallpaper (see `extra/matugen/`).
-The 404 when no override exists is harmless. Serving `~/.gqy/config/webui-theme.css`
-at `/theme.css` is a pending backend route.
+`index.html` has one theme `<link>` that loads after `styles.css` and overrides tokens.
+Settings → Interface → Color scheme points it at one of three sources, or disables it for the default look:
+
+- `/theme.css`: the matugen wallpaper palette, served from `~/.gqy/config/webui-theme.css`.
+- `/webui-themes/<name>.css`: the theme library in `~/.gqy/config/webui-themes/`. GQY writes these with the
+  built-in `webui-theme` skill. A header comment gives each one a title and description, and the settings page
+  lists and deletes them (`/api/webui-themes`).
+- Nothing: the built-in palette.
+
+Themes are CSS only. GQY cannot change page scripts or markup, because anyone who can write frontend JS can run
+code in the admin's browser (docs/design/2026-09-25-webui-isolation.md §4).

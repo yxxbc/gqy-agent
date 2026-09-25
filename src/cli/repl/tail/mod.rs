@@ -159,6 +159,13 @@ pub(in crate::cli) struct LiveReplTail {
     /// 行号会过期——tick 在旧行覆写就画出第二份 footer(孤儿),取消回合后
     /// 那行永远没人清(用户 08-20 截图实锤)。
     pub(in crate::cli) footer_offset: Option<u16>,
+    /// 底栏那一行的左边距与宽度，和 `footer_offset` 同一帧记下来。单行覆写
+    /// （转轮 tick、回合收尾）按它画，才会和整帧画的位置对齐。见 [`Self::footer_offset`]。
+    pub(in crate::cli) footer_left: u16,
+    pub(in crate::cli) footer_cols: usize,
+    /// 上一帧输入框的窄框几何：(左边距, 宽度)，None = 全宽贴左。点击定位光标
+    /// 要按它反查折行后的列（09-24 验收问题 10）。
+    pub(in crate::cli) input_layout: Option<(u16, usize)>,
     pub(in crate::cli) footer_spinner_last: Option<std::time::Instant>,
     pub(in crate::cli) jobs: Vec<crate::tools::jobs::JobOverview>,
     /// 已经下过"停"的任务 → 下达的时刻。见 `suppress_jobs`。
@@ -613,6 +620,9 @@ impl LiveReplTail {
             footer,
             round_base_footer: None,
             footer_offset: None,
+            footer_left: 0,
+            footer_cols: 80,
+            input_layout: None,
             footer_spinner_last: None,
             jobs: Vec::new(),
             suppressed_jobs: std::collections::HashMap::new(),
@@ -653,6 +663,8 @@ impl LiveReplTail {
         empty: bool,
     ) {
         self.editor.mode_switchable = empty;
+        // 大厅里（空会话）底栏不报上下文占用，第一句话发出去就恢复。
+        self.footer.hide_context = empty;
         if empty {
             if self.banner.is_none() {
                 let mut banner =
@@ -755,6 +767,8 @@ impl LiveReplTail {
 
     pub(in crate::cli) fn set_footer(&mut self, footer: ReplFooterStatus) {
         self.footer = footer;
+        // 底栏是整体替换的，空会话的「不画上下文」得跟着重新贴上去。
+        self.footer.hide_context = self.session_empty();
         self.round_base_footer = None;
         self.footer_spinner_last = None;
     }
@@ -765,23 +779,39 @@ impl LiveReplTail {
             return Ok(());
         }
         self.footer_spinner_last = None;
+        self.repaint_footer_row()
+    }
+
+    /// 只覆写底栏那一行。左边距和宽度用**上一帧记下的**那一份：大厅里底栏在窄框
+    /// 里，按第 0 列 + 终端全宽去画会让它左右跳（09-24 验收问题 1）。
+    fn repaint_footer_row(&mut self) -> Result<()> {
         let Some(offset) = self.footer_offset else {
             return Ok(());
         };
-        let row = self.tail_start.saturating_add(offset);
         if !self.rendered {
             return Ok(());
         }
-        let (cols, rows) = terminal::size().unwrap_or((80, 24));
+        let row = self.tail_start.saturating_add(offset);
+        let (_, rows) = terminal::size().unwrap_or((80, 24));
         if row >= rows {
             return Ok(());
         }
-        let line =
-            crate::cli::footer::repl_footer_line(self.editor.mode, &self.footer, usize::from(cols));
-        let input_cursor = self.input_cursor;
+        let line = crate::cli::footer::repl_footer_line(
+            self.editor.mode,
+            &self.footer,
+            self.footer_cols,
+        );
+        let (left, input_cursor) = (self.footer_left, self.input_cursor);
         synchronized_terminal_update(CursorAfterUpdate::Preserve, || {
             let mut stdout = io::stdout();
-            queue!(stdout, MoveTo(0, row), Print(line))?;
+            // 先清掉这一行的残り，再从左边距起画：窄框左边是 banner 的星空，
+            // 不能整行清。
+            queue!(
+                stdout,
+                MoveTo(left, row),
+                Clear(ClearType::CurrentLine),
+                Print(line)
+            )?;
             queue!(stdout, MoveTo(input_cursor.0, input_cursor.1))?;
             stdout.flush()?;
             Ok(())
@@ -981,24 +1011,7 @@ impl LiveReplTail {
         self.footer_spinner_last = Some(now);
         self.footer.running_spinner =
             Some(self.footer.running_spinner.map_or(0, |f| f.wrapping_add(1)));
-        let Some(offset) = self.footer_offset else {
-            return Ok(());
-        };
-        let row = self.tail_start.saturating_add(offset);
-        let (cols, rows) = terminal::size().unwrap_or((80, 24));
-        if row >= rows {
-            return Ok(());
-        }
-        let line =
-            crate::cli::footer::repl_footer_line(self.editor.mode, &self.footer, usize::from(cols));
-        let input_cursor = self.input_cursor;
-        synchronized_terminal_update(CursorAfterUpdate::Preserve, || {
-            let mut stdout = io::stdout();
-            queue!(stdout, MoveTo(0, row), Print(line))?;
-            queue!(stdout, MoveTo(input_cursor.0, input_cursor.1))?;
-            stdout.flush()?;
-            Ok(())
-        })
+        self.repaint_footer_row()
     }
 }
 

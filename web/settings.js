@@ -2220,6 +2220,8 @@ window.GqySettings = (() => {
       }
       root.append(grid);
     }
+    // 外部扩展（技能 / 脚本 / MCP / pm 包）在 settings-extensions.js，卡片、抽屉等零件从这里借，长得和内置插件一样。
+    window.GqySettingsExtensions?.render(root, { el, icon, chip, toggle, card, row, empty, button, openDrawer, closeDrawer, openDialog, confirmAction, textInput, textarea, cfg, setCfg, toast, rerender });
   }
 
   function openPluginDrawer(pluginKey) {

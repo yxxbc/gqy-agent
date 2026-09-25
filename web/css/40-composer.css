@@ -56,9 +56,9 @@
   transition: box-shadow var(--motion-slow) ease, border-color var(--motion-slow) ease;
 }
 
+/* 页面一打开输入框就是聚焦的，外圈光环会一直亮着；聚焦只让描边转强调色。 */
 .composer:focus-within {
-  border-color: color-mix(in srgb, var(--accent) 55%, transparent);
-  box-shadow: var(--card-shadow), 0 0 0 3px color-mix(in srgb, var(--accent) 15%, transparent);
+  border-color: color-mix(in srgb, var(--accent) 50%, transparent);
 }
 
 .composer.is-disabled {

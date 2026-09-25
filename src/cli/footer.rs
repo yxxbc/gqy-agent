@@ -17,6 +17,10 @@ pub(in crate::cli) struct ReplFooterStatus {
     /// 回合运行中的盲文转轮帧号;None=空闲不显示。随 spinner tick 推进,
     /// set_footer 的权威覆盖(from_config 构造)自然回落 None。
     pub(in crate::cli) running_spinner: Option<usize>,
+    /// 空会话（还在大厅里）不画上下文占用。那个数字是系统提示词 + 工具目录的
+    /// 前缀估算，技术上真会占，但一句话没说就看到「7.3k」像是还没聊就用掉了
+    /// （09-24 验收问题 7）。
+    pub(in crate::cli) hide_context: bool,
 }
 
 /// Σ is hidden entirely when nothing has been spent yet, so an empty session
@@ -54,6 +58,7 @@ impl ReplFooterStatus {
             mixed_models,
             thinking: None,
             running_spinner: None,
+            hide_context: false,
             token_usage: render::TokenMeter {
                 session_tokens,
                 context_window: window.map(|(value, _)| value),
@@ -221,6 +226,7 @@ pub(in crate::cli) fn repl_footer_line(
     // keeping it here cost 14 columns and pushed the whole footer past 80.
     let usage = render::TokenMeter {
         turn_tokens: 0,
+        context_hidden: footer.hide_context,
         ..footer.token_usage
     };
     // Narrow terminals: the gauge shrinks to a bare percent first, then drop

@@ -153,6 +153,51 @@ fn renders_inline_code_when_stream_chunks_split_backticks() {
 }
 
 #[test]
+fn renders_double_backtick_span_whose_content_contains_a_backtick() {
+    // 模型写 ``a`b`` 时闭合必须认**等长**的反引号串：拿下一个单反引号当闭合的话，
+    // 只会得到一个空的着色段，剩下的反引号原样漏在屏幕上。
+    let output = render_inline("记号 ``a`b`` 要整段上色");
+    assert_eq!(
+        output,
+        format!("记号 {INLINE_CODE_STYLE}a`b{RESET} 要整段上色"),
+        "{output}"
+    );
+    // 单反引号的旧行为不能动：整行不该留下定界符。
+    assert_eq!(render_inline("`x` 与 `y`"), format!("{INLINE_CODE_STYLE}x{RESET} 与 {INLINE_CODE_STYLE}y{RESET}"));
+}
+
+#[test]
+fn keeps_unclosed_backtick_run_literal_without_eating_the_line() {
+    // 这一行找不到等长的闭合串：那串反引号原样吐出来，后面真的 `x` 照样上色。
+    let output = render_inline("``` 开头没闭合,后面 `x` 还在");
+    assert!(output.starts_with("``` "), "{output}");
+    assert!(output.contains(&format!("{INLINE_CODE_STYLE}x{RESET}")), "{output}");
+}
+
+#[test]
+fn styles_inline_code_inside_link_label() {
+    let output = render_inline("[读 `x.y.z`](https://example.com/a)");
+    assert!(
+        output.contains(&format!("{LINK_LABEL_STYLE}读 {INLINE_CODE_STYLE}x.y.z")),
+        "{output}"
+    );
+    assert!(!output.contains('`'), "标签里的反引号要被吃掉: {output}");
+    assert!(
+        output.contains(&format!("{URL_STYLE}https://example.com/a{RESET}")),
+        "{output}"
+    );
+}
+
+#[test]
+fn fenced_code_blocks_keep_backticks_literal() {
+    // 围栏里的反引号轮不到行内解析：这条守住那条边界。
+    let mut renderer = MarkdownStreamRenderer::new();
+    let output = renderer.push("```\nlet x = `date`;\n```\n");
+    let plain = strip_ansi_text(&output);
+    assert!(plain.contains("let x = `date`;"), "{plain}");
+}
+
+#[test]
 fn keeps_identifier_underscores_literal() {
     let output = render_inline("GTK_IM_MODULE and _italic_");
     assert!(output.contains("GTK_IM_MODULE"));

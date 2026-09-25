@@ -64,7 +64,7 @@ pub struct PluginSelection {
     /// 只在 `scripts` 插件开着时有意义。
     #[serde(skip_serializing_if = "Option::is_none")]
     pub scripts: Option<Vec<String>>,
-    /// 技能按名字的白名单;None = 全部。平台级内置技能(skill-creator /
+    /// 技能按名字的白名单;None = 全部。平台级内置技能(skill-creator / gqy-cli /
     /// script-creator)不受它管——那是「如何扩展自己」的元能力。
     /// 只在 `subsystems.skills` 开着时有意义。
     #[serde(skip_serializing_if = "Option::is_none")]

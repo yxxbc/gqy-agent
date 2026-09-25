@@ -1,7 +1,7 @@
 //! `gqy pm`:装 / 卸 / 升 / 搜 / 列 / tap。`gqypm` 是同一套(argv[0] 识别)。
 
 use crate::cli::*;
-use crate::pm::{self, PackageSource};
+use crate::pm;
 
 #[derive(Debug, Args)]
 pub struct PmArgs {
@@ -74,17 +74,6 @@ fn confirm(question: &str, yes: bool) -> Result<bool> {
     Ok(matches!(answer.trim(), "y" | "Y" | "yes" | "是"))
 }
 
-async fn resolve_source(
-    paths: &GqyPaths,
-    spec: &str,
-    reference: Option<&str>,
-) -> Result<PackageSource> {
-    match PackageSource::parse_spec(spec, reference)? {
-        Some(source) => Ok(source),
-        None => pm::resolve_from_taps(paths, spec).await,
-    }
-}
-
 async fn notify_daemon(paths: &GqyPaths) {
     // 脚本目录一变下一回合自动重扫;通知 daemon 重载配置顺带刷新技能目录指纹。
     if let Err(error) = reload_daemon_if_running(paths).await {
@@ -104,7 +93,8 @@ pub(in crate::cli) async fn run_pm(paths: &GqyPaths, args: PmArgs) -> Result<()>
     let config = AppConfig::load_or_default(paths)?;
     match args.command {
         PmCommand::Install(install) => {
-            let source = resolve_source(paths, &install.spec, install.reference.as_deref()).await?;
+            let source =
+                pm::resolve_source(paths, &install.spec, install.reference.as_deref()).await?;
             let fetched = pm::fetch(&source).await?;
             let plan = pm::plan_install(&config, paths, &fetched.root)?;
             let name = plan.manifest.package.name.clone();
@@ -172,31 +162,18 @@ pub(in crate::cli) async fn run_pm(paths: &GqyPaths, args: PmArgs) -> Result<()>
             }
             let mut changed = false;
             for name in targets {
-                let installed = &lock.packages[&name];
-                let source =
-                    resolve_source(paths, &installed.source, installed.reference.as_deref())
-                        .await?;
-                let fetched = pm::fetch(&source).await?;
-                let plan = pm::plan_install(&config, paths, &fetched.root)?;
-                if plan.manifest.package.name != name {
-                    bail!(
-                        "{} now serves package {:?}, not {name:?}",
-                        source.describe(),
-                        plan.manifest.package.name
-                    );
-                }
-                if pm::is_up_to_date(installed, &plan, fetched.commit.as_deref())? {
+                let Some(prepared) = pm::prepare_upgrade(&config, paths, &name).await? else {
                     println!("{name}: {}", t("up to date", "已是最新"));
                     continue;
-                }
+                };
                 println!(
                     "{name}: {} -> {}",
-                    installed.version, plan.manifest.package.version
+                    prepared.from_version, prepared.to_version
                 );
                 if !confirm(t("Upgrade?", "升级吗?"), yes)? {
                     continue;
                 }
-                pm::install(paths, &plan, &source, fetched.commit, false)?;
+                pm::apply_upgrade(paths, prepared)?;
                 changed = true;
                 println!(
                     "{}",

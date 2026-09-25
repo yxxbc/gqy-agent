@@ -1,0 +1,127 @@
+#!/usr/bin/env python3
+# Id: anysearch
+# Display name: AnySearch 智能搜索
+# Description: Search the web via AnySearch AI search infrastructure. Fast, noise-filtered search with intent routing, sub-domain tags, and clean markdown output.
+# Timeout: 30
+# Parameters: {"type":"object","properties":{"query":{"type":"string","description":"Search query keywords, questions, or site syntax like site:x.com"},"max_results":{"type":"integer","description":"Max number of results to return (1-10), default 8"},"tag":{"type":"string","description":"Optional sub-domain capability tag, e.g. code.doc, code.snippet, finance"},"zone":{"type":"string","enum":["cn","intl"],"description":"Optional search region, cn or intl"},"language":{"type":"string","description":"Preferred language code, e.g. zh-CN, en"},"format":{"type":"string","enum":["md","json"],"description":"Output format, default md"}},"required":["query"]}
+
+import json
+import os
+import sys
+import urllib.error
+import urllib.request
+
+API_URL = "https://api.anysearch.com/v1/search"
+
+def search(query, max_results=8, tag=None, zone=None, language=None, output_format="md"):
+    payload = {
+        "query": query,
+        "max_results": max(1, min(10, int(max_results))) if max_results else 8
+    }
+    if tag:
+        payload["tag"] = tag
+    if zone:
+        payload["zone"] = zone
+    if language:
+        payload["language"] = language
+
+    headers = {
+        "Content-Type": "application/json",
+        "User-Agent": "GQY-Agent/1.0"
+    }
+    api_key = os.environ.get("ANYSEARCH_API_KEY", "").strip()
+    if api_key:
+        headers["Authorization"] = f"Bearer {api_key}"
+
+    req = urllib.request.Request(
+        API_URL,
+        data=json.dumps(payload).encode("utf-8"),
+        headers=headers,
+        method="POST"
+    )
+
+    try:
+        with urllib.request.urlopen(req, timeout=20) as resp:
+            data = json.loads(resp.read().decode("utf-8"))
+    except urllib.error.HTTPError as e:
+        err_body = e.read().decode("utf-8", errors="replace")
+        return {"ok": False, "error": f"HTTP {e.code}: {err_body}"}
+    except Exception as e:
+        return {"ok": False, "error": f"Request failed: {str(e)}"}
+
+    if data.get("code") != 0:
+        return {"ok": False, "error": data.get("message", "Unknown error")}
+
+    res_data = data.get("data", {})
+    results = res_data.get("results", [])
+    metadata = res_data.get("metadata", {})
+
+    if output_format == "json":
+        return {
+            "ok": True,
+            "query": query,
+            "total": metadata.get("total_results", len(results)),
+            "time_ms": metadata.get("search_time_ms"),
+            "results": results
+        }
+
+    # Format Markdown
+    if not results:
+        return f"No search results found for query: {query}"
+
+    lines = [f"### AnySearch Results for: `{query}`\n"]
+    for i, item in enumerate(results, 1):
+        title = item.get("title", "Untitled").strip()
+        url = item.get("url", "")
+        content = item.get("content") or item.get("snippet") or ""
+        content = content.strip()
+        lines.append(f"{i}. [{title}]({url})")
+        if content:
+            lines.append(f"   {content}")
+        lines.append("")
+
+    time_ms = metadata.get("search_time_ms")
+    if time_ms:
+        lines.append(f"*(Search completed in {time_ms} ms)*")
+
+    return "\n".join(lines)
+
+def main():
+    raw = os.environ.get("GQY_ARGS_JSON")
+    if not raw:
+        if not sys.stdin.isatty():
+            raw = sys.stdin.read()
+        else:
+            raw = "{}"
+    try:
+        args = json.loads(raw) if raw.strip() else {}
+    except Exception:
+        args = {}
+
+    query = args.get("query", "").strip()
+    if not query:
+        print(json.dumps({"ok": False, "error": "Parameter 'query' is required"}, ensure_ascii=False))
+        return
+
+    max_results = args.get("max_results", 8)
+    tag = args.get("tag")
+    zone = args.get("zone")
+    language = args.get("language")
+    fmt = args.get("format", "md")
+
+    output = search(
+        query=query,
+        max_results=max_results,
+        tag=tag,
+        zone=zone,
+        language=language,
+        output_format=fmt
+    )
+
+    if isinstance(output, dict):
+        print(json.dumps(output, ensure_ascii=False, indent=2))
+    else:
+        print(output)
+
+if __name__ == "__main__":
+    main()

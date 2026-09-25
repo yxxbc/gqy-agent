@@ -1,0 +1,304 @@
+#!/usr/bin/env python3
+# -*- coding: utf-8 -*-
+# 显示名称：macOS 新闻
+# Platform: macos
+# Description: Fetch macOS news and update advisories. The macOS counterpart of Arch news: read it before installing a system update to learn whether this release breaks something. Four sources, each fetched independently and degraded on failure: applesec (Apple's official security-releases page -- which OS versions got security fixes and when, filtered to macOS/Safari/Xcode entries), eclecticlight (Howard Oakley; the closest thing macOS has to Arch news -- what actually changed and what is known broken), mrmacintosh (enterprise Mac admin angle, usually first to say "hold off on this one"), apple (Apple Developer News; official releases and deprecations). Items published since the last run are flagged is_new, same idea as archlinux_news; the marker lives in the script cache dir, so the first run flags everything. Check sources_failed before concluding "no news": with one source missing the list looks normal but may be missing the single warning that mattered. Output defaults to Markdown; format=json returns {sources_ok, sources_failed, new_count, total, items[]}.
+# Timeout: 60
+# Group: research
+# Permission: read-only
+# Trust: owner
+# Example: {"limit":8}
+# Parameters:
+# {
+#   "type": "object",
+#   "properties": {
+#     "source": {
+#       "type": "string",
+#       "enum": ["all", "applesec", "eclecticlight", "mrmacintosh", "apple"],
+#       "description": "Which feed to read. Default all (merged, newest first)"
+#     },
+#     "limit": {
+#       "type": "integer",
+#       "description": "Max items to return, 1-30. Default 10"
+#     },
+#     "new_only": {
+#       "type": "boolean",
+#       "description": "Only return items published since the last run. Default false"
+#     },
+#     "format": {
+#       "type": "string",
+#       "enum": ["markdown", "json"],
+#       "description": "Output format. Default markdown"
+#     }
+#   }
+# }
+
+import json
+import os
+import re
+import sys
+import urllib.request
+from datetime import datetime
+from email.utils import parsedate_to_datetime
+from xml.etree import ElementTree
+
+# key -> (显示名, URL, 解析方式)
+FEEDS = {
+    "applesec": ("Apple 安全更新", "https://support.apple.com/en-us/100100", "apple_security"),
+    "eclecticlight": ("Eclectic Light", "https://eclecticlight.co/category/technology/feed/", "rss"),
+    "mrmacintosh": ("Mr. Macintosh", "https://mrmacintosh.com/feed/", "rss"),
+    "apple": ("Apple Developer News", "https://developer.apple.com/news/rss/news.rss", "rss"),
+}
+
+# applesec 那张表里 iOS/watchOS/tvOS 的条目占大多数;这是 macOS 工具,
+# 只留标题或适用平台里提到 macOS / Safari / Xcode 的行。
+APPLE_KEEP = ("macos", "safari", "xcode", "mac ")
+
+UA = "miyu-macos-news/1.0"
+STATE_FILE = "macos_news_seen.json"
+
+ENTITIES = (
+    ("&nbsp;", " "), ("&amp;", "&"), ("&lt;", "<"), ("&gt;", ">"),
+    ("&quot;", '"'), ("&#8217;", "'"), ("&#8216;", "'"),
+    ("&#8220;", '"'), ("&#8221;", '"'), ("&#8230;", "..."),
+)
+
+
+def fail(error, fix=None, code=2):
+    print(json.dumps({"ok": False, "error": error, "fix": fix}, ensure_ascii=False))
+    sys.exit(code)
+
+
+def cache_dir():
+    path = os.environ.get("GQY_SCRIPT_CACHE_DIR")
+    if not path:
+        base = os.environ.get("XDG_CACHE_HOME", os.path.expanduser("~/.cache"))
+        path = os.path.join(base, "miyu")
+    os.makedirs(path, exist_ok=True)
+    return path
+
+
+def load_seen():
+    try:
+        with open(os.path.join(cache_dir(), STATE_FILE), encoding="utf-8") as handle:
+            data = json.load(handle)
+        return data if isinstance(data, dict) else {}
+    except Exception:
+        return {}
+
+
+def save_seen(seen):
+    # 缓存写不进去不该让整个工具失败:大不了下次所有条目都算新的
+    try:
+        with open(os.path.join(cache_dir(), STATE_FILE), "w", encoding="utf-8") as handle:
+            json.dump(seen, handle, ensure_ascii=False, indent=2)
+    except Exception:
+        pass
+
+
+def strip_html(text):
+    text = re.sub(r"(?is)<(script|style).*?</\1>", " ", text or "")
+    text = re.sub(r"(?s)<[^>]+>", " ", text)
+    for entity, char in ENTITIES:
+        text = text.replace(entity, char)
+    return re.sub(r"\s+", " ", text).strip()
+
+
+def sort_key(item):
+    raw = (item.get("published") or "").strip()
+    try:
+        return parsedate_to_datetime(raw).timestamp()
+    except Exception:
+        pass
+    for fmt in ("%d %b %Y", "%d %B %Y", "%b %d, %Y", "%B %d, %Y"):
+        try:
+            return datetime.strptime(raw, fmt).timestamp()
+        except ValueError:
+            continue
+    return 0.0
+
+
+def fetch(url):
+    request = urllib.request.Request(url, headers={"User-Agent": UA})
+    with urllib.request.urlopen(request, timeout=20) as response:
+        if response.status != 200:
+            raise RuntimeError("HTTP %s" % response.status)
+        return response.read()
+
+
+def parse_feed(raw, source_key, source_name):
+    root = ElementTree.fromstring(raw)
+    items = []
+    for node in root.iter("item"):  # RSS 2.0
+        items.append({
+            "source": source_key,
+            "source_name": source_name,
+            "title": strip_html(node.findtext("title") or ""),
+            "url": (node.findtext("link") or "").strip(),
+            "published": (node.findtext("pubDate") or "").strip(),
+            "summary": strip_html(node.findtext("description") or "")[:400],
+        })
+    if items:
+        return items
+    ns = "{http://www.w3.org/2005/Atom}"  # Atom 兜底
+    for node in root.iter(ns + "entry"):
+        link = ""
+        for candidate in node.iter(ns + "link"):
+            link = candidate.get("href") or ""
+            if candidate.get("rel") in (None, "alternate"):
+                break
+        items.append({
+            "source": source_key,
+            "source_name": source_name,
+            "title": strip_html(node.findtext(ns + "title") or ""),
+            "url": link.strip(),
+            "published": (node.findtext(ns + "updated")
+                          or node.findtext(ns + "published") or "").strip(),
+            "summary": strip_html(node.findtext(ns + "summary") or "")[:400],
+        })
+    return items
+
+
+def parse_apple_security(raw, source_key, source_name):
+    """Apple 安全更新页是服务端渲染的表格:名称 / 适用平台 / 发布日期 / 公告链接。"""
+    html = raw.decode("utf-8", "replace")
+    items = []
+    for row in re.findall(r"(?s)<tr[^>]*>(.*?)</tr>", html):
+        cells = [strip_html(cell)
+                 for cell in re.findall(r"(?s)<td[^>]*>(.*?)</td>", row)]
+        if len(cells) < 2 or not cells[0]:
+            continue  # 表头或空行
+        title, platforms = cells[0], cells[1]
+        published = cells[2] if len(cells) > 2 else ""
+        haystack = ("%s %s" % (title, platforms)).lower()
+        if not any(word in haystack for word in APPLE_KEEP):
+            continue
+        link = re.search(r'href="([^"]+)"', row)
+        url = link.group(1) if link else "https://support.apple.com/en-us/100100"
+        if url.startswith("/"):
+            url = "https://support.apple.com" + url
+        items.append({
+            "source": source_key,
+            "source_name": source_name,
+            "title": title,
+            "url": url,
+            "published": published,
+            "summary": ("适用于:%s" % platforms) if platforms else "",
+        })
+    return items
+
+
+def mark_new(items, sources_ok, seen):
+    """按源各自从最新往回数,数到上次见过的那条为止——与 archlinux_news 同一套口径。"""
+    new_count = 0
+    newest = {}
+    for key in sources_ok:
+        per_source = [item for item in items if item["source"] == key]
+        if not per_source:
+            continue
+        newest[key] = per_source[0]["url"]
+        last_url = seen.get(key)
+        fresh = 0
+        for entry in per_source:
+            if last_url is not None and entry["url"] == last_url:
+                break
+            fresh += 1
+        for index, entry in enumerate(per_source):
+            entry["is_new"] = index < fresh
+        new_count += fresh
+    for entry in items:
+        entry.setdefault("is_new", False)
+    return new_count, newest
+
+
+def render_markdown(payload):
+    lines = []
+    head = "## macOS 新闻 · "
+    head += ("%d 条新的" % payload["new_count"]) if payload["new_count"] else "无新条目"
+    head += " · 抓到 %d 条" % payload["total"]
+    if payload["returned"] < payload["total"]:
+        head += ",显示前 %d 条" % payload["returned"]
+    lines.append(head)
+    lines.append("")
+    for item in payload["items"]:
+        mark = "🆕 " if item["is_new"] else ""
+        lines.append("- %s**[%s](%s)**"
+                     % (mark, item["title"] or "(无标题)", item["url"]))
+        meta = " · ".join(x for x in (item["source_name"], item["published"]) if x)
+        if meta:
+            lines.append("  %s" % meta)
+        if item["summary"]:
+            lines.append("  %s" % item["summary"][:200])
+    if payload["sources_failed"]:
+        lines.append("")
+        lines.append("### Notes")
+        for entry in payload["sources_failed"]:
+            lines.append("- 源 `%s` 取不到:%s。这批结果可能漏了它的内容。"
+                         % (entry["source"], entry["error"]))
+    return "\n".join(lines)
+
+
+def main():
+    raw_args = os.environ.get("GQY_ARGS_JSON") or sys.stdin.read() or "{}"
+    try:
+        args = json.loads(raw_args) or {}
+    except json.JSONDecodeError as error:
+        fail("arguments are not valid JSON: %s" % error,
+             'pass a JSON object, e.g. {"limit": 8}')
+
+    source = args.get("source") or "all"
+    if source != "all" and source not in FEEDS:
+        fail("unknown source %r" % source,
+             "use one of: all, %s" % ", ".join(FEEDS))
+    try:
+        limit = max(1, min(30, int(args.get("limit") or 10)))
+    except (TypeError, ValueError):
+        fail("limit must be an integer", 'e.g. {"limit": 10}')
+    new_only = bool(args.get("new_only"))
+    fmt = args.get("format") or "markdown"
+
+    wanted = list(FEEDS) if source == "all" else [source]
+    seen = load_seen()
+    items, sources_ok, sources_failed = [], [], []
+
+    for key in wanted:
+        name, url, kind = FEEDS[key]
+        parser = parse_apple_security if kind == "apple_security" else parse_feed
+        try:
+            items.extend(parser(fetch(url), key, name))
+            sources_ok.append(key)
+        except Exception as error:  # 单源失败不拖垮整体
+            sources_failed.append({"source": key, "error": str(error)[:200]})
+
+    if not sources_ok:
+        detail = "; ".join("%s: %s" % (e["source"], e["error"]) for e in sources_failed)
+        fail("every feed failed: %s" % detail, "check the network, then retry")
+
+    items.sort(key=sort_key, reverse=True)
+    new_count, newest = mark_new(items, sources_ok, seen)
+
+    if new_only:
+        items = [item for item in items if item["is_new"]]
+    total = len(items)
+    items = items[:limit]
+
+    seen.update(newest)
+    save_seen(seen)
+
+    payload = {
+        "ok": True,
+        "sources_ok": sources_ok,
+        "sources_failed": sources_failed,
+        "new_count": new_count,
+        "total": total,
+        "returned": len(items),
+        "items": items,
+    }
+    if fmt == "json":
+        print(json.dumps(payload, ensure_ascii=False, indent=2))
+    else:
+        print(render_markdown(payload))
+
+
+if __name__ == "__main__":
+    main()

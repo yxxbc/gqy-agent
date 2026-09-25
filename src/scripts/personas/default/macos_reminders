@@ -1,0 +1,217 @@
+#!/usr/bin/env python3
+# Display name: macOS 待办
+# Platform: macos
+# Description: Read and write macOS Reminders: add, list, complete or delete todos. Use for daily todo management.
+# Timeout: 60
+# Group: life
+# Parameters:
+# {
+#   "type": "object",
+#   "properties": {
+#     "action": {"type": "string", "enum": ["lists", "list", "today", "add", "complete", "delete"], "description": "lists: 列出所有列表; list: 列出未完成; today: 今天到期或已逾期; add: 新增; complete: 完成; delete: 删除"},
+#     "text": {"type": "string", "description": "待办内容（add 必填；complete/delete 为匹配关键字）"},
+#     "list": {"type": "string", "description": "列表名，默认使用默认列表"},
+#     "due": {"type": "string", "description": "截止时间，ISO 8601，如 2026-09-15T19:00:00（本地时间）"},
+#     "note": {"type": "string", "description": "备注"},
+#     "remind_at": {"type": "string", "description": "提醒时间，ISO 8601 本地时间，到点由系统提醒"},
+#     "repeat": {"type": "string", "description": "重复规则，iCalendar RRULE，如 FREQ=DAILY 表示每天重复"},
+#     "include_completed": {"type": "boolean", "description": "list 时是否包含已完成项，默认 false"},
+#     "limit": {"type": "integer", "description": "最多返回条数，默认 30"},
+#     "format": {"type": "string", "enum": ["text", "json"], "description": "输出格式，默认 text"}
+#   },
+#   "required": ["action"]
+# }
+import json
+import os
+import subprocess
+import sys
+from datetime import datetime
+
+JXA_COMMON = r"""
+function iso(v) { try { return v ? v.toISOString() : null; } catch (e) { return null; } }
+function pickList(app, name) {
+  var all = app.lists();
+  if (name) {
+    for (var i = 0; i < all.length; i++) { if (all[i].name() === name) return all[i]; }
+    return null;
+  }
+  for (var j = 0; j < all.length; j++) { if (all[j].name() === 'Reminders') return all[j]; }
+  return all.length ? all[0] : null;
+}
+function collect(list, includeCompleted) {
+  var rems = includeCompleted ? list.reminders() : list.reminders.whose({completed: false})();
+  var out = [];
+  for (var i = 0; i < rems.length; i++) {
+    var r = rems[i];
+    out.push({ name: r.name(), completed: Boolean(r.completed()), due: iso(r.dueDate()), note: String(r.body() || '') });
+  }
+  return out;
+}
+function main() {
+  var app = Application('Reminders');
+  if (P.action === 'lists') return { ok: true, lists: app.lists.name() };
+  var list = pickList(app, P.list);
+  if (!list) return { ok: false, error: '找不到列表' + (P.list ? '：' + P.list : '') };
+  if (P.action === 'add') {
+    if (!P.text) return { ok: false, error: 'text 必填' };
+    var props = { name: P.text };
+    if (P.note) props.body = P.note;
+    var item = app.Reminder(props);
+    list.reminders.push(item);
+    if (P.due) item.dueDate = new Date(P.due);
+    if (P.remind_at) item.remindMeDate = new Date(P.remind_at);
+    if (P.repeat) item.recurrence = P.repeat;
+    return { ok: true, added: P.text, list: list.name(), due: P.due || null,
+             remind_at: P.remind_at || null, repeat: P.repeat || null };
+  }
+  if (P.action === 'complete' || P.action === 'delete') {
+    if (!P.text) return { ok: false, error: 'text 必填' };
+    var rems = list.reminders.whose({ completed: false })();
+    var hit = [];
+    for (var k = 0; k < rems.length; k++) {
+      var nm = rems[k].name();
+      if (nm === P.text || nm.indexOf(P.text) >= 0) {
+        hit.push(nm);
+        if (P.action === 'complete') { rems[k].completed = true; } else { rems[k].delete(); }
+      }
+    }
+    if (!hit.length) return { ok: false, error: '没找到匹配的待办：' + P.text };
+    return { ok: true, action: P.action, items: hit, list: list.name() };
+  }
+  var items = collect(list, Boolean(P.include_completed));
+  return { ok: true, list: list.name(), items: items };
+}
+try { JSON.stringify(main()); } catch (e) { JSON.stringify({ ok: false, error: String(e) }); }
+"""
+
+
+def fail(error, fix=None, code=2):
+    print(json.dumps({"ok": False, "error": error, "fix": fix}, ensure_ascii=False))
+    sys.exit(code)
+
+
+EVENTKIT_BIN = os.path.expanduser("~/bin/gqy-reminder")
+
+
+def add_via_eventkit(args):
+    """带重复规则的待办交给 EventKit 小工具：macOS 26 的脚本接口已设不了 recurrence。"""
+    payload = {
+        "action": "add",
+        "title": args.get("text"),
+        "notes": args.get("note"),
+        "list": args.get("list"),
+        "remind_at": args.get("remind_at") or args.get("due"),
+        "repeat": args.get("repeat"),
+    }
+    payload = {k: v for k, v in payload.items() if v}
+    proc = subprocess.run(
+        [EVENTKIT_BIN],
+        input=json.dumps(payload, ensure_ascii=False),
+        capture_output=True,
+        text=True,
+    )
+    if proc.returncode != 0:
+        detail = (proc.stdout or proc.stderr or "").strip()[:200] or "未知错误"
+        fail("EventKit 写入失败：" + detail)
+    try:
+        data = json.loads((proc.stdout or "").strip() or "{}")
+    except json.JSONDecodeError:
+        fail("EventKit 输出无法解析")
+    if not data.get("ok"):
+        fail(str(data.get("error")))
+    return data
+
+
+def run_jxa(args):
+    script = "const P = " + json.dumps(args, ensure_ascii=False) + ";\n" + JXA_COMMON
+    proc = subprocess.run(
+        ["osascript", "-l", "JavaScript", "-"],
+        input=script,
+        capture_output=True,
+        text=True,
+    )
+    if proc.returncode != 0:
+        err = (proc.stderr or "").strip()
+        if "-1743" in err or "Not authorized" in err:
+            fail(
+                "没有访问提醒事项的权限",
+                "系统设置 → 隐私与安全性 → 自动化，允许终端/顾清影控制「提醒事项」",
+            )
+        fail("osascript 失败：" + (err or "未知错误"))
+    try:
+        return json.loads((proc.stdout or "").strip() or "{}")
+    except json.JSONDecodeError:
+        fail("osascript 输出无法解析：" + (proc.stdout or "")[:200])
+
+
+def local_dt(value):
+    if not value:
+        return None
+    try:
+        return datetime.fromisoformat(value.replace("Z", "+00:00")).astimezone()
+    except ValueError:
+        return None
+
+
+def fmt_due(value):
+    dt = local_dt(value)
+    if not dt:
+        return ""
+    now = datetime.now().astimezone()
+    stamp = dt.strftime("%m-%d %H:%M")
+    if dt.date() == now.date():
+        stamp = "今天 " + dt.strftime("%H:%M")
+    elif dt < now:
+        stamp = "逾期 " + dt.strftime("%m-%d %H:%M")
+    return stamp
+
+
+def main():
+    raw = sys.stdin.read() or "{}"
+    try:
+        args = json.loads(raw)
+    except json.JSONDecodeError:
+        fail("参数不是合法 JSON")
+
+    action = args.get("action")
+    if not action:
+        fail("action 必填，可选 lists/list/today/add/complete/delete")
+
+    if action == "add" and args.get("repeat") and os.path.exists(EVENTKIT_BIN):
+        print(json.dumps(add_via_eventkit(args), ensure_ascii=False, indent=2))
+        return
+
+    data = run_jxa(args)
+    if not data.get("ok"):
+        fail(data.get("error", "执行失败"))
+
+    if args.get("format") == "json" or action in ("lists", "add", "complete", "delete"):
+        print(json.dumps(data, ensure_ascii=False, indent=2))
+        return
+
+    items = data.get("items", [])
+    if action == "today":
+        now = datetime.now().astimezone()
+        kept = []
+        for it in items:
+            dt = local_dt(it.get("due"))
+            if dt and dt <= now.replace(hour=23, minute=59, second=59):
+                kept.append(it)
+        items = kept
+
+    limit = int(args.get("limit") or 30)
+    items = items[:limit]
+    if not items:
+        print("没有待办（列表：" + str(data.get("list")) + "）")
+        return
+
+    lines = ["待办（" + str(data.get("list")) + "，" + str(len(items)) + " 条）："]
+    for idx, it in enumerate(items, 1):
+        due = fmt_due(it.get("due"))
+        flag = "已完成" if it.get("completed") else ("[" + due + "] " if due else "")
+        lines.append(str(idx) + ". " + flag + str(it.get("name")))
+    print("\n".join(lines))
+
+
+if __name__ == "__main__":
+    main()

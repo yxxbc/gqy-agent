@@ -97,7 +97,8 @@ pub(in crate::cli) fn open_config_ui(paths: &GqyPaths, args: &str) -> Result<Opt
         return Ok(None);
     }
     let choices = crate::config_tui::settings_group_choices();
-    if !choices.iter().any(|(id, _)| id.eq_ignore_ascii_case(args)) {
+    // 分组名可以直接输：id 和界面上显示的名字都认（菜单里那六行的名字就是参数）。
+    if !crate::config_tui::is_settings_group(args) {
         let ids: Vec<&str> = choices.iter().map(|(id, _)| *id).collect();
         return Ok(Some(format!(
             "{}: {args} ({})",

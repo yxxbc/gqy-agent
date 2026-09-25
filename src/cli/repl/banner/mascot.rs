@@ -10,6 +10,9 @@
 //! 立绘源图是 `assets/mascot/portrait.png`（`testkit/tui/mascot.py
 //! --export-portrait` 从用户提供的原图裁出头肩、缩到 256 像素宽），半格版在
 //! 运行时按终端能给的格数现缩。
+//!
+//! 黑猫是字符画，三档降级（48×23 / 24×12 / 16×8，同一张原图整块降采样）：欢迎框
+//! 并排时最多只能给 43 列，只留原图那一档等于永远不画猫。
 
 use std::sync::OnceLock;
 
@@ -29,6 +32,13 @@ const PORTRAIT_WIDTHS: [usize; 2] = [32, 24];
 const KITTY_MAX: (u16, u16) = (16, 8);
 /// 透明度低于这个就当背景，不画。
 const ALPHA_CUT: u8 = 128;
+
+/// 黑猫的降级阶梯：原图按这个倍数整块降采样，从大到小试（1 = 原图 48×23）。
+/// 并排时欢迎框最多只给 43 列（`MAX_WIDTH` 84 扣掉框线 4、文字下限 34、间隔 3），
+/// 原图那一档在任何终端宽度下都塞不进，没有阶梯就永远看不见猫（09-27 验收问题 8）。
+const CAT_RUNGS: [usize; 3] = [1, 2, 3];
+/// 字符画的密度阶梯，越靠后越黑；降采样按块取平均密度。
+const CAT_RAMP: [char; 10] = [' ', '.', ':', '-', '=', '+', '*', '#', '%', '@'];
 
 /// 黑猫的青瓷绿渐变：上淡下浓，深浅底各一套。
 const CAT_DARK: (Rgb, Rgb) = ((0xc9, 0xd3, 0xd0), (0x7f, 0xb5, 0xa3));
@@ -188,16 +198,88 @@ fn kitty_portrait(image: &DynamicImage, max_cols: usize, max_rows: usize) -> Opt
     })
 }
 
+/// 黑猫：挑阶梯里放得下的最大一档，一档都放不下才返回 `None`。
 fn cat(theme: Theme, max_cols: usize, max_rows: usize) -> Option<MascotRows> {
-    let lines: Vec<&str> = CAT_ART.lines().collect();
-    let cols = lines
+    cat_ladder()
+        .iter()
+        .find(|(cols, lines)| *cols <= max_cols && lines.len() <= max_rows)
+        .map(|(cols, lines)| paint_cat(lines, *cols, theme))
+}
+
+/// 阶梯的三档字符画（宽度 + 行）。降采样是原图的纯函数，进程内算一次。
+fn cat_ladder() -> &'static [(usize, Vec<String>)] {
+    static LADDER: OnceLock<Vec<(usize, Vec<String>)>> = OnceLock::new();
+    LADDER.get_or_init(|| {
+        let art: Vec<&str> = CAT_ART.lines().collect();
+        CAT_RUNGS
+            .iter()
+            .map(|factor| {
+                let lines = shrink_cat(&art, *factor);
+                let cols = lines
+                    .iter()
+                    .map(|line| line.chars().count())
+                    .max()
+                    .unwrap_or(0);
+                (cols, lines)
+            })
+            .collect()
+    })
+}
+
+/// 整块平均密度降采样：`factor` 倍缩小，每块画成它的平均密度对应的那个字符。
+/// 直接隔行隔列取样会把一字符宽的耳朵和尾巴轮廓抽掉，猫就散架了。
+fn shrink_cat(lines: &[&str], factor: usize) -> Vec<String> {
+    if factor <= 1 {
+        return lines.iter().map(|line| line.to_string()).collect();
+    }
+    let width = lines
         .iter()
         .map(|line| line.chars().count())
         .max()
         .unwrap_or(0);
-    if cols > max_cols || lines.len() > max_rows {
-        return None;
-    }
+    let grid: Vec<Vec<char>> = lines
+        .iter()
+        .map(|line| {
+            let mut chars: Vec<char> = line.chars().collect();
+            chars.resize(width, ' ');
+            chars
+        })
+        .collect();
+    let rows = grid.len().div_ceil(factor);
+    let cols = width.div_ceil(factor);
+    (0..rows)
+        .map(|block_y| {
+            (0..cols)
+                .map(|block_x| {
+                    let mut total = 0usize;
+                    let mut taken = 0usize;
+                    for y in block_y * factor..(block_y + 1) * factor {
+                        let Some(row) = grid.get(y) else { continue };
+                        for x in block_x * factor..(block_x + 1) * factor {
+                            total += density(row.get(x).copied().unwrap_or(' '));
+                            taken += 1;
+                        }
+                    }
+                    // 整数四舍五入回密度阶梯；整块空白（或整块越界）才是空白。
+                    if taken == 0 {
+                        ' '
+                    } else {
+                        let index = (2 * total + taken) / (2 * taken);
+                        CAT_RAMP[index.min(CAT_RAMP.len() - 1)]
+                    }
+                })
+                .collect()
+        })
+        .collect()
+}
+
+/// 字符在密度阶梯上的位置；认不出的字符当空白（不污染降采样）。
+fn density(cell: char) -> usize {
+    CAT_RAMP.iter().position(|ch| *ch == cell).unwrap_or(0)
+}
+
+/// 按深浅底各一套的青瓷绿渐变逐行上色（上淡下浓）。
+fn paint_cat(lines: &[String], cols: usize, theme: Theme) -> MascotRows {
     let (from, to) = match tone::current() {
         Tone::Dark => CAT_DARK,
         Tone::Light => CAT_LIGHT,
@@ -212,7 +294,7 @@ fn cat(theme: Theme, max_cols: usize, max_rows: usize) -> Option<MascotRows> {
             segs_to_ansi(vec![Seg::new(padded, style)])
         })
         .collect();
-    Some(MascotRows { rows, cols })
+    MascotRows { rows, cols }
 }
 
 fn custom(art: &BannerArt, theme: Theme, max_cols: usize, max_rows: usize) -> Option<MascotRows> {
@@ -282,12 +364,63 @@ mod tests {
         ));
     }
 
+    /// 最大的一档必须是原图：大终端不该因此丢掉细节。
     #[test]
-    fn cat_is_48_by_23_and_needs_the_room() {
+    fn cat_keeps_the_full_48_by_23_art_when_it_fits() {
         let cat = Mascot::Cat.render(theme(Depth::True), 60, 30).unwrap();
         assert_eq!((cat.cols, cat.rows.len()), (48, 23));
         assert!(cat.rows.iter().all(|row| width_of(row) == 48));
-        assert!(Mascot::Cat.render(theme(Depth::True), 47, 30).is_none());
-        assert!(Mascot::Cat.render(theme(Depth::True), 60, 22).is_none());
+    }
+
+    /// 并排那一档最多只有 43 列（`banner/mod.rs` 的 MAX_WIDTH 84 扣掉框线 4、
+    /// 文字下限 34、间隔 3），原图 48 列在任何终端宽度下都塞不进去——09-27
+    /// 验收问题 8 就是「设了 cat 却什么都看不到」。必须有更小的档。
+    #[test]
+    fn cat_falls_down_the_ladder_when_the_room_is_tight() {
+        let medium = Mascot::Cat.render(theme(Depth::True), 43, 22).unwrap();
+        assert_eq!((medium.cols, medium.rows.len()), (24, 12));
+        assert!(medium.rows.iter().all(|row| width_of(row) == 24));
+        let small = Mascot::Cat.render(theme(Depth::True), 20, 11).unwrap();
+        assert_eq!((small.cols, small.rows.len()), (16, 8));
+        // 连最小的一档都放不下，才真的什么都不画。
+        assert!(Mascot::Cat.render(theme(Depth::True), 15, 30).is_none());
+        assert!(Mascot::Cat.render(theme(Depth::True), 60, 7).is_none());
+    }
+
+    /// 小档得还是一只坐着的黑猫：剪影不能降采样降到断成几块。
+    /// 密度阶梯里越靠后的字符越黑，用它数「有墨的格子」占比。
+    #[test]
+    fn small_rungs_keep_a_solid_silhouette() {
+        for max_cols in [43, 20] {
+            let cat = Mascot::Cat.render(theme(Depth::True), max_cols, 30).unwrap();
+            let inked: usize = cat
+                .rows
+                .iter()
+                .map(|row| crate::cli::strip_terminal_control_sequences(row))
+                .map(|row| row.chars().filter(|c| *c != ' ').count())
+                .sum();
+            let area = cat.cols * cat.rows.len();
+            assert!(
+                inked * 100 >= area * 35,
+                "{max_cols} 列这一档只剩 {:.0}% 的墨",
+                inked as f64 * 100.0 / area as f64
+            );
+        }
+    }
+
+    /// 按欢迎框并排时真正传给黑猫的格子数（大厅：宽度取终端 3/4 封顶 84，
+    /// 行数扣掉活动区 5 行和框线 2 行），常见终端尺寸下必须画得出来。
+    #[test]
+    fn cat_fits_the_side_by_side_room_of_real_terminal_sizes() {
+        for (term_cols, term_rows) in [(100usize, 30usize), (120, 35), (80, 24)] {
+            let width = (term_cols * 3 / 4).min(84).max(32);
+            let inner = width - 4;
+            let budget = term_rows.saturating_sub(6).saturating_sub(2);
+            let art = Mascot::Cat
+                .render(theme(Depth::True), inner.saturating_sub(37), budget)
+                .unwrap_or_else(|| panic!("{term_cols}x{term_rows} 画不出黑猫"));
+            assert!(art.cols + 3 + 34 <= inner, "还是太宽：{}", art.cols);
+            assert!(art.rows.len() <= budget, "还是太高：{}", art.rows.len());
+        }
     }
 }

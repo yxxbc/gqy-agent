@@ -1,4 +1,4 @@
-# 外部扩展进设置页的插件列表（2026-09-24，待排期）
+# 外部扩展进设置页的插件列表（2026-09-24 方案，09-26 已施工）
 
 来由：用户问「当前的插件是不是只能用内置的，不能注册」。答案是内置插件（Rust 编译进二进制）确实不能在外部注册，但脚本工具、MCP 服务器、技能、`gqy pm` 包都能不改代码地加。用户在三个方向里选了「让外部扩展出现在设置的插件列表里」，先写方案，不施工。
 
@@ -61,3 +61,20 @@
 2. 关掉一个脚本，下一轮对话里她不再用它；再打开恢复。
 3. 点开一个 pm 包，看到版本和文件清单，能升级和卸载。
 4. 用成员账号登录，看不到这个分组。
+
+---
+
+## 七、施工记录（09-26）
+
+施工前与用户定下的几处：
+
+- **范围**：四类一起做。技能逐个开关写进当前人格清单的 `plugins.skills` 白名单；WebUI 能用表单新建技能；pm 只做升级 / 卸载，安装仍走命令行；TUI 只读加开关。
+- **技能开关分三种**（`src/skills/admin.rs`）：平台级内置技能常开不给关（`fixed`）；人格自己那一层的技能不受白名单管，用目录里的 `.disabled` 标记（`marker`，与 `gqy skills disable` 同一机制）——否则她用 manage_skill 新建的技能会默认看不见；全局层与可选内置技能写白名单（`whitelist`），白名单原为 None 时第一次关某个会展开成「当前开着的全部」。
+- **来源分两种**（用户 09-26 追加）：互联网来的（git 克隆的 MCP 服务器与技能目录、pm 包）与自己创建的。`src/pm/origin.rs` 按路径向上找 git 仓库（仓库根不能是 gqy 数据目录的上级，防家目录 dotfiles 仓库误判），记远端、commit 和依赖同步方式（npm / pnpm / yarn、uv / pip）。「检查更新」抓远端默认分支（有上游用上游）；「更新」在已跟踪文件有本地修改时拒绝，分支上快进、分离头指针就切到新提交，再同步依赖。只接受当前识别出来的扩展目录。由别的程序管理的（不在 gqy 目录里也不是 git 仓库）只显示不更新。
+- **她写的 6 个脚本搬进源码**（`src/scripts/personas/default/`：afu_scale、anysearch、blender_model、iching_divination、macos_reminders、macos_news）。脚本头新增 `Platform:`（`macos` / `linux`），不匹配当前系统的在扫描时就跳过；两个 macOS 专用脚本标了它，blender_model 改成先找 `BLENDER_BIN`、PATH 再回落 macOS 路径。装上新版后删掉 `~/.gqy/extensions/scripts/` 里的旧副本。
+- 改完不用重载 daemon：技能与脚本目录每一轮按指纹重扫。
+
+代码位置：`src/web/extensions_api.rs`（聚合与写操作）、`web/settings-extensions.js`（「扩展」分组，零件从 settings.js 借）、`src/config_tui/extensions.rs`（插件菜单末尾「扩展」）、`src/pm/upgrade.rs`（升级拆成准备 / 执行两步，命令行与 WebUI 共用）。
+
+按用户要求没写新测试；只改了一处现有断言（自定义人格可见的平台级内置技能多了 gqy-cli、webui-theme）。
+

@@ -27,6 +27,7 @@ mod ledger;
 mod load_tools;
 mod map;
 mod mcp;
+pub(crate) use mcp::listing_status as mcp_listing_status;
 pub(crate) mod memes;
 mod memory;
 pub(crate) mod net_guard;

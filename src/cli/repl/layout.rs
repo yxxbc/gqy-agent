@@ -343,6 +343,43 @@ pub(in crate::cli) fn repl_cursor_layout_positions_for_cols(
     positions
 }
 
+/// 鼠标点在第 `click_row` 终端行的第 `click_col` 列，输入框里的光标该落在第几个
+/// 字上。`rows` 是输入框文字行从上到下的终端行号，`positions` 是
+/// [`repl_cursor_layout_positions_for_cols`] 的输出，`text_left` 是文字起点所在的
+/// 终端列（框的左边距 + 行首装饰）。
+///
+/// 折行后的行号与列号都来自画输入框时同一套布局账——按未折行的列算，点第二行就
+/// 会落回句尾（09-24 验收问题 10）。点在这一行文字右边之外时钉在这一行末尾。
+pub(in crate::cli) fn repl_caret_index_at_click(
+    positions: &[(usize, usize, usize)],
+    rows: &[u16],
+    text_left: usize,
+    click_row: u16,
+    click_col: u16,
+) -> Option<usize> {
+    let line = rows.iter().position(|row| *row == click_row)?;
+    let target = usize::from(click_col).saturating_sub(text_left);
+    let mut picked = None;
+    for (index, row, col) in positions {
+        if *row < line {
+            continue;
+        }
+        if *row > line {
+            break;
+        }
+        if *col > target {
+            break;
+        }
+        picked = Some(*index);
+    }
+    picked.or_else(|| {
+        positions
+            .iter()
+            .find(|(_, row, _)| *row == line)
+            .map(|(index, _, _)| *index)
+    })
+}
+
 pub(in crate::cli) fn repl_prompt_rows(prefix: &str, lines: &[String]) -> u16 {
     repl_prompt_rows_for_cols(prefix, lines, terminal_cols())
 }

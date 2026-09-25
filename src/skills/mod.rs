@@ -1,5 +1,7 @@
+mod admin;
 mod draft;
 pub(crate) mod manifest;
+pub(crate) use admin::*;
 pub(crate) use draft::*;
 pub(crate) use manifest::*;
 
@@ -39,6 +41,16 @@ const BUILTIN_SKILLS: &[(&str, &str, bool)] = &[
     (
         "script-creator",
         include_str!("../skills/script-creator.md"),
+        true,
+    ),
+    // 她对自己命令行的认知(09-26):人格提示词里没有命令表,手册在知识库里只在
+    // 被问到时才查,动手执行时靠猜——猜错的子命令会被当成聊天消息发给 daemon。
+    // 命令属于平台而不是人格,所以平台级。
+    ("gqy-cli", include_str!("../skills/gqy-cli.md"), true),
+    // WebUI 主题只开放 CSS(token 覆盖):写前端脚本等于能在管理员浏览器里执行代码。
+    (
+        "webui-theme",
+        include_str!("../skills/webui-theme.md"),
         true,
     ),
     (
@@ -402,7 +414,7 @@ mod tests {
     }
 
     /// 内置技能默认属于 顾清影 出厂人格:默认人格看得见非平台级内置技能,
-    /// 自定义人格只剩平台级(skill-creator、script-creator)。
+    /// 自定义人格只剩平台级(skill-creator、script-creator、gqy-cli、webui-theme)。
     #[test]
     fn builtin_skills_are_persona_gated_except_platform_wide() {
         let temp = tempfile::tempdir().unwrap();
@@ -428,7 +440,12 @@ mod tests {
             .collect();
         assert_eq!(
             custom_names,
-            BTreeSet::from(["skill-creator".to_string(), "script-creator".to_string()]),
+            BTreeSet::from([
+                "skill-creator".to_string(),
+                "script-creator".to_string(),
+                "gqy-cli".to_string(),
+                "webui-theme".to_string(),
+            ]),
             "自定义人格只应看到平台级内置技能"
         );
 

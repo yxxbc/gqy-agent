@@ -111,13 +111,51 @@
 
 .theme-options {
   display: flex;
+  flex-wrap: wrap;
   padding: 14px 16px;
   gap: 10px;
+}
+
+/* 主题库里的主题:选项 + 右上角的删除钮,悬停才显示 */
+.theme-options .theme-entry {
+  position: relative;
+  display: flex;
+  flex: 1;
+  min-width: 160px;
+}
+
+.theme-options .theme-remove {
+  position: absolute;
+  top: -6px;
+  right: -6px;
+  display: grid;
+  flex: none;
+  width: 22px;
+  min-width: 0;
+  min-height: 0;
+  height: 22px;
+  padding: 0;
+  place-items: center;
+  border-radius: 50%;
+  background: var(--surface-3);
+  opacity: 0;
+  transition: opacity var(--motion) ease;
+}
+
+.theme-options .theme-entry:hover .theme-remove,
+.theme-options .theme-remove:focus-visible {
+  opacity: 1;
+}
+
+.theme-options .theme-remove svg {
+  width: 12px;
+  height: 12px;
 }
 
 .theme-options button {
   display: flex;
   flex: 1;
+  min-width: 140px;
   min-height: 44px;
   align-items: center;
   padding: 8px 12px;

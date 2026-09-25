@@ -651,17 +651,23 @@ pub(in crate::cli) async fn run_remote_repl(
                     };
                     // 暗色 + 图标：这是系统回执，不是模型正文，得和邻居们
                     // （工作目录绑定、后台任务表头）长得一族。单个 \n 收尾，
-                    // 和它们一致——多一个就空两行。
-                    repl_note(&mut live_repl, &format!("\x1b[2m◎ {summary}\x1b[0m\n"))?;
+                    // 和它们一致——多一个就空两行。走 repl_record 不进通知条：
+                    // 目标只回这一句，浮两秒就收等于告诉用户「什么都没发生」。
+                    crate::cli::repl::session::repl_record(
+                        &mut live_repl,
+                        &format!("\x1b[2m◎ {summary}\x1b[0m\n"),
+                    )?;
                 }
                 ReplSlashCommand::Usage => {
                     let snapshot = StateStore::new(paths)?.usage_snapshot()?;
                     let usage = footer.token_usage;
                     let context = Some((usage.session_tokens, usage.context_window));
-                    repl_note(
-                        &mut live_repl,
-                        &format!("{}\n\n", usage_overview_text(&snapshot, context)),
-                    )?;
+                    let text = usage_overview_text(&snapshot, context);
+                    // 整块用量表印进正文会把对话冲散，所以开成浮窗（Esc 关）。
+                    // inline 没有覆盖层，回落到往正文里印。
+                    if !live_repl.open_text_overlay(t(" Token usage ", " Token 用量 "), &text) {
+                        repl_note(&mut live_repl, &format!("{text}\n\n"))?;
+                    }
                 }
                 ReplSlashCommand::Persona => match run_persona_picker(paths, command_args) {
                     Ok(true) => {

@@ -123,20 +123,27 @@ impl TuiPlugin {
 
 pub(in crate::config_tui) fn edit_plugins(
     stdout: &mut io::Stdout,
+    paths: &GqyPaths,
     config: &mut AppConfig,
 ) -> Result<()> {
     let mut selected = 0usize;
     loop {
         draw_plugin_menu(stdout, config, selected)?;
-        let plugin = TUI_PLUGINS[selected];
+        // 最后一行是「扩展」入口，不是内置插件，没有开关
+        let plugin = TUI_PLUGINS.get(selected).copied();
         match read_key()? {
             KeyCode::Esc | KeyCode::Char('q') => return Ok(()),
             KeyCode::Up | KeyCode::Char('k') => selected = selected.saturating_sub(1),
-            KeyCode::Down | KeyCode::Char('j') => {
-                selected = (selected + 1).min(TUI_PLUGINS.len() - 1)
+            KeyCode::Down | KeyCode::Char('j') => selected = (selected + 1).min(TUI_PLUGINS.len()),
+            KeyCode::Char(' ') => {
+                if let Some(plugin) = plugin {
+                    plugin.toggle(config)
+                }
             }
-            KeyCode::Char(' ') => plugin.toggle(config),
-            KeyCode::Enter | KeyCode::Char('i') => edit_plugin_detail(stdout, config, plugin)?,
+            KeyCode::Enter | KeyCode::Char('i') => match plugin {
+                Some(plugin) => edit_plugin_detail(stdout, config, plugin)?,
+                None => edit_extensions(stdout, paths, config)?,
+            },
             _ => {}
         }
     }
@@ -175,24 +182,29 @@ fn draw_plugin_menu(stdout: &mut io::Stdout, config: &AppConfig, selected: usize
     )?;
     let visible_rows = height.saturating_sub(6) as usize;
     let start = selected.saturating_sub(visible_rows.saturating_sub(1));
-    for (row, (index, plugin)) in TUI_PLUGINS
+    let extensions = (
+        "  ›",
+        t("Extensions", "扩展"),
+        t(
+            "Skills, script tools, MCP servers and pm packages",
+            "技能、脚本工具、MCP 服务器和 pm 包",
+        ),
+    );
+    let lines = TUI_PLUGINS
         .iter()
-        .enumerate()
-        .skip(start)
-        .take(visible_rows)
-        .enumerate()
+        .map(|plugin| {
+            let state = if plugin.enabled(config) {
+                t("[ON]", "[开]")
+            } else {
+                t("[OFF]", "[关]")
+            };
+            (state, plugin.name(), plugin.description())
+        })
+        .chain(std::iter::once(extensions));
+    for (row, (index, (state, name, description))) in
+        lines.enumerate().skip(start).take(visible_rows).enumerate()
     {
-        let state = if plugin.enabled(config) {
-            t("[ON]", "[开]")
-        } else {
-            t("[OFF]", "[关]")
-        };
-        let line = plugin_row(
-            state,
-            plugin.name(),
-            plugin.description(),
-            width.saturating_sub(4) as usize,
-        );
+        let line = plugin_row(state, name, description, width.saturating_sub(4) as usize);
         queue!(stdout, MoveTo(x + 2, y + row as u16 + 4))?;
         if index == selected {
             queue!(
@@ -209,7 +221,12 @@ fn draw_plugin_menu(stdout: &mut io::Stdout, config: &AppConfig, selected: usize
     Ok(())
 }
 
-fn plugin_row(state: &str, name: &str, description: &str, width: usize) -> String {
+pub(in crate::config_tui) fn plugin_row(
+    state: &str,
+    name: &str,
+    description: &str,
+    width: usize,
+) -> String {
     let fixed = pad(state, 8) + &pad(name, 24);
     let remaining = width.saturating_sub(display_width(&fixed)).max(10);
     fixed + &truncate(description, remaining)

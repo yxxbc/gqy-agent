@@ -82,6 +82,20 @@ pub(in crate::cli) fn queue_lifted_frame(
     }
 }
 
+fn tail_total_rows(
+    banner_rows: u16,
+    queue_rows: usize,
+    queue_gap: u16,
+    editor_rows: u16,
+    job_rows: u16,
+) -> u16 {
+    1u16.saturating_add(banner_rows)
+        .saturating_add(queue_rows.min(u16::MAX as usize) as u16)
+        .saturating_add(queue_gap)
+        .saturating_add(editor_rows)
+        .saturating_add(job_rows)
+}
+
 impl LiveReplTail {
     pub(in crate::cli) fn suspend(&mut self) -> Result<()> {
         // 全屏：清屏把光标交到顶上，选择器 / 提问面板 / 图片就当自己拿到了
@@ -132,12 +146,15 @@ impl LiveReplTail {
     fn resume_at_inner(&mut self, (output_col, output_row): (u16, u16), own: bool) -> Result<()> {
         let (cols, terminal_rows) = terminal::size().unwrap_or((80, 24));
         let terminal_rows = terminal_rows.max(1);
-        let editor_rows = repl_input_rendered_rows(
+        // 输入框的折行宽度：大厅里是窄框宽，其余时候是终端宽。窄框宽要等大厅
+        // 摆好位置才知道，所以先按全宽估一次，拿到框宽再改算一次。
+        let mut input_cols = usize::from(cols);
+        let mut editor_rows = repl_input_rendered_rows(
             &self.editor.input,
             self.editor.raw_pasted_lines,
             false,
             self.editor.picker.view(&self.editor.input).is_some(),
-            usize::from(cols),
+            input_cols,
         );
         let mut queue_lines =
             queued_prompt_lines(&self.queued, self.editor.mode, usize::from(cols));
@@ -169,12 +186,13 @@ impl LiveReplTail {
             _ => Vec::new(),
         };
         let banner_rows = banner_lines.len().min(u16::MAX as usize) as u16;
-        let total_rows = 1u16
-            .saturating_add(banner_rows)
-            .saturating_add(queue_lines.len().min(u16::MAX as usize) as u16)
-            .saturating_add(queue_gap)
-            .saturating_add(editor_rows)
-            .saturating_add(job_rows);
+        let mut total_rows = tail_total_rows(
+            banner_rows,
+            queue_lines.len(),
+            queue_gap,
+            editor_rows,
+            job_rows,
+        );
         // Derived from what is on screen rather than stored: the tail was
         // pinned to the bottom exactly when its bottom edge sat on the last
         // usable row. `suspend()` leaves both values untouched, so they are
@@ -214,13 +232,37 @@ impl LiveReplTail {
             // 不留的话 footer 直接贴在屏幕最后一行上，挤得没有呼吸。
             // 空会话大厅:整屏交给 banner 画(星空 + 渐变字),输入框嵌在字下面的
             // 窄框里,不在屏底。第一句话发出去后 banner 撤掉,回到屏底、全宽。
-            let lobby = self.banner.as_ref().map(|banner| {
+            let mut lobby = self.banner.as_ref().map(|banner| {
                 banner.lobby(
                     usize::from(cols),
                     usize::from(terminal_rows),
                     usize::from(total_rows),
                 )
             });
+            // 大厅的窄框只占屏幕中间一段，输入框里的字按**框宽**折行。第一遍按终端
+            // 宽估出来的行数偏少，画多的那一行正好压在底栏上——底栏看着就是两行
+            // （09-24 验收问题 10）。框宽只随总行数变，补算一次就收敛。
+            if let Some(box_width) = lobby.as_ref().map(|lobby| usize::from(lobby.width)) {
+                if box_width != input_cols {
+                    input_cols = box_width;
+                    editor_rows = repl_input_rendered_rows(
+                        &self.editor.input,
+                        self.editor.raw_pasted_lines,
+                        false,
+                        self.editor.picker.view(&self.editor.input).is_some(),
+                        input_cols,
+                    );
+                    total_rows =
+                        tail_total_rows(banner_rows, queue_lines.len(), queue_gap, editor_rows, job_rows);
+                    lobby = self.banner.as_ref().map(|banner| {
+                        banner.lobby(
+                            usize::from(cols),
+                            usize::from(terminal_rows),
+                            usize::from(total_rows),
+                        )
+                    });
+                }
+            }
             screen.set_banner(lobby.as_ref().map(|lobby| lobby.rows.clone()));
             if std::env::var_os("GQY_LOBBY_TRACE").is_some() {
                 if let Some(lobby) = &lobby {
@@ -340,6 +382,12 @@ impl LiveReplTail {
             layout_box,
         )?;
         self.footer_offset = footer_row.map(|abs| abs.saturating_sub(tail_start));
+        // 底栏的几何也记一份：转轮 tick 和回合收尾是**单行覆写**，它们只会
+        // MoveTo(0) + 终端全宽。大厅里整帧画的是窄框左边距 + 框宽，两者不一致
+        // 时同一行就在屏底全宽和大厅窄框之间来回跳（09-24 验收问题 1）。
+        self.footer_left = box_left;
+        self.footer_cols = layout_box.map_or(usize::from(cols), |(_, width)| width);
+        self.input_layout = layout_box;
         if let Some(screen) = &mut self.screen {
             screen.set_input_rows(drawn_input);
             // 反显盖在输入框**之上**：输入框刚画完，这会儿盖才不会被它冲掉。
@@ -550,6 +598,53 @@ impl LiveReplTail {
             let _ = self.resume_at_own(cursor);
         }
         taken
+    }
+
+    /// 点输入框里的某个字 → 把光标放到那一个字上。
+    ///
+    /// 折行后的行列必须用**画输入框时同一套布局账**反查：按未折行的列算，点第二行
+    /// 就会落回句尾（09-24 验收问题 10）。
+    pub(in crate::cli) fn place_input_caret(&mut self, row: u16, column: u16) {
+        let Some(screen) = self.screen.as_ref() else {
+            return;
+        };
+        let rows = screen.input_text_rows();
+        // 窄框几何是上一帧记下的；没有（非大厅）就是全宽贴左。
+        let (left, width) = self.input_layout.unwrap_or((0, terminal_cols()));
+        let wrap_cols = input_box_wrap_cols(width);
+        let text_left =
+            usize::from(left) + repl_prefix_width_for_cols(INPUT_BOX_TEXT_INDENT, wrap_cols);
+        let positions = repl_cursor_layout_positions_for_cols(
+            INPUT_BOX_TEXT_INDENT,
+            &self.editor.input,
+            wrap_cols,
+        );
+        let index = repl_caret_index_at_click(&positions, &rows, text_left, row, column);
+        if let Some(index) = index {
+            self.editor.cursor = index;
+        }
+    }
+
+    /// 把一段现成的多行文本开成覆盖层面板（`/usage` 的用量表）。
+    ///
+    /// 只在全屏且块登记处启用时成立；返回假表示没接住，调用方自己回落到印进正文。
+    pub(in crate::cli) fn open_text_overlay(&mut self, title: &str, text: &str) -> bool {
+        if !crate::render::blocks::enabled() {
+            return false;
+        }
+        let lines: Vec<String> = text.lines().map(|line| line.to_string()).collect();
+        let Some(id) = crate::render::blocks::register_overlay(title.to_string(), lines) else {
+            return false;
+        };
+        let opened = self
+            .screen
+            .as_mut()
+            .is_some_and(|screen| screen.open_overlay(id));
+        if opened {
+            let cursor = self.output_cursor;
+            let _ = self.resume_at_own(cursor);
+        }
+        opened
     }
 
     /// 面板开着时跟着内容刷新。后台任务的日志自己在长，没人碰键盘也得动。

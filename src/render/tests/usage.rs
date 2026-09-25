@@ -60,6 +60,34 @@ fn a_cache_rate_divides_by_the_prompt_not_the_whole_turn() {
     );
 }
 
+/// 空会话的底栏：上下文那一整栏不画，Σ 照旧（09-24 验收问题 7）。
+#[test]
+fn hidden_context_drops_only_the_context_meter() {
+    let shown = format_token_usage_inline_with(
+        &TokenMeter {
+            session_tokens: 7_300,
+            context_window: Some(168_000),
+            cumulative_tokens: Some(40_000),
+            context_hidden: true,
+            ..Default::default()
+        },
+        Some(|ratio| format!("({:.0}%)", ratio * 100.0)),
+        true,
+    );
+    assert!(!shown.contains("7.3k"), "{shown}");
+    assert!(!shown.contains("168k"), "{shown}");
+    assert!(shown.contains("Σ40k"), "{shown}");
+    let visible = format_token_usage_inline_with(
+        &TokenMeter {
+            context_hidden: false,
+            ..TokenMeter::default()
+        },
+        None,
+        true,
+    );
+    assert!(visible.contains("/?"), "{visible}");
+}
+
 /// 输出速度跟在本轮用量后面、上下文表前面;没本轮用量(footer)时打头。
 /// 只测到分子或分母其中一个时不显示——和缓存率一样,没依据的数不渲染。
 #[test]
@@ -68,6 +96,7 @@ fn the_output_speed_sits_between_the_turn_figure_and_the_context_meter() {
         turn_tokens: 24_800,
         turn_prompt_tokens: 12_000,
         turn_cached_tokens: 11_200,
+        context_hidden: false,
         session_tokens: 26_000,
         context_window: Some(1_000_000),
         context_window_assumed: false,

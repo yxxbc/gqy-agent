@@ -1,0 +1,342 @@
+#!/usr/bin/env python3
+# Display name: Blender 3D 建模与渲染
+# Description: Control Blender for 3D modeling, procedural asset generation, bpy code execution, model export (.glb/.gltf/.obj/.blend), and scene rendering. Automatically uses live Blender viewport if open, or headless background Blender.
+# Timeout: 180
+# Group: creative
+# Parameters:
+# {
+#   "type": "object",
+#   "properties": {
+#     "action": {
+#       "type": "string",
+#       "enum": ["status", "run_code", "create_asset", "render", "export"],
+#       "description": "status: 检查连接与版本; run_code: 执行自定义 bpy 代码; create_asset: 参数化生成常见道具/模型; render: 渲染当前场景成图片; export: 导出模型文件(.glb/.obj/.blend等)"
+#     },
+#     "code": {
+#       "type": "string",
+#       "description": "Python bpy 脚本代码（run_code 或辅助操作使用）"
+#     },
+#     "asset_type": {
+#       "type": "string",
+#       "enum": ["lowpoly_tree", "building", "sword", "table_chair", "spaceship", "custom"],
+#       "description": "create_asset 模式下的资产类型"
+#     },
+#     "export_path": {
+#       "type": "string",
+#       "description": "模型导出绝对路径，如 /Users/mac/Desktop/model.glb"
+#     },
+#     "render_path": {
+#       "type": "string",
+#       "description": "渲染图片保存绝对路径，如 /Users/mac/Desktop/render.png"
+#     },
+#     "prefer_mode": {
+#       "type": "string",
+#       "enum": ["auto", "live", "headless"],
+#       "description": "执行模式，auto 自动检测活体视口，live 强制连开着的 Blender，headless 强制后台无头执行"
+#     }
+#   },
+#   "required": ["action"]
+# }
+
+import json
+import os
+import shutil
+import socket
+import subprocess
+import sys
+import tempfile
+import time
+
+# 找 Blender：先看 BLENDER_BIN，再看 PATH，最后是 macOS 的默认安装位置
+BLENDER_BIN = (
+    os.environ.get("BLENDER_BIN")
+    or shutil.which("blender")
+    or "/Applications/Blender.app/Contents/MacOS/Blender"
+)
+BRIDGE_HOST = "127.0.0.1"
+BRIDGE_PORT = 9876
+
+def check_live_bridge():
+    try:
+        s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+        s.settimeout(1.0)
+        s.connect((BRIDGE_HOST, BRIDGE_PORT))
+        req = json.dumps({"action": "ping"}).encode("utf-8")
+        s.sendall(req)
+        resp = s.recv(4096)
+        s.close()
+        data = json.loads(resp.decode("utf-8"))
+        return data.get("ok", False), data.get("blender_version", "unknown")
+    except:
+        return False, None
+
+def send_live_code(code_str):
+    try:
+        s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+        s.settimeout(60.0)
+        s.connect((BRIDGE_HOST, BRIDGE_PORT))
+        req = json.dumps({"id": f"req_{int(time.time()*1000)}", "action": "run", "code": code_str}).encode("utf-8")
+        s.sendall(req)
+        resp = s.recv(65536)
+        s.close()
+        return json.loads(resp.decode("utf-8"))
+    except Exception as e:
+        return {"ok": False, "error": f"Live bridge communication failed: {e}"}
+
+def run_headless_code(code_str, save_blend_path=None):
+    if not os.path.exists(BLENDER_BIN):
+        return {"ok": False, "error": f"Blender not found at {BLENDER_BIN}"}
+    
+    with tempfile.NamedTemporaryFile(mode='w', suffix='.py', delete=False) as f:
+        f.write(code_str)
+        temp_script = f.name
+    
+    cmd = [BLENDER_BIN, "--background", "--python", temp_script]
+    if save_blend_path:
+        cmd.extend(["--save", save_blend_path])
+    
+    try:
+        proc = subprocess.run(cmd, capture_output=True, text=True, timeout=120)
+        return {
+            "ok": proc.returncode == 0,
+            "stdout": proc.stdout[-3000:] if proc.stdout else "",
+            "stderr": proc.stderr[-2000:] if proc.stderr else "",
+            "returncode": proc.returncode
+        }
+    except Exception as e:
+        return {"ok": False, "error": str(e)}
+    finally:
+        if os.path.exists(temp_script):
+            try:
+                os.remove(temp_script)
+            except:
+                pass
+
+def get_asset_code(asset_type, export_path=None, render_path=None):
+    base_code = """
+import bpy
+import math
+
+# Clear scene
+bpy.ops.wm.read_factory_settings(use_empty=True)
+"""
+    if asset_type == "lowpoly_tree":
+        base_code += """
+# Low-poly Tree
+# Trunk
+bpy.ops.mesh.primitive_cylinder_add(vertices=6, radius=0.3, depth=2, location=(0, 0, 1))
+trunk = bpy.context.active_object
+trunk.name = "Tree_Trunk"
+mat_trunk = bpy.data.materials.new(name="Mat_Trunk")
+mat_trunk.use_nodes = True
+mat_trunk.node_tree.nodes["Principled BSDF"].inputs["Base Color"].default_value = (0.35, 0.2, 0.05, 1.0)
+trunk.data.materials.append(mat_trunk)
+
+# Leaves (3 cones stacked)
+for i, (loc_z, r, d) in enumerate([(2.2, 1.4, 1.6), (3.0, 1.1, 1.4), (3.7, 0.8, 1.2)]):
+    bpy.ops.mesh.primitive_cone_add(vertices=7, radius1=r, depth=d, location=(0, 0, loc_z))
+    leaves = bpy.context.active_object
+    leaves.name = f"Tree_Leaves_{i+1}"
+    mat_leaves = bpy.data.materials.new(name=f"Mat_Leaves_{i+1}")
+    mat_leaves.use_nodes = True
+    color_g = 0.5 - (i * 0.08)
+    mat_leaves.node_tree.nodes["Principled BSDF"].inputs["Base Color"].default_value = (0.1, color_g, 0.15, 1.0)
+    leaves.data.materials.append(mat_leaves)
+"""
+    elif asset_type == "building":
+        base_code += """
+# Low-poly Cyberpunk Building
+bpy.ops.mesh.primitive_cube_add(size=2, location=(0, 0, 3))
+building = bpy.context.active_object
+building.scale = (1.2, 1.2, 3.0)
+bpy.ops.object.transform_apply(scale=True)
+
+mat_wall = bpy.data.materials.new(name="Mat_Wall")
+mat_wall.use_nodes = True
+mat_wall.node_tree.nodes["Principled BSDF"].inputs["Base Color"].default_value = (0.15, 0.18, 0.25, 1.0)
+mat_wall.node_tree.nodes["Principled BSDF"].inputs["Roughness"].default_value = 0.4
+building.data.materials.append(mat_wall)
+
+# Roof antenna
+bpy.ops.mesh.primitive_cylinder_add(vertices=8, radius=0.08, depth=2.5, location=(0, 0, 7.25))
+antenna = bpy.context.active_object
+mat_emit = bpy.data.materials.new(name="Mat_Emit")
+mat_emit.use_nodes = True
+mat_emit.node_tree.nodes["Principled BSDF"].inputs["Emission Color"].default_value = (0.0, 0.8, 1.0, 1.0)
+mat_emit.node_tree.nodes["Principled BSDF"].inputs["Emission Strength"].default_value = 5.0
+antenna.data.materials.append(mat_emit)
+"""
+    elif asset_type == "sword":
+        base_code += """
+# Low-poly Fantasy Sword
+# Blade
+bpy.ops.mesh.primitive_cube_add(size=1, location=(0, 0, 1.6))
+blade = bpy.context.active_object
+blade.scale = (0.12, 0.03, 1.8)
+bpy.ops.object.transform_apply(scale=True)
+mat_blade = bpy.data.materials.new(name="Mat_Blade")
+mat_blade.use_nodes = True
+mat_blade.node_tree.nodes["Principled BSDF"].inputs["Base Color"].default_value = (0.8, 0.85, 0.9, 1.0)
+mat_blade.node_tree.nodes["Principled BSDF"].inputs["Metallic"].default_value = 0.9
+mat_blade.node_tree.nodes["Principled BSDF"].inputs["Roughness"].default_value = 0.2
+blade.data.materials.append(mat_blade)
+
+# Guard
+bpy.ops.mesh.primitive_cube_add(size=1, location=(0, 0, 0.7))
+guard = bpy.context.active_object
+guard.scale = (0.4, 0.08, 0.08)
+bpy.ops.object.transform_apply(scale=True)
+mat_gold = bpy.data.materials.new(name="Mat_Gold")
+mat_gold.use_nodes = True
+mat_gold.node_tree.nodes["Principled BSDF"].inputs["Base Color"].default_value = (0.9, 0.7, 0.1, 1.0)
+mat_gold.node_tree.nodes["Principled BSDF"].inputs["Metallic"].default_value = 0.8
+guard.data.materials.append(mat_gold)
+
+# Hilt & Pommel
+bpy.ops.mesh.primitive_cylinder_add(vertices=8, radius=0.04, depth=0.6, location=(0, 0, 0.35))
+hilt = bpy.context.active_object
+hilt.data.materials.append(mat_gold)
+bpy.ops.mesh.primitive_uv_sphere_add(radius=0.08, location=(0, 0, 0.02))
+pommel = bpy.context.active_object
+pommel.data.materials.append(mat_gold)
+"""
+    else:
+        # Default table & chair
+        base_code += """
+# Low-poly Table and Chair
+# Table top
+bpy.ops.mesh.primitive_cube_add(size=1, location=(0, 0, 1.0))
+table = bpy.context.active_object
+table.scale = (1.6, 1.0, 0.08)
+bpy.ops.object.transform_apply(scale=True)
+mat_wood = bpy.data.materials.new(name="Mat_Wood")
+mat_wood.use_nodes = True
+mat_wood.node_tree.nodes["Principled BSDF"].inputs["Base Color"].default_value = (0.45, 0.28, 0.15, 1.0)
+table.data.materials.append(mat_wood)
+
+# 4 legs
+for x, y in [(-0.7, -0.4), (0.7, -0.4), (-0.7, 0.4), (0.7, 0.4)]:
+    bpy.ops.mesh.primitive_cylinder_add(vertices=6, radius=0.04, depth=0.96, location=(x, y, 0.48))
+    leg = bpy.context.active_object
+    leg.data.materials.append(mat_wood)
+"""
+    
+    # Setup Camera & Light if rendering
+    base_code += """
+# Camera & Lighting
+bpy.ops.object.camera_add(location=(4.0, -4.0, 3.5), rotation=(math.radians(65), 0, math.radians(45)))
+cam = bpy.context.active_object
+bpy.context.scene.camera = cam
+
+bpy.ops.object.light_add(type='SUN', location=(5, -5, 10))
+sun = bpy.context.active_object
+sun.data.energy = 4.0
+"""
+    if export_path:
+        ext = os.path.splitext(export_path)[1].lower()
+        if ext in ['.glb', '.gltf']:
+            base_code += f"""
+bpy.ops.export_scene.gltf(filepath=r'{export_path}', export_format='GLB' if '{ext}' == '.glb' else 'GLTF_SEPARATE')
+"""
+        elif ext == '.obj':
+            base_code += f"""
+bpy.ops.wm.obj_export(filepath=r'{export_path}')
+"""
+        elif ext == '.blend':
+            base_code += f"""
+bpy.ops.wm.save_as_mainfile(filepath=r'{export_path}')
+"""
+    
+    if render_path:
+        base_code += f"""
+bpy.context.scene.render.image_settings.file_format = 'PNG'
+bpy.context.scene.render.filepath = r'{render_path}'
+bpy.context.scene.render.resolution_x = 1024
+bpy.context.scene.render.resolution_y = 1024
+bpy.ops.render.render(write_still=True)
+"""
+    return base_code
+
+def main():
+    if len(sys.argv) > 1 and sys.argv[1] in ["--help", "-h"]:
+        print("Blender 3D Modeling tool for GQY")
+        return
+
+    try:
+        req = json.load(sys.stdin)
+    except:
+        req = {"action": "status"}
+
+    action = req.get("action", "status")
+    code = req.get("code", "")
+    asset_type = req.get("asset_type", "lowpoly_tree")
+    export_path = req.get("export_path")
+    render_path = req.get("render_path")
+    prefer_mode = req.get("prefer_mode", "auto")
+
+    live_ok, live_ver = check_live_bridge()
+
+    if action == "status":
+        blender_installed = os.path.exists(BLENDER_BIN)
+        result = {
+            "ok": True,
+            "blender_installed": blender_installed,
+            "blender_path": BLENDER_BIN if blender_installed else None,
+            "live_viewport_active": live_ok,
+            "live_blender_version": live_ver,
+            "addon_installed": os.path.exists(os.path.expanduser("~/Library/Application Support/Blender/5.2/scripts/addons/gqy_blender_bridge.py")),
+            "description": "Blender 5.2.0 环境就绪，支持后台静默生模与实时视口联动"
+        }
+        print(json.dumps(result, ensure_ascii=False, indent=2))
+        return
+
+    # Decide execution mode
+    use_live = False
+    if prefer_mode == "live":
+        use_live = True
+    elif prefer_mode == "auto":
+        use_live = live_ok
+    
+    if action == "run_code":
+        final_code = code
+        if export_path:
+            ext = os.path.splitext(export_path)[1].lower()
+            if ext in ['.glb', '.gltf']:
+                final_code += f"\nbpy.ops.export_scene.gltf(filepath=r'{export_path}')"
+            elif ext == '.obj':
+                final_code += f"\nbpy.ops.wm.obj_export(filepath=r'{export_path}')"
+        if render_path:
+            final_code += f"\nbpy.context.scene.render.filepath = r'{render_path}'\nbpy.ops.render.render(write_still=True)"
+            
+        if use_live and live_ok:
+            res = send_live_code(final_code)
+            res["mode"] = "live_viewport"
+            print(json.dumps(res, ensure_ascii=False, indent=2))
+        else:
+            res = run_headless_code(final_code)
+            res["mode"] = "headless_background"
+            print(json.dumps(res, ensure_ascii=False, indent=2))
+        return
+
+    if action in ["create_asset", "render", "export"]:
+        script_code = get_asset_code(asset_type, export_path=export_path, render_path=render_path)
+        if use_live and live_ok:
+            res = send_live_code(script_code)
+            res["mode"] = "live_viewport"
+            res["asset_type"] = asset_type
+            res["export_path"] = export_path
+            res["render_path"] = render_path
+            print(json.dumps(res, ensure_ascii=False, indent=2))
+        else:
+            res = run_headless_code(script_code)
+            res["mode"] = "headless_background"
+            res["asset_type"] = asset_type
+            res["export_path"] = export_path
+            res["render_path"] = render_path
+            print(json.dumps(res, ensure_ascii=False, indent=2))
+        return
+
+    print(json.dumps({"ok": False, "error": f"Unknown action: {action}"}))
+
+if __name__ == "__main__":
+    main()

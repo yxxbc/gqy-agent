@@ -202,6 +202,14 @@ pub(in crate::cli) fn repl_note(live: &mut LiveReplTail, text: &str) -> Result<(
     if live.toast_note(text) {
         return Ok(());
     }
+    repl_record(live, text)
+}
+
+/// 一定进正文的一行提示：不走通知条。
+///
+/// `/goal` 这类「设完就没下文」的回执必须走这条——通知条两秒后自己收，用户回头
+/// 只看得到一张空屏，以为命令压根没执行（09-24 验收问题 2）。
+pub(in crate::cli) fn repl_record(live: &mut LiveReplTail, text: &str) -> Result<()> {
     live.apply_output_frame(format!("{text}\n").as_bytes())
 }
 

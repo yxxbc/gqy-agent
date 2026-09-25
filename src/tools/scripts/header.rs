@@ -77,6 +77,20 @@ pub(crate) struct ScriptMetadata {
     pub(crate) hints: Vec<(String, String)>,
     /// `Requires: tool_a, tool_b`:本回合先调用过其中之一才放行。
     pub(crate) requires: Vec<String>,
+    /// `Platform: macos` / `linux`:只在这些系统上注册;缺省 = 到处都注册。
+    /// 用的是 `std::env::consts::OS` 的名字,mac / darwin / osx 都当 macos。
+    pub(crate) platforms: Vec<String>,
+}
+
+impl ScriptMetadata {
+    /// 头部声明了平台、且当前系统不在其中时为 false,扫描直接跳过。
+    pub(crate) fn runs_here(&self) -> bool {
+        self.platforms.is_empty()
+            || self
+                .platforms
+                .iter()
+                .any(|platform| platform == std::env::consts::OS)
+    }
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -95,6 +109,7 @@ enum HeaderKey {
     Example,
     Hint,
     Requires,
+    Platform,
 }
 
 /// 读脚本开头(最多 32KB),UTF-8 边界截断按 lossy 处理——头部在前,截在
@@ -213,6 +228,15 @@ pub(crate) fn extract_metadata(raw: &str) -> ScriptMetadata {
                 }
             }
             HeaderKey::Requires => metadata.requires = split_groups(value),
+            HeaderKey::Platform => {
+                metadata.platforms = split_groups(value)
+                    .into_iter()
+                    .map(|platform| match platform.to_ascii_lowercase().as_str() {
+                        "mac" | "darwin" | "osx" => "macos".to_string(),
+                        other => other.to_string(),
+                    })
+                    .collect()
+            }
         }
     }
     metadata
@@ -250,6 +274,7 @@ fn header_key(raw: &str) -> Option<HeaderKey> {
         "example" | "stub_example" | "示例" => HeaderKey::Example,
         "hint" | "cross_hint" | "指路" | "指路句" => HeaderKey::Hint,
         "requires" | "requires_prior" | "需先调用" | "前置工具" => HeaderKey::Requires,
+        "platform" | "platforms" | "os" | "平台" | "系统" => HeaderKey::Platform,
         _ => return None,
     })
 }

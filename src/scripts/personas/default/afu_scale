@@ -1,0 +1,79 @@
+#!/usr/bin/env python3
+# Display name: 蚂蚁阿福体脂秤
+# Description: Read weight and body composition from Ant Afu Welland BLE body scale.
+# Timeout: 60
+# Parameters: {"type":"object","properties":{"action":{"type":"string","enum":["read","scan"],"description":"read (default) to connect and read metrics, scan to discover device"},"timeout":{"type":"integer","description":"scan or read timeout in seconds, default 15"}}}
+import datetime
+import json
+import os
+import subprocess
+import sys
+
+BASE_DIR = "/Users/mac/Projects/ant-afu-welland-scale"
+CLI_PATH = os.path.join(BASE_DIR, ".venv/bin/afu-welland-scale")
+HEALTH_DIR = os.path.expanduser("~/.gqy/data/health")
+RAW_LOG_PATH = os.path.join(HEALTH_DIR, "scale_raw.jsonl")
+HISTORY_PATH = os.path.join(HEALTH_DIR, "weight_history.jsonl")
+
+
+def fail(error, fix=None, code=2):
+    print(json.dumps({"ok": False, "error": error, "fix": fix}, ensure_ascii=False))
+    sys.exit(code)
+
+
+def main():
+    raw = os.environ.get("GQY_ARGS_JSON") or sys.stdin.read() or "{}"
+    try:
+        args = json.loads(raw) if raw.strip() else {}
+    except Exception:
+        args = {}
+
+    action = args.get("action", "read")
+    timeout = str(args.get("timeout", 15))
+
+    if not os.path.exists(CLI_PATH):
+        fail("CLI tool not found", fix=f"Please verify {CLI_PATH} exists")
+
+    os.makedirs(HEALTH_DIR, exist_ok=True)
+
+    if action == "scan":
+        cmd = [CLI_PATH, "scan", "--timeout", timeout]
+    else:
+        cmd = [
+            CLI_PATH, "read",
+            "--timeout", timeout,
+            "--age", "18",
+            "--sex", "male",
+            "--height", "175",
+            "--log", RAW_LOG_PATH,
+        ]
+
+    try:
+        proc = subprocess.run(cmd, capture_output=True, text=True, timeout=55)
+        output = proc.stdout.strip()
+        if not output and proc.stderr:
+            output = proc.stderr.strip()
+        if proc.returncode != 0:
+            print(json.dumps({"ok": False, "error": output or "Command failed"}, ensure_ascii=False))
+            sys.exit(proc.returncode)
+
+        if action == "read" and output and "体重稳定" in output:
+            try:
+                record = {
+                    "time": datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
+                    "raw_summary": output,
+                }
+                with open(HISTORY_PATH, "a", encoding="utf-8") as f:
+                    f.write(json.dumps(record, ensure_ascii=False) + "\n")
+            except Exception:
+                pass
+
+        print(output if output else json.dumps({"ok": True, "message": "未扫描到设备，请确认体脂秤已踩亮唤醒并在附近"}, ensure_ascii=False))
+    except subprocess.TimeoutExpired:
+        fail("读取超时", fix="请确认体脂秤已踩亮唤醒并在 Mac 蓝牙覆盖范围内")
+    except Exception as e:
+        fail(str(e))
+
+
+if __name__ == "__main__":
+    main()

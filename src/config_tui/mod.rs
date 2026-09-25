@@ -2,6 +2,7 @@ mod antigravity_form;
 mod claude_code_form;
 mod cli_catalog;
 mod codex_form;
+mod extensions;
 mod personas;
 mod platforms;
 mod plugin_settings;
@@ -20,6 +21,7 @@ mod widgets;
 use antigravity_form::*;
 use claude_code_form::*;
 use codex_form::*;
+use extensions::*;
 use personas::*;
 use platforms::*;
 use plugin_settings::*;
@@ -107,6 +109,11 @@ pub fn settings_group_choices() -> Vec<(&'static str, &'static str)> {
         .iter()
         .map(|group| (group.id, group.title()))
         .collect()
+}
+
+/// `/config <分组>` 认不认这个参数：id 或界面上显示的名字（中/英）都算。
+pub fn is_settings_group(arg: &str) -> bool {
+    settings_group(arg).is_some()
 }
 
 fn run_single_group(
@@ -236,6 +243,134 @@ fn sync_usage_ledger_after_save(
     }
 }
 
+/// 主菜单的一行对应做什么。设置分组直接铺在顶层，行名与 `/config <分组>`
+/// 能输的名字同源（都来自 `SETTINGS_GROUPS`）。
+enum MainMenuAction {
+    ProviderBrowser,
+    TextModels,
+    MultimodalModels,
+    Embedding,
+    Tiers,
+    Plugins,
+    Prompts,
+    Platforms,
+    SettingsGroup(&'static SettingsGroup),
+    Voice,
+    Save,
+}
+
+fn main_menu(config: &AppConfig) -> (Vec<String>, Vec<MainMenuAction>) {
+    let active = active_label(config);
+    let multimodal = active_multimodal_label(config);
+    let mut options = vec![
+        t("Providers and models", "供应商和模型").to_string(),
+        format!(
+            "{} ({}: {active})",
+            t("Configure global text models", "配置全局文本模型"),
+            t("Current", "当前")
+        ),
+        format!(
+            "{} ({}: {multimodal})",
+            t("Configure global multimodal models", "配置全局多模态模型"),
+            t("Current", "当前")
+        ),
+        format!(
+            "{} ({}: {})",
+            t("Configure embedding model", "配置 Embedding 模型"),
+            t("Current", "当前"),
+            embedding_model_label(config)
+        ),
+        t("Configure tiered model pools", "配置分级模型池").to_string(),
+        t("Plugins", "插件配置").to_string(),
+        t("Custom prompts", "自定义提示词").to_string(),
+        format!(
+            "{} ({})",
+            t("IM platforms", "接入通讯平台"),
+            platforms_label(config)
+        ),
+    ];
+    let mut actions = vec![
+        MainMenuAction::ProviderBrowser,
+        MainMenuAction::TextModels,
+        MainMenuAction::MultimodalModels,
+        MainMenuAction::Embedding,
+        MainMenuAction::Tiers,
+        MainMenuAction::Plugins,
+        MainMenuAction::Prompts,
+        MainMenuAction::Platforms,
+    ];
+    // 六个设置分组平铺在这里，不再藏在「全局参数设置」下面一层。
+    for group in SETTINGS_GROUPS {
+        let count = (group.fields)(config).fields.len();
+        options.push(if is_zh() {
+            format!("{}（{count} 项）", group.title())
+        } else {
+            format!("{} ({count})", group.title())
+        });
+        actions.push(MainMenuAction::SettingsGroup(group));
+    }
+    options.push(format!(
+        "{} ({}: {} · TTS: {})",
+        t("Voice", "语音功能"),
+        t("wake", "唤醒"),
+        if config.voice.enabled {
+            t("on", "开")
+        } else {
+            t("off", "关")
+        },
+        if config.voice.tts.enabled {
+            t("on", "开")
+        } else {
+            t("off", "关")
+        },
+    ));
+    actions.push(MainMenuAction::Voice);
+    options.push(t("Save and exit", "保存并退出").to_string());
+    actions.push(MainMenuAction::Save);
+    (options, actions)
+}
+
+/// 执行主菜单选中的一行。返回 `Some(退出码)` 表示用户要离开菜单，`None` 表示
+/// 留在菜单里。
+#[allow(clippy::too_many_arguments)]
+fn run_main_action(
+    stdout: &mut io::Stdout,
+    paths: &GqyPaths,
+    config: &mut AppConfig,
+    thinking_variants: &mut ThinkingVariantPreferences,
+    pristine_config: &Option<String>,
+    action: &MainMenuAction,
+) -> Result<Option<bool>> {
+    let outcome = match action {
+        MainMenuAction::ProviderBrowser => {
+            ProviderBrowser::new(paths, config, thinking_variants).run(stdout)
+        }
+        MainMenuAction::TextModels => select_active_provider(stdout, config),
+        MainMenuAction::MultimodalModels => select_active_multimodal_provider(stdout, config),
+        MainMenuAction::Embedding => edit_embedding_model(stdout, config),
+        MainMenuAction::Tiers => select_model_tiers(stdout, config),
+        MainMenuAction::Plugins => edit_plugins(stdout, paths, config),
+        MainMenuAction::Prompts => edit_custom_prompts(stdout, paths, config),
+        MainMenuAction::Platforms => select_platforms(stdout, paths, config),
+        MainMenuAction::SettingsGroup(group) => edit_settings_group(stdout, config, group),
+        MainMenuAction::Voice => edit_voice(stdout, paths, config),
+        MainMenuAction::Save => match config.save(paths) {
+            Ok(()) => {
+                thinking_variants.save(paths)?;
+                sync_usage_ledger_after_save(paths, pristine_config.as_ref(), config);
+                return Ok(Some(true));
+            }
+            Err(error) => Err(error),
+        },
+    };
+    if let Err(error) = outcome {
+        // 子界面的表单解析/保存错误只作废当次输入,config 的
+        // 内存态还在;显示错误后回主菜单,不让 TUI 整个崩出。
+        show_tui_error(stdout, &error)?;
+    }
+    Ok(None)
+}
+
 fn run_main_menu(
     stdout: &mut io::Stdout,
     paths: &GqyPaths,
@@ -247,52 +382,7 @@ fn run_main_menu(
     let pristine_config = serde_json::to_string(config).ok();
     let mut selected = 0usize;
     loop {
-        let active = active_label(config);
-        let multimodal = active_multimodal_label(config);
-        let options = [
-            t("Providers and models", "供应商和模型").to_string(),
-            format!(
-                "{} ({}: {active})",
-                t("Configure global text models", "配置全局文本模型"),
-                t("Current", "当前")
-            ),
-            format!(
-                "{} ({}: {multimodal})",
-                t("Configure global multimodal models", "配置全局多模态模型"),
-                t("Current", "当前")
-            ),
-            format!(
-                "{} ({}: {})",
-                t("Configure embedding model", "配置 Embedding 模型"),
-                t("Current", "当前"),
-                embedding_model_label(config)
-            ),
-            t("Configure tiered model pools", "配置分级模型池").to_string(),
-            t("Plugins", "插件配置").to_string(),
-            t("Custom prompts", "自定义提示词").to_string(),
-            format!(
-                "{} ({})",
-                t("IM platforms", "接入通讯平台"),
-                platforms_label(config)
-            ),
-            t("Global settings", "全局参数设置").to_string(),
-            format!(
-                "{} ({}: {} · TTS: {})",
-                t("Voice", "语音功能"),
-                t("wake", "唤醒"),
-                if config.voice.enabled {
-                    t("on", "开")
-                } else {
-                    t("off", "关")
-                },
-                if config.voice.tts.enabled {
-                    t("on", "开")
-                } else {
-                    t("off", "关")
-                },
-            ),
-            t("Save and exit", "保存并退出").to_string(),
-        ];
+        let (options, actions) = main_menu(config);
         draw_menu(
             stdout,
             t(" GQY CONFIG ", " GQY 配置 "),
@@ -328,31 +418,18 @@ fn run_main_menu(
             KeyCode::Up | KeyCode::Char('k') => selected = selected.saturating_sub(1),
             KeyCode::Down | KeyCode::Char('j') => selected = (selected + 1).min(options.len() - 1),
             KeyCode::Enter => {
-                let outcome = match selected {
-                    0 => ProviderBrowser::new(paths, config, thinking_variants).run(stdout),
-                    1 => select_active_provider(stdout, config),
-                    2 => select_active_multimodal_provider(stdout, config),
-                    3 => edit_embedding_model(stdout, config),
-                    4 => select_model_tiers(stdout, config),
-                    5 => edit_plugins(stdout, config),
-                    6 => edit_custom_prompts(stdout, paths, config),
-                    7 => select_platforms(stdout, paths, config),
-                    8 => edit_settings(stdout, config),
-                    9 => edit_voice(stdout, paths, config),
-                    10 => match config.save(paths) {
-                        Ok(()) => {
-                            thinking_variants.save(paths)?;
-                            sync_usage_ledger_after_save(paths, pristine_config.as_ref(), config);
-                            return Ok(true);
-                        }
-                        Err(error) => Err(error),
-                    },
-                    _ => Ok(()),
+                let Some(action) = actions.get(selected) else {
+                    continue;
                 };
-                if let Err(error) = outcome {
-                    // 子界面的表单解析/保存错误只作废当次输入,config 的
-                    // 内存态还在;显示错误后回主菜单,不让 TUI 整个崩出。
-                    show_tui_error(stdout, &error)?;
+                if let Some(exit) = run_main_action(
+                    stdout,
+                    paths,
+                    config,
+                    thinking_variants,
+                    &pristine_config,
+                    action,
+                )? {
+                    return Ok(exit);
                 }
             }
             _ => {}

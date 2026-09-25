@@ -77,6 +77,31 @@ fn settings_groups_round_trip_unchanged_values() {
     }
 }
 
+/// 六个分组铺在主菜单顶层，名字就是 `/config <分组>` 能输的名字（09-24 验收
+/// 问题 4：以前藏在「全局参数设置」下面一层，用户不知道有这些）。
+#[test]
+fn settings_groups_sit_on_the_main_menu() {
+    let config = AppConfig::default();
+    let (options, actions) = crate::config_tui::main_menu(&config);
+    for group in SETTINGS_GROUPS {
+        let label = group.title();
+        assert!(
+            options.iter().any(|option| option.starts_with(label)),
+            "主菜单里没有 {label}"
+        );
+        assert!(
+            actions
+                .iter()
+                .any(|action| matches!(action, crate::config_tui::MainMenuAction::SettingsGroup(group_) if group_.title() == label)),
+            "{label} 没有对应的菜单动作"
+        );
+        // 界面上显示什么就能 `/config` 什么，中英文和 id 都认。
+        assert!(crate::config_tui::is_settings_group(label));
+        assert!(crate::config_tui::is_settings_group(group.id));
+    }
+    assert!(!crate::config_tui::is_settings_group("没有这个分组"));
+}
+
 #[test]
 fn list_settings_keep_items_with_commas_and_semicolons() {
     let mut config = AppConfig::default();

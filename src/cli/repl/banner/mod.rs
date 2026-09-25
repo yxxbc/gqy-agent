@@ -20,6 +20,7 @@ use crate::terminal::palette::Theme;
 use crate::terminal::starfield::BannerArt;
 
 pub(in crate::cli) mod mascot;
+pub(in crate::cli) mod murmurs;
 pub(in crate::cli) mod preview;
 pub(in crate::cli) mod welcome;
 
@@ -70,6 +71,7 @@ impl BannerScene {
                 persona: crate::web::persona_display_name(config, paths),
                 cwd: current_dir_label(),
                 recent: recent_sessions(config, paths, mode),
+                murmur: murmurs::pick(config, paths).unwrap_or_default(),
             }
         };
         Some(Self {
