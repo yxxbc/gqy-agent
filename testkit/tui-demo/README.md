@@ -1,5 +1,11 @@
 # tui-demo：ratatui 全屏 TUI 手感演示（沿用现有 REPL 视觉）
 
+> **2026-09-25：演示程序本体已删除**（`Cargo.toml` / `Cargo.lock` / `src/`）。主程序的 TUI 早已换上
+> ratatui 0.30，这个停在 0.29 的独立 crate 不再维护，它锁定的旧版 `lru` 还会被 OpenSSF Scorecard
+> 当成仓库漏洞。要看或重跑演示：`git checkout 892fcec4 -- testkit/tui-demo`。
+> 目录里的 PTY / kitty 测具（`cpu_probe.py`、`drive.py`、`kitty_probe*.py`）是通用的，参数传
+> 真正的 `gqy` 可执行文件即可，照旧可用；下面的调研与实测记录保留作参考。
+
 2026-09-10 TUI 重构调研的配套演示。独立 crate，不进主工程依赖，不接 daemon。
 画面逐项复刻自现有 REPL（style.rs / footer.rs / layout.rs / inline_picker.rs /
 wait_spinner.rs / stream / terminal/kitty.rs），全屏模型只负责让「分页、悬浮、覆盖、自绘选区」成为可能。
