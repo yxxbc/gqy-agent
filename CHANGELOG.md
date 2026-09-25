@@ -17,6 +17,8 @@
 - 规范化安全策略与漏洞报告指南（[SECURITY.md](SECURITY.md)）：明确受支持版本、负责任漏洞披露流程与底层安全护栏，并对齐 Linux 基金会 OpenSSF 最佳实践认证标准
 - 接入 Linux 基金会 OpenSSF 官方在线最佳实践认证（项目 ID 14831）：主页挂载可公开查验的官方认证动态徽章，直通认证主页与全套达标对照表（[docs/openssf-certification-guide.md](docs/openssf-certification-guide.md)）
 - 项目主页双语支持：[README.md](README.md) 改写为英文为主、中文为辅的国际化规范文档，全面直链中文文档库；原完整中文文档保存为 [README_zh.md](README_zh.md) 并提供顶部一键切换栏
+- 扩展与技能管理系统（Extensions & Skills Admin）：新增技能管理机制与内置技能（`webui-theme`、`gqy-cli`），后端提供 `/api/extensions` 与 `/api/webui-themes` 接口，支持技能、脚本、MCP 与 PM 包的查询、动态注册与管理
+- WebUI 与 TUI 扩展设置面板：WebUI 设置中支持对扩展与技能进行统一的抽屉化配置与主题切换；终端 TUI 设置中新增扩展入口
 - iMessage 桥接能把顾清影新画的图直接发到手机上（只发生图插件输出目录里的图片）
 - iMessage 里长按她的某条消息回复，她知道你在回哪一句；你点的 ❤️ 等回应她也看得到，回应本身不会让她回一条
 - iMessage 里可以用指令管理聊天：`/new` 开新话题、`/topics` 看话题、`/topic 2` 切换，`/model` 查看和切换模型（只对这个聊天生效），`/pause` / `/resume` 暂停和恢复，`/help` 看说明。指令由桥接直接回复，不经过模型
