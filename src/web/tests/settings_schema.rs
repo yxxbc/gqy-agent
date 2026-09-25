@@ -1,4 +1,4 @@
-//! `web/settings-schema.js` 与 Rust 配置的同步检查。
+//! `web/settings-schema/`（拼成 `/settings-schema.js`）与 Rust 配置的同步检查。
 //!
 //! 设置页的字段表是手抄 Rust 默认值的("改 Rust 默认值时请同步"),以前没有
 //! 任何东西比对:字段路径拼错会让设置页往配置里写一个不存在的键,默认值抄错
@@ -14,7 +14,8 @@ use crate::config::AppConfig;
 use serde_json::{Map, Value};
 use std::collections::HashMap;
 
-const SCHEMA: &str = include_str!("../../../web/settings-schema.js");
+/// build.rs 从 `web/settings-schema/*.js` 拼出来、实际发给浏览器的那一份。
+const SCHEMA: &str = include_str!(concat!(env!("OUT_DIR"), "/settings-schema.js"));
 
 #[derive(Debug, Clone, PartialEq)]
 enum Tok {
@@ -486,7 +487,7 @@ fn settings_schema_matches_rust_config_defaults() {
     }
     assert!(
         problems.is_empty(),
-        "web/settings-schema.js drifted from src/config ({} fields):\n  {}",
+        "web/settings-schema/ drifted from src/config ({} fields):\n  {}",
         problems.len(),
         problems.join("\n  ")
     );

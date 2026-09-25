@@ -111,7 +111,8 @@ fn build_tool_description_index(out_dir: &str) {
 ///
 /// `css/` is not served file by file: its parts are concatenated in file-name
 /// order into one `/styles.css`, so the cascade order is the file order and the
-/// browser still makes a single request.
+/// browser still makes a single request. `settings-schema/` is concatenated the
+/// same way into one `/settings-schema.js`, wrapped in an IIFE.
 fn build_web_asset_index(out_dir: &str) {
     const ROOT: &str = "web";
     let manifest_dir = env::var("CARGO_MANIFEST_DIR").expect("CARGO_MANIFEST_DIR is set by cargo");
@@ -147,6 +148,17 @@ fn build_web_asset_index(out_dir: &str) {
     source.push_str(&format!(
         "    (\"/styles.css\", include_bytes!({:?}), \"text/css; charset=utf-8\"),\n",
         styles.display().to_string()
+    ));
+    let settings_schema = Path::new(out_dir).join("settings-schema.js");
+    fs::write(
+        &settings_schema,
+        web_concat_settings_schema(Path::new(ROOT).join(WEB_SETTINGS_SCHEMA_DIR).as_path())
+            .expect("concatenate web/settings-schema"),
+    )
+    .expect("write concatenated settings-schema.js");
+    source.push_str(&format!(
+        "    (\"/settings-schema.js\", include_bytes!({:?}), \"application/javascript; charset=utf-8\"),\n",
+        settings_schema.display().to_string()
     ));
     source.push_str("];\n");
     fs::write(Path::new(out_dir).join("web_assets.rs"), source)
