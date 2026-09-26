@@ -42,7 +42,7 @@
 1. **Rust 内存安全**：核心 Agent 循环、网络调度与协议处理均采用 Rust 编写，根除缓冲区溢出与野指针等内存破坏缺陷。
 2. **凭据脱敏与隔离**：
    - API Key 与密码仅存储于权限受限目录（`~/.gqy/config/config.jsonc`，权限 `0700`）。
-   - 导出的调试归档默认排除敏感密钥（`--no-secrets`）。
+   - `gqy export` 的归档默认**包含**密钥（明文 tar.gz，权限 `0600`，程序会警告），分享前用 `--no-secrets` 清空。
    - 请求日志脱敏：默认仅记录 Token 统计，严格禁止向持久化日志中写入用户明文提示词正文。
 3. **命令执行与沙箱护栏**：
    - 外部命令均具备超时截断、独立进程组隔离与黑名单阻断（`tools.command_deny`）。
@@ -50,3 +50,16 @@
 4. **通讯平台权限隔离（如 QQ / 外部服务）**：
    - 身份验证基于平台强凭据（Principal / 账号 ID），严格防范冒名欺诈。
    - 平台端默认采用受限工具面，隔离本地终端高危命令能力，防止越权滥用。
+5. **WebUI 与多用户**：
+   - WebUI 永远要登录；密码 PBKDF2 存库，登录令牌只存 sha256。
+   - 成员回合与绑定了 `/sandbox` 的会话套 Landlock 沙盒（Linux），读写都限制在工作区与必需的系统目录。
+   - WebUI 主题只开放 CSS，不开放前端脚本；CSP 为 `script-src 'self'; style-src 'self'`。
+
+---
+
+## 4. 供应链与构建安全 (Supply Chain)
+
+- **依赖审计**：CI 每次推送运行 cargo-deny（`deny.toml`：RustSec 漏洞库、许可证白名单、依赖来源仅限 crates.io）。
+- **静态分析与评分**：CodeQL（`.github/workflows/codeql.yml`）与 OpenSSF Scorecard（`scorecard.yml`）。
+- **模糊测试**：`fuzz/` 下的 cargo-fuzz 目标（JSON 提取、参数形状还原、`safe_prompt_field`），每周定时及相关代码变动时运行（`fuzz.yml`）。
+- **构建来源证明**：Release 由 GitHub Actions 云端构建，附 SLSA provenance（`gqy-provenance.sigstore.json`、`gqy-provenance.intoto.jsonl`），可用 `gh attestation verify gqy-<平台>.tar.gz -R yxxbc/gqy-agent` 校验。

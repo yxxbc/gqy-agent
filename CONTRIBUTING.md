@@ -25,12 +25,12 @@
 完整的工程规范在 [AGENTS.md](AGENTS.md)（原本是写给编码代理的，人也适用），环境搭建见 [参与开发](docs/wiki/14-参与开发.md)。最常碰到的几条：
 
 - **格式与检查**：提交前跑 `cargo fmt`，`cargo clippy` 不新增警告。
-- **测试**：修 bug 先写一个能复现的测试，确认修之前它是红的；新功能要有测试。CI 会在 Linux 和 macOS 上跑全套测试，必须全绿才会合并。
+- **测试**：修 bug 先写一个能复现的测试，确认修之前它是红的；新功能要有测试。CI 会在 Linux 和 macOS 上跑全套测试，外加 fmt、门禁脚本（依赖方向、模型面英文、文件规模、WebUI 依赖方向与 CSS token）、CHANGELOG 格式和 cargo-deny 依赖审计，必须全绿才会合并。本地可以先跑 `bash test_scripts/refactor-check.sh`。
 - **文件别写太大**：单个文件目标 800 行以内，超过 1500 行要拆，2000 行是红线。
 - **提示词与缓存**：模型能看到的文字（工具描述、注入内容）要保持逐字节稳定，不能拼时间、随机数、本机路径进去，否则会让提示词缓存失效。改这一块前先读 AGENTS.md 第 1 节。
 - **工具**：新增或删除工具要同时改 `src/tools/descriptions/*.json`、`config/plugin_catalog.rs`、`tools/compose.rs`，见 [扩展指南](docs/wiki/15-扩展指南.md)。
 - **数据库**：迁移只能在末尾追加，只增不删。
-- **前后端一起改**：一个功能如果终端界面和网页都有，两边要同步。
+- **前后端一起改**：一个功能如果终端界面和网页都有，两边要同步。只改网页前端时，用 debug 构建加 `GQY_WEB_DIR=<仓库>/web` 启动 daemon，刷新浏览器就能看到改动，不用每次重编；目录结构见 [web/README.md](web/README.md)。
 - **不要改**：`nix/release.json`（只由脚本生成）、`scripts/imessage/` 的路径。
 
 ## 提交信息

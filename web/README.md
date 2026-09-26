@@ -3,18 +3,38 @@
 These static assets are embedded into the GQY daemon at build time. Run the local WebUI with:
 
 ```sh
-cargo run --bin gqy -- web
+cargo run --bin gqy -- web              # --port <PORT> (default 8300), --bind <ADDR> (default 0.0.0.0)
 ```
 
-The command starts the GQY daemon (the same `gqy` executable re-run in daemon mode) when needed, prints the access URLs, and exits. Use `gqy daemon status` or `gqy daemon stop` to inspect or stop the daemon. WebUI listens on all local network interfaces by default. Password protection is optional:
+The command starts the GQY daemon (the same `gqy` executable re-run in daemon mode) when needed, prints the access URLs, and exits. Use `gqy daemon status` or `gqy daemon stop` to inspect or stop the daemon. WebUI listens on all local network interfaces by default.
 
-```sh
-cargo run --bin gqy -- web -p secret
-cargo run --bin gqy -- web -p
-cargo run --bin gqy -- web --password-file /path/to/password.txt
-```
+Login is always required. On first visit, sign in with the built-in account (username `gqy`, password `GQY520`) and create the admin account; the built-in account stops working after that. Further members join with invite codes the admin generates.
 
-With a password configured, the WebUI prompts for it and establishes a same-origin session after login.
+## Layout
+
+- `app.js` is the ES module entry. Modules are layered and may only depend left to right:
+  `core/` (request layer, DOM helpers, icons, toast, storage) → `state/` (store, element refs) →
+  `widgets/` → `features/` (one directory or file per feature: composer, conversation, console,
+  settings, sessions, artifacts, ...) → `app.js`. Features do not import each other unless the edge is
+  listed with a reason in `test_scripts/web-deps.json`; `test_scripts/web_dep_check.py` enforces this.
+- Files in the `web/` root other than `app.js` (`settings.js`, `settings-extensions.js`, `dashboards.js`,
+  `dash-*.js`, ...) are legacy classic scripts that expose `window.GqyXxx`. They are not checked for direction
+  yet.
+- `css/*.css` are concatenated in file-name order into one `/styles.css`, and `settings-schema/*.js` are
+  concatenated into one `/settings-schema.js` wrapped in an IIFE. Edit the parts, never a generated file.
+- `vendor/` is served separately (pre-gzipped). `index.html` and `fence-frame.html` have their own handlers.
+- Every other file is served at its path relative to `web/` (`web/a/b.js` → `/a/b.js`). `build.rs` scans the
+  directory, so a new file needs no Rust change. The rules live in `src/web/asset_rules.rs`, shared by
+  `build.rs` and the dev loader below. Reference new files from `index.html`, which gets `?v=<build id>`
+  appended.
+- The CSP is `script-src 'self'; style-src 'self'`, so inline scripts and styles are blocked.
+
+Assets are compiled in, so a change needs a rebuild. For frontend-only work, run a **debug** build with
+`GQY_WEB_DIR=<repo>/web`. The daemon then reads `web/` from disk on every request, so a browser refresh
+picks up changes. `/api/health` reports the source in `web_assets`. Release builds ignore the variable
+(`src/web/dev_assets.rs` exists only under `debug_assertions`).
+
+The split design is in `docs/design/2026-09-24-webui-split.md`.
 
 ## Theming
 

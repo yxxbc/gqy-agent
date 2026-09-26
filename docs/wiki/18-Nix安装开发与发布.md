@@ -7,11 +7,13 @@
 ## 0. 一张图看懂
 
 ```
-开发者改代码 ──► 提交到 gqy 分支 ──► 改 Cargo.toml 版本、打 tag vX.Y.Z 推上去
+开发者改代码 ──► 提交到 gqy 分支（用户可见改动写进 CHANGELOG 的 [Unreleased]）
                                               │
-                        GitHub Actions（publish-release.yml）
-                        ├─ 云端编译 4 个平台，打包成 gqy-<平台>.tar.gz
-                        ├─ 发布到 GitHub Releases
+                   Actions 页手动运行 publish-release.yml，填版本号 X.Y.Z
+                        ├─ 定稿 CHANGELOG、同步 Cargo.toml / Cargo.lock / README 徽章
+                        ├─ github-actions[bot] 提交并打 tag vX.Y.Z
+                        ├─ 云端编译 4 个平台，打包成 gqy-<平台>.tar.gz，签 SLSA 来源证明
+                        ├─ 发布到 GitHub Releases（正文 = CHANGELOG 该版本段 + 安装说明）
                         └─ 把新包的 sha256 写进 gqy 分支的 nix/release.json（自动提交）
                                               │
 用户：nix profile install / upgrade ◄─────────┘

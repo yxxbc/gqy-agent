@@ -1,4 +1,4 @@
-# 顾清影 架构（as-built，2026-09-11）
+# 顾清影 架构（as-built，2026-09-11，09-26 核对）
 
 配套架构图：https://claude.ai/code/artifact/20ce2a89-cd70-41f4-a25a-36bdb303f2ea
 
@@ -35,14 +35,41 @@
   QQ 面板 + dashboard）、语音（唤醒 · 听写 · TTS · 协议片段）、技能扫描（目录 →
   `load_skill` / `manage_skill`）。和压缩、提示词组装咬在一起，市场装不了。
 - **插件**（只往工具面加东西，persona 看不出内置与外装的区别）：
-  - 内置（编译进）：ledger、knowledge_base、memes、alarm、image_generation、web_images、
-    archlinux（含 AUR 审查安装）、usage_query、api_quota、send_qq_message。
-  - 外装（目录扫描）：scripts、skills、MCP 服务器、插件包。
+  - 内置（编译进，清单是 `src/config/plugin_catalog.rs` 的 `PLUGINS`，注册单元是
+    `src/tools/compose.rs` 的 `UNITS`，两边一一对应有测试钉着）：files、album、usage_query、
+    alarm、exchange_rate、map、express、archlinux（含 AUR 审查安装）、api_quota、print_image、
+    memes、platform_outreach（从对话里给通讯平台发消息）、web_images、image_generation、
+    knowledge_base、ledger，以及两个外装入口的总闸 scripts、mcp。
+  - 外装（目录扫描）：scripts、skills、MCP 服务器、`gqy pm` 包。内置脚本与内置技能对默认
+    人格全开，对自定义人格是可选件（人格清单 `plugins.scripts` / `plugins.skills` 点名）；
+    平台级内置技能（skill-creator、script-creator、gqy-cli、webui-theme）任何人格都开。
+  - 管理面：WebUI 设置 → 插件 →「扩展」与终端配置器的扩展页把技能、脚本、MCP、pm 包列在
+    一起（`src/web/extensions_api.rs`、`src/config_tui/extensions.rs`、`src/skills/admin.rs`）；
+    git 克隆来的扩展可查更新、快进更新（`src/pm/origin.rs`）。
   - 每件清单声明五个字段：trust 位、分组归属、指路句、跨工具闸、附件投递
     （阶段 1 已补，`src/tools/scripts/header.rs`）。
 
 ### 场所层 —— 入口只声明两件事
 不拥有工具，只附胶水、按信任过滤。见「四」。
+
+### 模块分层（门禁）
+上面三层是概念划分；代码里按顶层模块再细分成八层，由 `test_scripts/arch_dep_check.py`
+的 `LAYERS` 表检查依赖方向（只许高层引用低层，现存的反向边记在
+`test_scripts/arch-dep-waivers.json`，只许变少）。`lib`、`main`、`bin/` 不归层；
+`src/assets/`、`src/scripts/` 是资源目录，不是模块。
+
+| 层 | 顶层模块 |
+|---|---|
+| 基础 | `i18n` `paths` `shell` `prompts` `logging` `notify` `json_extract` `token_counter` `token_estimate` `memory_types` `platform_types` `slash_commands` |
+| 配置 | `config` `default_models` `models_cache` |
+| 基础设施 | `llm` `state` `embedding` `ipc` `question` `alarm` `skills` `pm` `transfer` `voice` `terminal` `persona_hint` `args` |
+| 能力 | `tools` `memory` `render` `ledger` `clipboard` `host_info` `default_kb` |
+| 回合引擎 | `agent` `runtime` |
+| 场所 | `platforms` |
+| daemon | `web` |
+| 入口 | `cli` `config_tui` `question_tui` `oobe` `daemon` |
+
+新增顶层模块或跨层引用时，同一提交里更新这张表与 `arch_dep_check.py`。
 
 ---
 
@@ -68,6 +95,10 @@ C 回合后钩子）和系统提示前言处进入；插件只在「组工具面
 9. **回合后钩子**（子系统挂接点 C，`stream.rs` 的 `process_after_turn`）：写事实/经历/日记、
    情绪更新、人格提醒计数、落库生成速度。
 10. **回到入口渲染**（场所层）：终端画 diff / kitty 图；WebUI 开 artifact；QQ 转图/语音。
+
+另有一个不在回合里的挂接：**聊后复盘**（`src/agent/review.rs`）。属主会话闲置满
+`plugins.memory.review_idle_seconds` 后用独立辅助请求回看最近几轮，结果以 `<self-review>`
+放在 system 侧最末尾（不化石化，两次复盘之间字节不变）。
 
 dev persona 启用集为空：第 3 步只有骨架和一行提示词，第 4 步只有核心 11 件，A/B/C 不构造。
 这就是「只构造启用的」，不是「装了再关」。
@@ -100,6 +131,10 @@ dev persona 启用集为空：第 3 步只有骨架和一行提示词，第 4 �
 | 语音唤醒 / 定时 / 闹钟 | Owner | 无面板 · 可播报 | 不给 `ask_question`；回复走 TTS 或通知 |
 | 子代理 | Internal | 无面板 | 同 persona；工具面是父回合快照；池按 tier |
 
+iMessage 不是场所层的一员：它是 `scripts/imessage/` 下的独立桥接进程，经 `gqy ask` 进来，
+走的是 stdio / ask 那一行。改成原生平台的方案稿在
+`design/2026-09-26-imessage-platform.md`，尚未施工。
+
 **信任解析顺带产出 principal**：入口、账号、用户 id 三元组哈希得到的稳定键，随会话冻结；
 记忆隔离、用量归属、沙盒根都从它派生。跨端进同一会话不重算工具面，用不了的工具报
 「此入口不可用」。
@@ -123,11 +158,12 @@ dev persona 启用集为空：第 3 步只有骨架和一行提示词，第 4 �
 
 ```
 ~/.gqy/
-├── config/              机器级配置（config.jsonc、shell/、scripts/、skills/），≈ /etc
+├── config/              机器级配置（config.jsonc、shell/、webui-themes/），≈ /etc
 ├── personas/            共享人格，管理员发布、成员只读，≈ /usr/share
 │   ├── default/         出厂 顾清影，全扩展开
 │   └── dev/             启用集为空
-├── extensions/          包管理器只写这里（scripts/、skills/），≈ /usr/lib
+├── extensions/          已装扩展：scripts/、skills/（含 personas/<scope>/ 人格专属层）、
+│                        pm/lock.json（包管理器锁文件），≈ /usr/lib
 ├── models/  cache/  state/   机器级运行时，≈ /var（账号表、邀请表、用量表、平台状态）
 ├── data/                【仍在用】机器/共享数据：kb、memes、documents、pictures、
 │                        prompts、platforms、persona-avatars、default-kb
@@ -153,7 +189,7 @@ state/cache/models。目录名用用户名，账号 id 另存账号表，princip
   过期前端回登录页。
 - **会话归属**：各人只看自己名下的；管理员看不到成员会话，连开关也没有。每个成员一个
   独立 `conversation.db`，Web / actor / IPC 全路径按会话所属 store 路由。
-- **只给管理员的页面**：供应商与 API key、共享人格编辑、扩展与脚本技能管理、QQ 与群管后台、
+- **只给管理员的页面**：供应商与 API key、共享人格编辑、扩展与脚本技能管理（含 WebUI 主题库）、QQ 与群管后台、
   共享人格 dashboard、按人拆的用量总表。
 - **成员能做**：私有人格、私有 dashboard、表情包库（按 persona scope）、开 dev 会话。
 
