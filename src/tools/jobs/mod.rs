@@ -119,6 +119,8 @@ struct JobEntry {
     metric: Option<String>,
     /// 同一个量的**数字**形态，给会话累计用。
     metric_tokens: Option<u64>,
+    /// 子代理的审计会话 id：网页端任务条据它打开详情抽屉。命令类任务没有。
+    audit_session_id: Option<String>,
 }
 
 /// trace 环形缓冲上限:子代理一步就几十条标记,4000 条够回放好几十步的展开区。
@@ -180,6 +182,9 @@ pub struct JobOverview {
     /// 同一个量的数字形态。跑着的时候先记在会话累计上，跑完由审计会话接手。
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub metric_tokens: Option<u64>,
+    /// 子代理的审计会话 id(`/api/subagents/{id}` 读它的完整过程)。
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub audit_session_id: Option<String>,
 }
 
 struct JobHost {
@@ -227,7 +232,8 @@ pub fn publish_job_progress(job_id: &str, message: &str) {
     {
         let mut jobs = jobs().lock().unwrap();
         if let Some(job) = jobs.get_mut(job_id) {
-            job.trace.push(message.to_string());
+            // 逐 token 的思考/正文增量并成段,见 `subagent_trace::push_coalesced`。
+            super::subagent_trace::push_coalesced(&mut job.trace, message);
             if job.trace.len() > MAX_TRACE {
                 let overflow = job.trace.len() - MAX_TRACE;
                 job.trace.drain(0..overflow);
@@ -282,6 +288,7 @@ fn overview_of(job: &JobEntry) -> JobOverview {
         status: job.state.label(),
         metric: job.metric.clone(),
         metric_tokens: job.metric_tokens,
+        audit_session_id: job.audit_session_id.clone(),
         running: !job.state.is_terminal(),
         runtime_seconds: job
             .finished
@@ -476,6 +483,7 @@ pub async fn spawn_background(
         trace: Vec::new(),
         metric: None,
         metric_tokens: None,
+        audit_session_id: None,
     };
     let started = overview_of(&entry);
     jobs().lock().unwrap().insert(job_id.clone(), entry);
@@ -528,6 +536,7 @@ pub async fn spawn_background_subagent<F>(
     title: Option<&str>,
     description: &str,
     dev: bool,
+    audit_session_id: Option<&str>,
     progress: &ToolProgress,
     build: impl FnOnce(String, PathBuf) -> F,
 ) -> Result<String>
@@ -579,6 +588,7 @@ where
         trace: Vec::new(),
         metric: None,
         metric_tokens: None,
+        audit_session_id: audit_session_id.map(str::to_string),
     };
     let started = overview_of(&entry);
     jobs().lock().unwrap().insert(job_id.clone(), entry);

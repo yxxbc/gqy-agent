@@ -45,6 +45,7 @@ pub(crate) use subagent::{
     is_subagent_marker, peek_subagent_trace, record_subagent_trace, take_subagent_trace,
 };
 pub(crate) mod subagent_runner;
+pub(crate) mod subagent_trace;
 mod todowrite;
 pub(crate) mod voice_chat;
 pub(crate) mod voice_speak;

@@ -56,6 +56,7 @@ mod server;
 mod session_cmds;
 mod sessions;
 mod shared_files;
+mod subagent_api;
 #[cfg(test)]
 pub(crate) mod tests;
 mod themes_api;
@@ -116,6 +117,7 @@ use server::*;
 use session_cmds::*;
 use sessions::*;
 use shared_files::*;
+use subagent_api::*;
 use themes_api::*;
 use today::*;
 use tty::*;

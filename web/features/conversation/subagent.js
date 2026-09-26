@@ -20,8 +20,83 @@ export const SUBAGENT_MARKERS = {
   result: "__subtool_result__",
   stats: "__subagent_stats__",
   detach: "__subagent_detach__",
-  brief: "__subagent_brief__"
+  brief: "__subagent_brief__",
+  // 审计会话 id:有了它才能打开详情抽屉(完整过程落在库里)。
+  session: "__subagent_session__",
+  // 中途量报:`<短标>\t<数字>\t<人话>`,一秒好几次,只刷计数不进时间线。
+  metric: "__subagent_metric__",
+  preparing: "__subtool_preparing__"
 };
+
+// 详情抽屉挂的旁路:任何 sink 收到的标记都先给它看一眼(抽屉据 auditId 认领)。
+// 用注册而不是直接 import 抽屉模块:抽屉本身要 import 这里的渲染函数。
+let liveTap = null;
+export function setSubagentLiveTap(fn) {
+  liveTap = typeof fn === "function" ? fn : null;
+}
+
+// 一个 sink 上攒下来的原始标记(同类增量并成段),抽屉打开时照它回放。和后端
+// `subagent_trace::push_coalesced` 同一个规矩。
+const MAX_SINK_MARKERS = 4000;
+function recordSinkMarker(sink, message) {
+  if (!sink.markers) sink.markers = [];
+  const list = sink.markers;
+  const last = list.length ? list[list.length - 1] : null;
+  for (const prefix of [SUBAGENT_MARKERS.reasoning, SUBAGENT_MARKERS.content]) {
+    if (message.startsWith(prefix)) {
+      if (last != null && last.startsWith(prefix)) {
+        list[list.length - 1] = last + message.slice(prefix.length);
+        return;
+      }
+      break;
+    }
+  }
+  if (message.startsWith(SUBAGENT_MARKERS.metric) || message.startsWith(SUBAGENT_MARKERS.preparing)) return;
+  list.push(message);
+  if (list.length > MAX_SINK_MARKERS) list.splice(0, list.length - MAX_SINK_MARKERS);
+}
+
+// 状态行那串数:「3 次工具 · ≈1.2K」(和 Claude 的 N tool uses · tokens 同一口径)。
+export function subagentCountsText(sink) {
+  const parts = [];
+  const calls = Number(sink?.toolCount || 0);
+  if (calls > 0) parts.push(`${calls} 次工具`);
+  if (sink?.tokenText) parts.push(sink.tokenText);
+  return parts.join(" · ");
+}
+
+// 前台工具卡 / 后台任务条(job)都从这里过:把这次子代理的实时 token 估算按
+// usageKey 汇进输入框那个「累计」(#131,后台子代理同样接上)。回放/播种时不接
+// (那是历史,会和后端基线重复计);抽屉自己的 sink 没有 usageKey,也不接。
+function feedCumulative(sink, n) {
+  if (sink.noCumulative) return;
+  const key = sink.usageKey || (sink.id != null ? sink.id : null);
+  if (key == null || n == null || !Number.isFinite(n) || state.seedingLive) return;
+  // 保留已有的 done/baseAtDone:子代理收尾还可能再来一条 stats,别把完成态覆盖没了。
+  const prev = state.liveSubagentTokens.get(key);
+  state.liveSubagentTokens.set(key, { tokens: n, done: prev?.done || false, baseAtDone: prev?.baseAtDone });
+  refreshComposerCumulative();
+}
+
+function refreshCounts(sink) {
+  if (sink.taskToken) sink.taskToken.textContent = subagentCountsText(sink);
+}
+
+// 从「工具调用 3 次」/「tool calls: 3」里抠次数。
+function toolCountFromText(text) {
+  const m = String(text || "").match(/工具调用\s*(\d+)\s*次|tool calls:\s*(\d+)/i);
+  if (!m) return null;
+  const n = Number(m[1] || m[2]);
+  return Number.isFinite(n) ? n : null;
+}
+
+// 审计会话 id 到了:记下,露出详情按钮。
+export function setSubagentAudit(sink, id) {
+  const value = String(id || "").trim();
+  if (!value) return;
+  sink.auditId = value;
+  if (sink.detailButton) sink.detailButton.hidden = false;
+}
 
 // 子代理任务简介 DOM(展开区最上方):标题 + 整段 prompt。前台从工具参数直接建;
 // 后台经 __subagent_brief__ marker 建(后台事件流里没有参数,09-12 #9)。
@@ -96,7 +171,33 @@ export function parseSubagentEvent(message) {
     }
   }
   if (text.startsWith(SUBAGENT_MARKERS.detach)) return { kind: "plain", text: text.slice(SUBAGENT_MARKERS.detach.length).trim() };
+  if (text.startsWith(SUBAGENT_MARKERS.session)) return { kind: "session", id: text.slice(SUBAGENT_MARKERS.session.length).trim() };
+  if (text.startsWith(SUBAGENT_MARKERS.metric)) {
+    const [display = "", raw = "", human = ""] = text.slice(SUBAGENT_MARKERS.metric.length).split("\t");
+    return { kind: "metric", display: display.trim(), raw: Number(raw), text: human.trim() };
+  }
+  if (text.startsWith(SUBAGENT_MARKERS.preparing)) return { kind: "preparing", name: text.slice(SUBAGENT_MARKERS.preparing.length).trim() };
   return { kind: "plain", text: text.trim() };
+}
+
+// 子代理的工具输出 → 收起行上那句结论。成功路径是文本形态,`result:` 之后是
+// 结论本体(见后端 `run_core`);失败是 ok:false 的 JSON。后台派发的返回值只有
+// job_id,没有结论,返回空串(窥视保持原样)。
+export function subagentResultPeek(output) {
+  const text = String(output || "");
+  const at = text.indexOf("\nresult:\n");
+  if (at >= 0) {
+    for (const raw of text.slice(at + "\nresult:\n".length).split("\n")) {
+      const line = raw.replace(/^[\s#>*\-|`]+/, "").trim();
+      if (line) return line;
+    }
+    return "";
+  }
+  try {
+    const value = JSON.parse(text);
+    if (value && value.ok === false && value.error) return `出错:${value.error}`;
+  } catch { /* 不是 JSON */ }
+  return "";
 }
 
 export function subagentPeekLine(ev) {
@@ -191,25 +292,46 @@ export function subAttach(sink, el) {
 }
 
 export function renderSubagentProgress(sink, message) {
+  message = String(message || "");
+  if (liveTap) liveTap(sink, message);
+  recordSinkMarker(sink, message);
   const ev = parseSubagentEvent(message);
+  if (ev.kind === "session") {
+    setSubagentAudit(sink, ev.id);
+    return;
+  }
+  if (ev.kind === "preparing") {
+    if (ev.name) {
+      sink.peekLine = `准备 ${ev.name}`;
+      if (sink.taskPeek) setReasoningPeek(sink.taskPeek, sink.peekLine);
+    }
+    return;
+  }
+  if (ev.kind === "metric") {
+    // 中途量报:刷次数与词元,不进时间线、不当窥视(原来掉进 plain 分支,窥视上
+    // 露出一串带制表符的原始标记)。
+    const calls = toolCountFromText(ev.text);
+    if (calls != null) sink.toolCount = Math.max(Number(sink.toolCount || 0), calls);
+    if (ev.display) sink.tokenText = ev.display;
+    // 只刷显示,不汇进「累计」:那条账仍只认 stats(与改动前一致,免得和后端
+    // 基线里已记的审计用量重复计)。
+    refreshCounts(sink);
+    return;
+  }
   if (ev.kind === "stats") {
     // stats 文本形如「工具调用 3 次　消耗词元 ≈1.2k」/「tool calls: 3　token cost: 1.2k」,
     // 每步更新一次。抠出 token 数(可能带 ≈ 前缀),喂给任务条那行的 token 显示(09-12 item 4)。
+    const calls = toolCountFromText(ev.text);
+    if (calls != null) sink.toolCount = Math.max(Number(sink.toolCount || 0), calls);
     const m = ev.text.match(/(?:词元|cost)\s*[：:]?\s*(≈?\s*[\d.]+\s*[kKmMbB万]?)/);
+    if (!m) refreshCounts(sink);
     if (m) {
       sink.tokenText = m[1].replace(/\s+/g, "");
-      if (sink.taskToken) sink.taskToken.textContent = sink.tokenText;
+      refreshCounts(sink);
       // 前台工具卡 / 后台任务条(job)都从这里过:把这次子代理的实时 token 估算按
       // usageKey 汇进输入框那个「累计」(#131,后台子代理同样接上)。回放/播种时不接
       // (那是历史,会和后端基线重复计)。
-      const key = sink.usageKey || (sink.id != null ? sink.id : null);
-      const n = tokensFromCount(sink.tokenText);
-      if (key != null && n != null && !state.seedingLive) {
-        // 保留已有的 done/baseAtDone:子代理收尾还可能再来一条 stats,别把完成态覆盖没了。
-        const prev = state.liveSubagentTokens.get(key);
-        state.liveSubagentTokens.set(key, { tokens: n, done: prev?.done || false, baseAtDone: prev?.baseAtDone });
-        refreshComposerCumulative();
-      }
+      feedCumulative(sink, tokensFromCount(sink.tokenText));
     }
     return;
   }
@@ -310,6 +432,12 @@ export function renderSubagentProgress(sink, message) {
     subEndContent(sink);
     const call = sink.pendingCall || { name: ev.name, display: ev.display, args: ev.args };
     sink.pendingCall = null;
+    // 次数兜底:量报没到(旧后端/回放)时自己数结果。
+    sink.resultCount = Number(sink.resultCount || 0) + 1;
+    if (sink.resultCount > Number(sink.toolCount || 0)) {
+      sink.toolCount = sink.resultCount;
+      refreshCounts(sink);
+    }
     const card = createPersistedToolCard({ name: call.name, display_name: call.display, arguments: call.args != null ? call.args : ev.args, output: ev.output, ok: ev.ok });
     subAttach(sink, card);
     sink.peekLine = (call.display || call.name) + " " + (ev.ok ? "完成" : "出错");

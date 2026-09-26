@@ -1,0 +1,239 @@
+/* ---------- 子代理详情(web/features/conversation/subagent-drawer.js) ----------
+   卡片 / 任务行上的「详情」按钮,和右侧滑出的详情抽屉(手机全屏)。 */
+
+/* 子代理卡片:head 后面跟一个详情按钮。head 是 button,按钮只能做它的兄弟,
+   所以卡片改成两列网格——第一行 head(撑满,整行可点照旧)+ 行尾的按钮,
+   其余(展开区、待办、附件)通栏。 */
+.tool-card.is-task.has-detail-button {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: center;
+  column-gap: 2px;
+}
+.tool-card.is-task.has-detail-button > .tool-head {
+  grid-column: 1;
+}
+.tool-card.is-task.has-detail-button > .subagent-detail-button {
+  grid-column: 2;
+}
+.tool-card.is-task.has-detail-button > :not(.tool-head):not(.subagent-detail-button) {
+  grid-column: 1 / -1;
+}
+/* 按钮还没露出来(审计会话 id 没到)时整列不占位。 */
+.tool-card.is-task.has-detail-button > .subagent-detail-button[hidden] {
+  display: none;
+}
+
+.subagent-detail-button {
+  display: inline-grid;
+  flex: none;
+  width: 24px;
+  height: 24px;
+  place-items: center;
+  padding: 0;
+  border: 0;
+  border-radius: var(--radius);
+  background: transparent;
+  color: var(--text-faint);
+  cursor: pointer;
+  transition: color var(--motion-fast) ease, background-color var(--motion-fast) ease;
+}
+.subagent-detail-button:hover,
+.subagent-detail-button:focus-visible {
+  background: var(--surface-2);
+  color: var(--text);
+}
+.subagent-detail-button svg {
+  width: 14px;
+  height: 14px;
+}
+.job-chip .subagent-detail-button {
+  width: 20px;
+  height: 20px;
+}
+
+/* ---------- 抽屉 ---------- */
+.subagent-drawer-root {
+  position: fixed;
+  inset: 0;
+  z-index: var(--z-overlay);
+  pointer-events: none;
+}
+/* 桌面端不遮挡:抽屉开着也能继续看对话、点别的卡片。 */
+.subagent-drawer-scrim {
+  position: absolute;
+  inset: 0;
+  background: transparent;
+}
+.subagent-drawer {
+  position: absolute;
+  top: 0;
+  right: 0;
+  bottom: 0;
+  display: grid;
+  grid-template-rows: auto auto minmax(0, 1fr);
+  width: min(560px, 100%);
+  border-left: 1px solid color-mix(in srgb, var(--line) 70%, transparent);
+  background: var(--surface-1);
+  box-shadow: var(--float-shadow);
+  color: var(--text);
+  outline: none;
+  pointer-events: auto;
+  transform: translateX(104%);
+  transition: transform var(--motion-slow) cubic-bezier(0.2, 0.8, 0.2, 1);
+}
+.subagent-drawer-root.is-open .subagent-drawer {
+  transform: none;
+}
+
+.subagent-drawer-head {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  padding: 14px 14px 8px 18px;
+}
+.subagent-drawer-titles {
+  display: grid;
+  flex: 1 1 auto;
+  min-width: 0;
+  gap: 2px;
+}
+.subagent-drawer-kicker {
+  color: var(--text-soft);
+  font-size: var(--fs-micro);
+  letter-spacing: 0.02em;
+}
+.subagent-drawer-title {
+  margin: 0;
+  overflow-wrap: anywhere;
+  font-size: var(--fs-chat);
+  font-weight: 600;
+  line-height: 1.4;
+}
+.subagent-drawer-close {
+  display: grid;
+  flex: none;
+  width: 28px;
+  height: 28px;
+  place-items: center;
+  border: 0;
+  border-radius: var(--radius);
+  background: transparent;
+  color: var(--text-soft);
+  cursor: pointer;
+}
+.subagent-drawer-close:hover,
+.subagent-drawer-close:focus-visible {
+  background: var(--surface-2);
+  color: var(--text);
+}
+
+.subagent-drawer-meta {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 4px 12px;
+  padding: 0 18px 12px;
+  border-bottom: 1px solid color-mix(in srgb, var(--line) 60%, transparent);
+  color: var(--text-soft);
+  font-size: var(--fs-meta);
+  font-variant-numeric: tabular-nums;
+}
+.subagent-drawer-model {
+  font-family: var(--font-mono);
+  font-size: var(--fs-micro);
+}
+.subagent-drawer-status {
+  padding: 2px 8px;
+  border-radius: var(--radius-pill);
+  background: var(--surface-2);
+  color: var(--text-soft);
+  font-size: var(--fs-micro);
+}
+.subagent-drawer-status.is-running {
+  background: color-mix(in srgb, var(--accent) 16%, transparent);
+  color: var(--accent);
+}
+.subagent-drawer-status.is-done {
+  background: color-mix(in srgb, var(--online) 16%, transparent);
+  color: var(--online);
+}
+.subagent-drawer-status.is-failed {
+  background: color-mix(in srgb, var(--danger) 16%, transparent);
+  color: var(--danger);
+}
+
+.subagent-drawer-body {
+  display: grid;
+  align-content: start;
+  gap: 18px;
+  padding: 14px 18px 28px;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+}
+.subagent-drawer-section {
+  display: grid;
+  min-width: 0;
+  gap: 8px;
+}
+.subagent-drawer-section[hidden] {
+  display: none;
+}
+.subagent-drawer-heading {
+  margin: 0;
+  color: var(--text-faint);
+  font-size: var(--fs-micro);
+  font-weight: 600;
+  letter-spacing: 0.04em;
+}
+.subagent-drawer-prompt {
+  max-height: 240px;
+  padding: 10px 12px;
+  overflow-y: auto;
+  border-radius: var(--radius);
+  background: var(--surface-2);
+  color: var(--text-soft);
+  font-size: var(--fs-meta);
+  line-height: 1.6;
+  overflow-wrap: anywhere;
+  white-space: pre-wrap;
+}
+.subagent-drawer-timeline {
+  min-width: 0;
+}
+.subagent-drawer-empty {
+  margin: 0;
+  color: var(--text-faint);
+  font-size: var(--fs-meta);
+}
+.subagent-drawer-empty[hidden] {
+  display: none;
+}
+.subagent-drawer-result {
+  min-width: 0;
+  font-size: var(--fs-chat);
+  line-height: 1.7;
+}
+.subagent-drawer-result.is-error {
+  color: var(--danger);
+  font-size: var(--fs-meta);
+  white-space: pre-wrap;
+}
+
+/* 手机:全屏,底下加一层遮罩(点它关)。 */
+@media (max-width: 836px) {
+  .subagent-drawer {
+    width: 100%;
+    border-left: 0;
+  }
+  .subagent-drawer-root.is-open .subagent-drawer-scrim {
+    background: color-mix(in srgb, var(--app-bg) 50%, transparent);
+    pointer-events: auto;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .subagent-drawer {
+    transition: none;
+  }
+}

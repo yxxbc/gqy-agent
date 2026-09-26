@@ -217,10 +217,15 @@ const MIGRATIONS: &[Migration] = &[
         name: "chat_rooms",
         apply: apply_v38_chat_rooms,
     },
+    Migration {
+        version: 39,
+        name: "subagent_trace",
+        apply: apply_v39_subagent_trace,
+    },
 ];
 
 /// Latest schema version this build produces.
-pub const LATEST_VERSION: i64 = 38;
+pub const LATEST_VERSION: i64 = 39;
 
 /// Returns the schema version currently recorded in the database.
 pub fn current_version(conn: &Connection) -> Result<i64> {

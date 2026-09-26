@@ -20,6 +20,8 @@ mod shared_files;
 pub use shared_files::SharedFile;
 mod sponsors;
 pub use sponsors::*;
+mod subagent_trace;
+pub use subagent_trace::SubagentAuditDetail;
 mod accounts;
 mod turns;
 pub use accounts::*;

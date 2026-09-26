@@ -397,6 +397,10 @@ impl StreamRenderer {
             }
             return Ok(());
         }
+        // 审计会话 id 只给网页端开详情抽屉用。
+        if message.starts_with(crate::tools::subagent_trace::SESSION_PREFIX) {
+            return Ok(());
+        }
         if let Some(text) = message.strip_prefix("__subagent_metric__") {
             // `<给人看的那串>\t<数字>\t<人话>`。数字进会话累计的实时加数，
             // 人话进面板抬头。

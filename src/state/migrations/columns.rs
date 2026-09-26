@@ -381,3 +381,18 @@ pub(in crate::state) fn apply_v38_chat_rooms(conn: &Connection) -> Result<()> {
     )?;
     Ok(())
 }
+
+/// v39：子代理的完整过程（思考段、正文段、工具调用与结果），挂在审计会话下。
+/// 追加型子表（§3.2）：一个标记一行，跟着审计会话级联删除。
+pub(in crate::state) fn apply_v39_subagent_trace(conn: &Connection) -> Result<()> {
+    conn.execute_batch(
+        "CREATE TABLE IF NOT EXISTS subagent_trace (
+            seq        INTEGER PRIMARY KEY,
+            session_id TEXT NOT NULL REFERENCES sessions(session_id) ON DELETE CASCADE,
+            marker     TEXT NOT NULL
+        );
+        CREATE INDEX IF NOT EXISTS idx_subagent_trace_session
+            ON subagent_trace(session_id, seq);",
+    )?;
+    Ok(())
+}

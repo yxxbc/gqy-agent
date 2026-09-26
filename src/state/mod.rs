@@ -11,6 +11,7 @@ mod queue;
 mod reviews;
 mod rooms;
 mod sessions;
+mod subagent_trace;
 mod turns;
 mod usage_ops;
 pub use migrations::DEFAULT_SESSION_ID;
@@ -42,13 +43,13 @@ pub use conversation_db::{
     PlatformMemeRefRecord, PlatformPluginScopeKey, PlatformSessionBinding,
     PlatformSessionBindingKey, QueuedPrompt, QueuedPromptAttachment, RedoCandidate, RedoInputKind,
     RedoStart, ReplayEntry, RoomMessage, RoomParticipant, SessionOverview, SessionRecord,
-    SessionReviewRow, SponsorOrder, SponsorRecord, SponsorSummary, SponsorTotal, ToolFlowCall,
-    ToolFlowRound, ToolFootprint, Turn, TurnFollowup, TurnInlineMedia, TurnJournalEvent,
-    TurnRedoCheckpointPayload, TurnReplay, TurnStatus, UserAttachment, UserAttachmentData,
-    DEFAULT_MAX_GOAL_ROUNDS, GLOBAL_PLATFORM_ACCOUNT_SCOPE, INLINE_MEDIA_KIND_IMAGE,
-    INLINE_MEDIA_KIND_PDF, INLINE_MEDIA_KIND_TEXT, INLINE_MEDIA_KIND_VIDEO, ROOM_SPEAKER_NOTICE,
-    ROOM_SPEAKER_PARTICIPANT, ROOM_SPEAKER_USER, USER_ATTACHMENT_KIND_FILE,
-    USER_ATTACHMENT_KIND_IMAGE, USER_ATTACHMENT_KIND_TEXT,
+    SessionReviewRow, SponsorOrder, SponsorRecord, SponsorSummary, SponsorTotal,
+    SubagentAuditDetail, ToolFlowCall, ToolFlowRound, ToolFootprint, Turn, TurnFollowup,
+    TurnInlineMedia, TurnJournalEvent, TurnRedoCheckpointPayload, TurnReplay, TurnStatus,
+    UserAttachment, UserAttachmentData, DEFAULT_MAX_GOAL_ROUNDS, GLOBAL_PLATFORM_ACCOUNT_SCOPE,
+    INLINE_MEDIA_KIND_IMAGE, INLINE_MEDIA_KIND_PDF, INLINE_MEDIA_KIND_TEXT,
+    INLINE_MEDIA_KIND_VIDEO, ROOM_SPEAKER_NOTICE, ROOM_SPEAKER_PARTICIPANT, ROOM_SPEAKER_USER,
+    USER_ATTACHMENT_KIND_FILE, USER_ATTACHMENT_KIND_IMAGE, USER_ATTACHMENT_KIND_TEXT,
 };
 pub use usage::{
     UsageMeta, UsageRange, UsageSnapshot, UsageStats, USAGE_KIND_AFFECTION, USAGE_KIND_GROUP_JOIN,

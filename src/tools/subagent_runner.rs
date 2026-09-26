@@ -183,6 +183,9 @@ pub struct SubagentProgress {
     progress: ToolProgress,
     tool_mode: ProgressMode,
     enabled: bool,
+    /// 完整过程落审计会话（WebUI 详情抽屉读它）。**不看档位**：终端 Summary 档
+    /// 发起的子代理，事后在网页上照样能看全。
+    recorder: Option<std::sync::Arc<super::subagent_trace::TraceRecorder>>,
 }
 
 impl SubagentProgress {
@@ -191,16 +194,42 @@ impl SubagentProgress {
             progress,
             tool_mode,
             enabled,
+            recorder: None,
         }
+    }
+
+    pub(crate) fn with_recorder(
+        mut self,
+        recorder: Option<std::sync::Arc<super::subagent_trace::TraceRecorder>>,
+    ) -> Self {
+        self.recorder = recorder;
+        self
     }
 
     pub fn clone_inner(&self) -> ToolProgress {
         self.progress.clone()
     }
 
+    fn record(&self, marker: &str) {
+        if let Some(recorder) = &self.recorder {
+            recorder.push(marker);
+        }
+    }
+
     pub fn phase(&self, message: impl Into<String>) {
+        let message = message.into();
+        self.record(&message);
         if self.enabled && self.tool_mode != ProgressMode::Hidden {
-            self.progress.report(message.into());
+            self.progress.report(message);
+        }
+    }
+
+    /// 任务简介：总是记进过程（详情抽屉的第一步），只在 Full 档往外发。
+    pub(crate) fn brief(&self, message: impl Into<String>) {
+        let message = message.into();
+        self.record(&message);
+        if self.enabled && self.tool_mode == ProgressMode::Full {
+            self.progress.report(message);
         }
     }
 
@@ -213,9 +242,10 @@ impl SubagentProgress {
         if text.is_empty() {
             return;
         }
+        let marker = format!("__subagent_reasoning__{}", text);
+        self.record(&marker);
         if self.enabled && self.tool_mode != ProgressMode::Hidden {
-            self.progress
-                .report(format!("__subagent_reasoning__{}", text));
+            self.progress.report(marker);
         }
     }
 
@@ -228,9 +258,10 @@ impl SubagentProgress {
         }
         // 同 `reasoning`：**Summary 档也发**。前台子代理的面板要靠它把"它开始
         // 说话了"这件事表达出来——说话之前那几步该收成一行 `Worked for …`。
+        let marker = format!("__subagent_content__{}", text);
+        self.record(&marker);
         if self.enabled && self.tool_mode != ProgressMode::Hidden {
-            self.progress
-                .report(format!("__subagent_content__{}", text));
+            self.progress.report(marker);
         }
     }
 
@@ -274,20 +305,33 @@ impl SubagentProgress {
     /// 「准备执行」一直挂到结果回来（用户实测截图）。画两遍的事让渲染那边自己
     /// 躲：Full 档 inline 收到这条时命令块不画，等结果整块画。
     pub fn tool_call_detail(&self, name: &str, args: &str) {
-        if !self.enabled || self.tool_mode == ProgressMode::Hidden {
-            return;
-        }
-        self.progress.report(format!(
+        let marker = format!(
             "__subtool_call__{}",
             json!({
                 "name": name,
                 "display": readable_tool_name(name),
                 "args": clip_detail(args),
             })
-        ));
+        );
+        self.record(&marker);
+        if !self.enabled || self.tool_mode == ProgressMode::Hidden {
+            return;
+        }
+        self.progress.report(marker);
     }
 
     pub fn tool_end(&self, step: usize, name: &str, args: &str, ok: bool, output: &str) {
+        let marker = format!(
+            "__subtool_result__{}",
+            json!({
+                "name": name,
+                "display": readable_tool_name(name),
+                "args": args,
+                "ok": ok,
+                "output": clip_detail(output),
+            })
+        );
+        self.record(&marker);
         if !self.enabled || self.tool_mode == ProgressMode::Hidden {
             return;
         }
@@ -310,16 +354,7 @@ impl SubagentProgress {
         }
         // 同 `reasoning`：Summary 档也发，全屏 TUI 的子代理面板要靠它。
         // 输出截断——这是给人看一眼的，不是把 IPC 当日志管道。
-        self.progress.report(format!(
-            "__subtool_result__{}",
-            json!({
-                "name": name,
-                "display": readable_tool_name(name),
-                "args": args,
-                "ok": ok,
-                "output": clip_detail(output),
-            })
-        ));
+        self.progress.report(marker);
     }
 }
 

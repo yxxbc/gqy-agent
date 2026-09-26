@@ -7,7 +7,7 @@ import { loadBootstrap } from "../boot.js";
 import { updateControlState } from "../composer/input.js";
 import { liveViewed, updateConversationChrome } from "../conversation/chrome.js";
 import { jobStreamSink, renderConversation } from "../conversation/render.js";
-import { renderSubagentProgress } from "../conversation/subagent.js";
+import { renderSubagentProgress, setSubagentAudit } from "../conversation/subagent.js";
 import { loadGoal } from "../goal.js";
 import { renderJobsStrip } from "../jobs.js";
 import { handleContextEvent } from "./context.js";
@@ -282,6 +282,8 @@ export function handleSseEvent(name, event) {
     const job = data?.job;
     if (job?.job_id) {
       state.backgroundJobs.set(String(job.job_id), { ...job, receivedAt: Date.now() });
+      // 子代理的审计会话 id 先挂到它的 sink 上:任务条收起时也能从主对话那张卡打开实时详情。
+      if (job.audit_session_id) setSubagentAudit(jobStreamSink(String(job.job_id)), job.audit_session_id);
       renderJobsStrip();
     }
     return;

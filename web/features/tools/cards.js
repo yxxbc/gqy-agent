@@ -3,6 +3,7 @@ import { createIcon, makeIconSlot } from "../../core/icons.js";
 import { procLineRefresh, railSnapFit } from "../conversation/proc-rail.js";
 import { contentAdded } from "../conversation/scroll.js";
 import { renderSubagentProgress, subEndContent, subEndReasoning } from "../conversation/subagent.js";
+import { makeSubagentDetailButton } from "../conversation/subagent-drawer.js";
 import { dedupeToolSubject, formatToolDuration, isSubagentTool, parsedToolArguments, prettyArguments, toolSubject } from "./format.js";
 import { state } from "../../state/store.js";
 
@@ -146,7 +147,15 @@ export function createPersistedToolCard(call) {
   if (hasSpan) card.gqyTiming = { startedAt: startedMs, finishedAt: finishedMs };
   statusText.textContent = ok ? (hasSpan ? formatToolDuration(finishedMs - startedMs) || "完成" : "完成") : "失败";
   status.append(makeIconSlot(ok ? "check" : "circle-alert"), statusText);
-  head.append(icon, title, status, makeIconSlot("chevron-down", "tool-chevron"));
+  // 子代理:标题后面那串「N 次工具 · 词元」,回放子过程时由 renderSubagentProgress 填。
+  let taskCounts = null;
+  if (isSubagentTool(name)) {
+    taskCounts = document.createElement("span");
+    taskCounts.className = "job-chip-token tool-task-token";
+    head.append(icon, title, taskCounts, status, makeIconSlot("chevron-down", "tool-chevron"));
+  } else {
+    head.append(icon, title, status, makeIconSlot("chevron-down", "tool-chevron"));
+  }
   head.addEventListener("click", () => {
     const collapsed = card.classList.toggle("collapsed");
     head.setAttribute("aria-expanded", String(!collapsed));
@@ -179,6 +188,7 @@ export function createPersistedToolCard(call) {
     detail.wrapper.hidden = false;
     body.appendChild(detail.wrapper);
   }
+  let detailButton = null;
   // 子代理:回看/刷新时把落库的子过程标记流回放成时间线(#9)。放在参数/结果之前,
   // 和实时展开态一个样。用一个一次性 sink 走同款 renderSubagentProgress。
   if (isSubagentTool(name) && Array.isArray(call?.sub_trace) && call.sub_trace.length) {
@@ -186,18 +196,27 @@ export function createPersistedToolCard(call) {
     subBlocks.className = "sub-blocks assistant-blocks";
     const sink = {
       blocks: subBlocks, brief: false, think: null, thinkAccum: "", contentBlock: null,
-      contentAccum: "", pendingCall: null, taskPeek: null, taskToken: null, peekLine: "",
+      contentAccum: "", pendingCall: null, taskPeek: null, taskToken: taskCounts, peekLine: "",
     };
     for (const marker of call.sub_trace) renderSubagentProgress(sink, String(marker));
     subEndReasoning(sink);
     subEndContent(sink);
     body.insertBefore(subBlocks, body.firstChild);
     card.classList.add("is-task");
+    if (sink.auditId) {
+      // 完整过程在库里:详情抽屉读接口,不靠这份(可能被截过的)回放。
+      detailButton = makeSubagentDetailButton(() => ({
+        auditId: sink.auditId,
+        title: toolSubject(name, call?.arguments) || "",
+      }), "tool-detail-open");
+      card.classList.add("has-detail-button");
+    }
   }
   const fold = document.createElement("div");
   fold.className = "tool-fold";
   fold.appendChild(body);
-  card.append(head, fold);
+  if (detailButton) card.append(head, detailButton, fold);
+  else card.append(head, fold);
   // 待办列表挂在签外面,收起态也看得见——那是给人看的产出,不是调试信息。
   const todos = window.GqyTodos?.isTodoTool(name) ? window.GqyTodos.render(output) : null;
   if (todos) card.appendChild(todos);

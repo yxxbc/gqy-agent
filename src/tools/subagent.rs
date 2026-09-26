@@ -30,7 +30,9 @@ pub fn record_subagent_trace(call_id: &str, marker: &str) {
     }
     let mut map = subagent_traces().lock().unwrap();
     let buf = map.entry(call_id.to_string()).or_default();
-    buf.push(marker.to_string());
+    // 逐 token 的思考/正文增量并成段:不并的话一段长思考就能把缓冲撑满,
+    // 从头挤掉前面的工具步骤。
+    super::subagent_trace::push_coalesced(buf, marker);
     if buf.len() > MAX_CALL_TRACE {
         let overflow = buf.len() - MAX_CALL_TRACE;
         buf.drain(0..overflow);
@@ -301,17 +303,40 @@ async fn run_subagent(
         parent: crate::tools::workspace::try_session().map(|session| session.to_string()),
         persona: context.config.active_persona_scope(),
     };
+    // 审计会话在派发之前建好:后台子代理的工具卡只拿得到 job_id,详情抽屉要的
+    // 会话 id 得趁这次调用的进度通道还开着时发出去,才会跟着落进这次调用的 trace。
+    let audit = SubagentAudit::open(&context, &anchor, &params.description, &params.prompt);
+    if let Some(audit) = &audit {
+        if progress_mode(&context.config) == ProgressMode::Full {
+            progress.report(audit.session_marker());
+        }
+    }
     if args
         .get("background")
         .and_then(Value::as_bool)
         .unwrap_or(false)
     {
-        return spawn_background(context, params, anchor, progress).await;
+        return spawn_background(context, params, anchor, audit, progress).await;
     }
     // 前台子代理阻塞在本次调用里,主体无从中途插话,不开收件箱(None)。
-    Ok(run_core(context, progress, params, anchor, None)
+    Ok(run_core(context, progress, params, anchor, audit, None)
         .await?
         .output)
+}
+
+/// WebUI 回合(既非终端、也非平台:没有 origin tty、没有平台 sender)一律用
+/// Full 档发子过程标记(思考 + 结构化工具调用/结果),网页端据此把展开后的
+/// 子过程时间线画成「思考+工具流」——和主智能体过程区同款(09-11 用户要求)。
+/// 网页端默认收起这些,静息态不吵;终端/平台仍按 display.tool_calls 配置,
+/// 免得 Summary 档的终端用户突然被子代理的全量嵌套刷屏。
+fn progress_mode(config: &AppConfig) -> ProgressMode {
+    let is_webui_turn = crate::tools::workspace::current_origin_tty().is_none()
+        && crate::tools::workspace::current_platform_sender().is_none();
+    if is_webui_turn {
+        ProgressMode::Full
+    } else {
+        ProgressMode::from_config(config)
+    }
 }
 
 /// 一次子代理运行的结果。
@@ -357,6 +382,7 @@ async fn spawn_background(
     context: SubagentContext,
     params: SubagentParams,
     anchor: AuditAnchor,
+    audit: Option<SubagentAudit>,
     progress: crate::tools::ToolProgress,
 ) -> Result<String> {
     let description = params.description.clone();
@@ -368,10 +394,13 @@ async fn spawn_background(
     let sandbox = crate::tools::sandbox::current_sandbox();
     let workspace = crate::tools::workspace::try_workspace();
     let session = crate::tools::workspace::try_session();
+    // 任务条那一行据它打开详情抽屉;挂在任务条目上,不靠进度流先后。
+    let audit_session_id = audit.as_ref().map(|audit| audit.session_id.clone());
     crate::tools::jobs::spawn_background_subagent(
         None,
         &description,
         params.dev,
+        audit_session_id.as_deref(),
         &progress,
         move |job_id, log_path| async move {
             write_subagent_prompt_header(&log_path, &prompt);
@@ -383,7 +412,7 @@ async fn spawn_background(
                 sandbox,
                 workspace,
                 session,
-                run_core(context, bridge, params, anchor, Some(job_id.clone())),
+                run_core(context, bridge, params, anchor, audit, Some(job_id.clone())),
             )
             .await;
             let state_label = match &run {
@@ -766,6 +795,7 @@ async fn run_core(
     progress: crate::tools::ToolProgress,
     params: SubagentParams,
     anchor: AuditAnchor,
+    audit: Option<SubagentAudit>,
     inbox_id: Option<String>,
 ) -> Result<SubagentRun> {
     let SubagentParams {
@@ -777,32 +807,32 @@ async fn run_core(
         dev,
     } = params;
     let tool_timeout = SUBAGENT_TOOL_TIMEOUT;
-
-    // WebUI 回合(既非终端、也非平台:没有 origin tty、没有平台 sender)一律用
-    // Full 档发子过程标记(思考 + 结构化工具调用/结果),网页端据此把展开后的
-    // 子过程时间线画成「思考+工具流」——和主智能体过程区同款(09-11 用户要求)。
-    // 网页端默认收起这些,静息态不吵;终端/平台仍按 display.tool_calls 配置,
-    // 免得 Summary 档的终端用户突然被子代理的全量嵌套刷屏。
-    let is_webui_turn = crate::tools::workspace::current_origin_tty().is_none()
-        && crate::tools::workspace::current_platform_sender().is_none();
-    let mode = if is_webui_turn {
-        ProgressMode::Full
-    } else {
-        ProgressMode::from_config(&context.config)
-    };
+    let mode = progress_mode(&context.config);
+    // 完整过程边跑边落审计会话(详情抽屉读它)。留一份 Arc:跑完先把最后那段
+    // 文本落下再写结果,状态变成完成时过程已经是全的。
+    let recorder = audit.as_ref().map(|audit| {
+        std::sync::Arc::new(super::subagent_trace::TraceRecorder::new(
+            audit.store.clone(),
+            audit.session_id.clone(),
+        ))
+    });
     // 过程回显曾借 deep_research 插件的 show_progress 开关;插件 09-13 删除后没有
     // 独立的子代理插件配置承接它,固定为开。
-    let sa_progress = SubagentProgress::new(progress, mode, true);
+    let sa_progress = SubagentProgress::new(progress, mode, true).with_recorder(recorder.clone());
 
     // 子过程展开区最上方的任务简介(09-12 #9:后台子代理展开后没有 prompt)。
-    // 只在 Full 档(WebUI)发;前台子代理前端从工具参数直接建 brief、并置 sink.brief,
-    // 收到这条 marker 会跳过不重复,后台没有参数就靠这条把 prompt 显示出来。
-    if mode == ProgressMode::Full {
-        sa_progress.phase(format!(
-            "__subagent_brief__{}",
-            serde_json::json!({ "description": &description, "prompt": &prompt })
-        ));
-    }
+    // 只在 Full 档(WebUI)往外发,但总是记进过程;前台子代理前端从工具参数直接建
+    // brief、并置 sink.brief,收到这条 marker 会跳过不重复,后台没有参数就靠这条
+    // 把 prompt 显示出来。dev/tier 给详情抽屉的抬头用。
+    sa_progress.brief(format!(
+        "__subagent_brief__{}",
+        serde_json::json!({
+            "description": &description,
+            "prompt": &prompt,
+            "dev": dev,
+            "tier": tier.label(),
+        })
+    ));
 
     // dev 子代理 = 开发模式的三件套,与 dev 会话同源:保留人格 "dev" 的
     // 作用域(记忆整套关)、那份 core_only 的工具面、以及中转线的 dev 工具
@@ -843,9 +873,9 @@ async fn run_core(
         SUBAGENT_SYSTEM_PROMPT.to_string()
     };
 
-    // 审计会话**开跑之前**就建好：它的用量行是会话累计里子代理那一份的来源，
-    // 跑完才写的话，中途被打断这一趟烧的词元就彻底没了（用户问到的正是这个）。
-    let audit = SubagentAudit::open(&context, &anchor, &description, &prompt);
+    // 审计会话**开跑之前**就建好(见 run_subagent)：它的用量行是会话累计里子代理
+    // 那一份的来源，跑完才写的话，中途被打断这一趟烧的词元就彻底没了（用户问到的
+    // 正是这个）。
     let mut runner = SubagentRunner::new(client, system_prompt, tools, sa_progress)
         .max_steps(max_steps)
         .timeout_seconds(tool_timeout)
@@ -874,11 +904,14 @@ async fn run_core(
     // (tool_timeout)仍然兜底单步挂死。
     // 标记「在子代理里」:vision_analyze 据此走旁路转写而非 inline 寄存
     // (子代理循环不接力 inline 媒体,见 workspace::in_subagent)。
-    let (result, stats) = match crate::tools::workspace::with_subagent(
+    let run = crate::tools::workspace::with_subagent(
         runner.run_with_resume(&prompt, resume_id.as_deref()),
     )
-    .await
-    {
+    .await;
+    if let Some(recorder) = &recorder {
+        recorder.flush();
+    }
+    let (result, stats) = match run {
         Ok((result, stats)) => (result, stats),
         Err(err) => {
             let output = serde_json::to_string_pretty(&json!({
@@ -970,7 +1003,27 @@ struct SubagentAudit {
     context_window: Option<i64>,
 }
 
+/// 没走到 `finish` 就被丢下（停止后台任务、主回合被打断）：把那个回合标成中断，
+/// 详情抽屉才不会一直显示「运行中」。已经完成的回合 `interrupt_turn` 不碰。
+impl Drop for SubagentAudit {
+    fn drop(&mut self) {
+        let _ = self
+            .store
+            .pinned(&self.session_id)
+            .interrupt_turn(&self.turn_id);
+    }
+}
+
 impl SubagentAudit {
+    /// 告诉网页端这趟子代理的审计会话 id，它据此打开详情抽屉。
+    fn session_marker(&self) -> String {
+        format!(
+            "{}{}",
+            super::subagent_trace::SESSION_PREFIX,
+            self.session_id
+        )
+    }
+
     fn open(
         context: &SubagentContext,
         anchor: &AuditAnchor,

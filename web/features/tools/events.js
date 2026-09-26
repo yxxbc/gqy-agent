@@ -6,9 +6,10 @@ import { normalizeArtifact, registerArtifact, safeAssetUrl, setArtifactWorkspace
 import { artifactChipOptions } from "../artifacts/workspace.js";
 import { createConversationMedia } from "../conversation/media.js";
 import { attachSubBrief, procLineAttach, procLineBreak, railSnapFit } from "../conversation/proc-rail.js";
-import { reasoningPeekText } from "../conversation/reasoning.js";
+import { reasoningPeekText, setReasoningPeek } from "../conversation/reasoning.js";
 import { contentAdded } from "../conversation/scroll.js";
-import { buildSubagentBrief, renderSubagentProgress, subEndReasoning, subScrollContainer } from "../conversation/subagent.js";
+import { buildSubagentBrief, renderSubagentProgress, subagentResultPeek, subEndReasoning, subScrollContainer } from "../conversation/subagent.js";
+import { makeSubagentDetailButton } from "../conversation/subagent-drawer.js";
 import { attachLiveTodoPanel, renderStageTodos } from "../goal.js";
 import { refreshComposerCumulative } from "../live/run.js";
 import { breakLiveText, clearTypingIndicator, ensureLiveArticle, syncBubbleWidth } from "../live/state.js";
@@ -135,6 +136,8 @@ export function createTool(live, data, opts = {}) {
   let liveProgress = null;
   let subBlocks = null;
   let briefBuilt = false;
+  let detailButton = null;
+  let toolRef = null;
   if (isTask) {
     // 子过程时间线的承载容器:proc-line 挂进这里(和主对话过程区同构)。
     subBlocks = document.createElement("div");
@@ -153,7 +156,17 @@ export function createTool(live, data, opts = {}) {
     const fold = document.createElement("div");
     fold.className = "tool-fold";
     fold.appendChild(body);
-    card.append(head, fold);
+    // 「详情」按钮:审计会话 id 到了(`__subagent_session__`)才露出来。和 head 是
+    // 兄弟而不是子节点——head 本身是 button,按钮不能套按钮。
+    detailButton = makeSubagentDetailButton(() => ({
+      auditId: toolRef?.auditId,
+      sink: toolRef,
+      title: taskArgs.description || subjectText,
+      running: Boolean(toolRef && !toolRef.finished),
+    }), "tool-detail-open");
+    detailButton.hidden = true;
+    card.classList.add("has-detail-button");
+    card.append(head, detailButton, fold);
     if (taskPeek) taskPeek.textContent = reasoningPeekText(subjectText || "正在启动子代理…");
   } else {
     card.append(head);
@@ -191,6 +204,8 @@ export function createTool(live, data, opts = {}) {
     taskToken,
     brief: briefBuilt,
     blocks: subBlocks,
+    detailButton,
+    auditId: null,
     think: null,
     thinkAccum: "",
     pendingCall: null,
@@ -204,6 +219,7 @@ export function createTool(live, data, opts = {}) {
     finished: false,
     collapseTimer: null
   };
+  toolRef = tool;
   head.addEventListener("click", () => {
     const collapsed = card.classList.toggle("collapsed");
     head.setAttribute("aria-expanded", String(!collapsed));
@@ -489,6 +505,13 @@ export function handleToolEvent(name, live, data) {
     // 跑完把那块四行活区域平滑收起成一行(用户拍板:运行时展开、完成后收起,可再点开)。
     if (tool.isTask) {
       subEndReasoning(tool);
+      // 收起后那一行窥视换成结论的第一句(像 Claude 的 Done 行):跑完了,人要看的
+      // 是它得出了什么,不是它最后调的那个工具。
+      const peek = subagentResultPeek(String(data?.output || ""));
+      if (peek && tool.taskPeek) {
+        tool.peekLine = peek;
+        setReasoningPeek(tool.taskPeek, peek);
+      }
       tool.card.classList.add("collapsed");
       tool.head.setAttribute("aria-expanded", "false");
       railSnapFit(tool.card);

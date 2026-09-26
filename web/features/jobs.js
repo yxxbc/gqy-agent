@@ -6,7 +6,8 @@ import { conversationRunning } from "./conversation/chrome.js";
 import { setReasoningPeek } from "./conversation/reasoning.js";
 import { jobStreamSink } from "./conversation/render.js";
 import { updateJumpButtonOffset } from "./conversation/scroll.js";
-import { renderSubagentProgress } from "./conversation/subagent.js";
+import { renderSubagentProgress, setSubagentAudit, subagentCountsText } from "./conversation/subagent.js";
+import { makeSubagentDetailButton } from "./conversation/subagent-drawer.js";
 import { connectEventSource } from "./live/sse.js";
 import { loadSessionView } from "./sessions/view.js";
 import { elements } from "../state/elements.js";
@@ -28,6 +29,10 @@ export function jobStatusDisplay(status) {
   if (value === "exited(0)") return "完成";
   const match = value.match(/^exited\((-?\d+)\)$/);
   return match ? `退出码 ${match[1]}` : value;
+}
+
+export function isSubagentJob(job) {
+  return job?.kind === "subagent" || job?.kind === "dev";
 }
 
 export function visibleBackgroundJobs() {
@@ -172,7 +177,9 @@ export function renderJobsStrip() {
   const showRows = !collapsible || jobsState.jobsStripOpen;
   for (const job of showRows ? jobs : []) {
     const jid = String(job.job_id);
-    const isSubagent = job.kind === "subagent";
+    // 开发模式子代理的 kind 是 "dev"(见 jobs::JobEntry::kind_label):漏了它,开发
+    // 子代理会被当成命令,展开只剩日志、没有子过程流。
+    const isSubagent = isSubagentJob(job);
     const row = document.createElement("div");
     row.className = "job-chip is-expandable";
     row.dataset.jobId = jid;
@@ -217,14 +224,30 @@ export function renderJobsStrip() {
     // 布局(09-12 #2):节点 · 标题 · token 秒数 · <淡出过渡> 窥视(撑开右对齐) · ✕。
     // 标题贴左 hug、token/时间紧跟其后,窥视占满余下空间、左侧淡出滚动,不再让标题
     // flex 撑开把窥视顶到最右留下大空档(#12)。展开箭头合进左侧标记槽。
-    row.append(makeJobSpinner(), label, token, time, peekSlot, stop);
+    let detail = null;
+    if (isSubagent) {
+      // 详情抽屉:审计会话 id 开跑时就挂在任务条目上(audit_session_id)。
+      const auditId = job.audit_session_id || jobStreamSink(jid).auditId;
+      if (auditId) {
+        detail = makeSubagentDetailButton(() => ({
+          auditId,
+          sink: jobStreamSink(jid),
+          title: job.title,
+          running: Boolean(state.backgroundJobs.get(jid)?.running),
+        }), "job-chip-detail");
+      }
+    }
+    row.append(makeJobSpinner(), label, token, time, peekSlot);
+    if (detail) row.appendChild(detail);
+    row.appendChild(stop);
 
     if (isSubagent) {
       const sink = jobStreamSink(jid);
+      if (job.audit_session_id && !sink.auditId) setSubagentAudit(sink, job.audit_session_id);
       sink.taskPeek = peek;
       sink.taskToken = token;
       if (sink.peekLine) setReasoningPeek(peek, sink.peekLine);
-      if (sink.tokenText) token.textContent = sink.tokenText;
+      if (sink.tokenText || sink.toolCount) token.textContent = subagentCountsText(sink);
     } else {
       // 后台命令没有进度流,但有输出日志(#120):把日志尾行当窥视,轮询刷新;
       // 先用已缓存的尾行填上(重建行时不闪)。
@@ -236,7 +259,7 @@ export function renderJobsStrip() {
     row.classList.toggle("is-open", expanded);
     row.setAttribute("aria-expanded", String(expanded));
     row.addEventListener("click", (event) => {
-      if (event.target.closest(".job-chip-stop")) return;
+      if (event.target.closest(".job-chip-stop, .job-chip-detail")) return;
       if (state.expandedJobs.has(jid)) {
         state.expandedJobs.delete(jid);
         // 收起状态行时,把里面已展开的思考/工具卡也一并收起(09-12 #5),
@@ -299,7 +322,10 @@ export async function seedJobsStrip() {
       // 刷新后子代理展开区是空的(子过程只在内存里,#9)。补拉这个任务到目前为止的
       // 原始标记流回放进它的 sink,展开就能看到之前的思考/工具/正文;之后的实时进度
       // 继续往同一个 sink 追加。每个 sink 只回放一次。
-      if (job.kind === "subagent") seedJobTrace(jid);
+      if (isSubagentJob(job)) {
+        if (job.audit_session_id) setSubagentAudit(jobStreamSink(jid), job.audit_session_id);
+        seedJobTrace(jid);
+      }
     }
     renderJobsStrip();
   } catch {
