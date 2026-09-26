@@ -19,6 +19,8 @@
 
 功能完成后应当简洁易懂地给出可照做的验收流程，经过用户验证后确认才可以commit。验收成功准备发布的内容写进 `CHANGELOG.md` 的 `[Unreleased]`（Keep a Changelog 格式，写法见文件开头）
 
+AI 代理提交时加一行尾注署名：`Co-Authored-By: <代理名> <厂商 noreply 邮箱>`（例：`Co-Authored-By: Cline <noreply@cline.bot>`、`Co-Authored-By: Claude Fable 5 <noreply@anthropic.com>`）。作者与提交者保持用户本人，尾注只记「谁写的」。
+
 docs/中有所有的计划和文档，可以自行按需阅读。
 
 ---
