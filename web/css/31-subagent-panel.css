@@ -582,6 +582,27 @@
   height: 14px;
 }
 
+/* 半截失败时的「继续」按钮:把没说完的交给下一轮接着写 */
+.run-notice-action {
+  margin-left: auto;
+  padding: 2px 10px;
+  border: 1px solid color-mix(in srgb, currentColor 45%, transparent);
+  border-radius: 999px;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  cursor: pointer;
+}
+
+.run-notice-action:hover {
+  background: color-mix(in srgb, currentColor 14%, transparent);
+}
+
+.run-notice-action:disabled {
+  opacity: .55;
+  cursor: default;
+}
+
 .loading-state,
 .blocked-state,
 .empty-state {

@@ -1,3 +1,4 @@
+import { apiRequest } from "../../core/api.js";
 import { asFiniteNumber, cacheSuffix, effectiveUsageTotal, formatTokens, formatUsageMeta, generationSpeedValue } from "../../core/format.js";
 import { makeIconSlot } from "../../core/icons.js";
 import { showToast } from "../../core/toast.js";
@@ -5,13 +6,15 @@ import { focusComposerIfDesktop, updateControlState } from "../composer/input.js
 import { consoleIsOpen } from "../console/panel.js";
 import { liveViewed, updateConversationChrome } from "../conversation/chrome.js";
 import { procLineBreak } from "../conversation/proc-rail.js";
-import { contentAdded } from "../conversation/scroll.js";
+import { contentAdded, scrollToBottom } from "../conversation/scroll.js";
 import { appendUserMessage } from "../conversation/user.js";
 import { refreshViewSnapshot } from "./sse.js";
-import { breakLiveText, clearTypingIndicator, disposeLiveState, ensureLiveArticle, removeLiveStopButton, renderQueueTray, showInterruptedMarker, showTypingIndicator, stashLiveArticle, syncBubbleWidth } from "./state.js";
+import { breakLiveText, clearTypingIndicator, disposeLiveState, ensureLiveArticle, ensureLiveUser, removeLiveStopButton, renderQueueTray, showInterruptedMarker, showTypingIndicator, stashLiveArticle, syncBubbleWidth } from "./state.js";
 import { finalizeLiveReasoning, rerenderLiveHtmlFences } from "./stream.js";
 import { endPendingQuestions } from "../questions.js";
-import { loadSessionView } from "../sessions/view.js";
+import { renderSessionList } from "../sessions/list.js";
+import { trackRun } from "../sessions/runs.js";
+import { createLiveForRun, loadSessionView } from "../sessions/view.js";
 import { setComposerUsage, updateContext, updateRuntimeUsage } from "../status.js";
 import { updateToolStatus, updateToolSummary } from "../tools/cards.js";
 import { clearPreparingTool } from "../tools/events.js";
@@ -30,6 +33,82 @@ export function appendRunNotice(live, message, error = false) {
   notice.appendChild(text);
   procLineBreak(live.blocks);
   live.blocks.appendChild(notice);
+  return notice;
+}
+
+/// 失败原因的中文说法。键是 `run.failed` 事件里服务端给的 failure_kind
+/// （见 `llm/openai_compatible/errors.rs` 的 `classify_failure`）；认不出的键
+/// 保留服务端原文——别把未知失败说成已知的。
+const FAILURE_REASONS = {
+  content_policy: "上游内容策略拦下了这条内容，没法接着往下写",
+  rate_limit: "上游限流了（429），过一会儿再试",
+  authentication: "上游登录态失效了（401/403），得重新登录",
+  transport_timeout: "上游卡住一直没有输出，已被终止",
+  transport_connect: "连不上上游",
+  transport_request: "上游连接中断",
+  endpoint_unavailable: "这个模型暂时不可用",
+  endpoint_incompatible: "上游不接受这条请求",
+  invalid_request: "上游认为请求有问题",
+  status: "上游返回了错误",
+};
+
+function failureNoticeText(data) {
+  const kind = String(data?.failure_kind || "");
+  return FAILURE_REASONS[kind] || String(data?.message || "本轮运行失败");
+}
+
+/// 半截失败后的「继续」：给同一会话发一条短请求，让模型接着把没说完的写完。
+/// 发的是普通用户消息（时间线上看得见），不做隐藏合成轮——用户按了什么、她
+/// 收到了什么，两边对得上，出问题也好查。
+const CONTINUE_PROMPT = "继续把上面没说完的说完，不要重复已经写过的内容。";
+
+function appendContinueAction(live, notice) {
+  if (!notice) return;
+  const button = document.createElement("button");
+  button.type = "button";
+  button.className = "run-notice-action";
+  button.textContent = "继续";
+  button.addEventListener("click", async () => {
+    if (button.disabled) return;
+    button.disabled = true;
+    try {
+      await startContinueRun(live.sessionId || state.viewSessionId, CONTINUE_PROMPT);
+    } catch (error) {
+      button.disabled = false;
+      // 409 = 会话里刚起了新的一轮;别把调度问题说成用户该重来一遍。
+      showToast(
+        error?.status === 409 ? "会话里刚开了新的一轮，稍等一下再点继续" : error?.message || "继续失败",
+        "error"
+      );
+    }
+  });
+  notice.appendChild(button);
+}
+
+async function startContinueRun(sessionId, content) {
+  const body = { content };
+  if (sessionId) body.session_id = sessionId;
+  const response = await apiRequest("/api/turns", { method: "POST", body: JSON.stringify(body) });
+  const payload = await response.json();
+  const queuedPrompt = payload?.queued ? payload.prompt : null;
+  if (queuedPrompt) {
+    if (!state.queuedPrompts.some((prompt) => String(prompt?.id) === String(queuedPrompt?.id))) {
+      state.queuedPrompts.push(queuedPrompt);
+    }
+    renderQueueTray();
+    return;
+  }
+  const runId = String(payload?.run_id || "");
+  if (!runId) throw new Error("服务未返回运行标识");
+  if (sessionId) trackRun(sessionId, runId);
+  const live = createLiveForRun(runId, content);
+  live.userText = content;
+  ensureLiveUser(live, content);
+  showTypingIndicator(live);
+  scrollToBottom({ force: true, smooth: true });
+  updateRuntimeUsage();
+  updateConversationChrome();
+  renderSessionList();
 }
 
 export function markUnfinishedTools(live) {
@@ -308,7 +387,13 @@ export function finishLiveRun(kind, data, live) {
   } else {
     markUnfinishedTools(live);
     endPendingQuestions(live, "本轮已结束，无法再提交回答");
-    appendRunNotice(live, String(data?.message || "本轮运行失败"), true);
+    const partial = Boolean(String(live.assistantText || "").trim());
+    const notice = appendRunNotice(
+      live,
+      `${failureNoticeText(data)}${partial ? "。已写出的部分保留着。" : ""}`,
+      true
+    );
+    if (partial) appendContinueAction(live, notice);
     if (live.headerStatus) live.headerStatus.textContent = "运行失败";
     if (live.meta) live.meta.textContent = "";
   }

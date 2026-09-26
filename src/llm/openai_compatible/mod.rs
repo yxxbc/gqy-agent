@@ -24,6 +24,7 @@ use cline::ClineRuntime;
 use codex::CodexRuntime;
 use dsml::*;
 use endpoints::*;
+pub(crate) use errors::classify_failure;
 use errors::*;
 use lower::*;
 pub use protocol::ThinkingVariantOptions;

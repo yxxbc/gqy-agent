@@ -553,10 +553,12 @@ async fn run_turn_task_inner(
                 "{}",
                 t("WebUI agent run setup failed", "WebUI 智能体运行初始化失败")
             );
-            events.publish(
-                "run.failed",
-                json!({ "run_id": run_id, "session_id": &*session_id, "message": message }),
-            );
+            let mut payload =
+                json!({ "run_id": run_id, "session_id": &*session_id, "message": message });
+            if let Some(kind) = crate::llm::classify_failure(&error) {
+                payload["failure_kind"] = json!(kind);
+            }
+            events.publish("run.failed", payload);
             return;
         }
     };
@@ -892,10 +894,12 @@ pub(in crate::web) fn finish_failed_run(
         "{}",
         t("WebUI agent run failed", "WebUI 智能体运行失败")
     );
-    events.publish(
-        "run.failed",
-        json!({ "run_id": run_id, "session_id": session_id, "message": message }),
-    );
+    let mut payload = json!({ "run_id": run_id, "session_id": session_id, "message": message });
+    // 失败归类给前端:内容策略/限流/传输超时各有各的说法,别只丢一句英文原文。
+    if let Some(kind) = crate::llm::classify_failure(error) {
+        payload["failure_kind"] = json!(kind);
+    }
+    events.publish("run.failed", payload);
 }
 
 #[allow(clippy::too_many_arguments)]

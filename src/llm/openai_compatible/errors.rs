@@ -378,6 +378,24 @@ pub(in crate::llm::openai_compatible) fn provider_error_text(value: &Value) -> S
         .unwrap_or_else(|| clean_plain_text(value.to_string()))
 }
 
+/// 错误链里的失败归类（稳定字符串，给 WebUI 事件与用户提示用）。
+///
+/// 只认链里第一个打得开的类型：HTTP 状态失败直接用 [`HttpFailureKind`] 的
+/// 命名（`content_policy`、`rate_limit`……），传输失败加 `transport_` 前缀
+/// （`transport_timeout`……）。识别不了返回 `None`，调用方保留错误原文——
+/// 不猜、不把未知失败硬塞进某个分类。
+pub(crate) fn classify_failure(error: &anyhow::Error) -> Option<String> {
+    for cause in error.chain() {
+        if let Some(failure) = cause.downcast_ref::<HttpStatusFailure>() {
+            return Some(failure.kind.to_string());
+        }
+        if let Some(failure) = cause.downcast_ref::<TransportFailure>() {
+            return Some(format!("transport_{}", failure.kind));
+        }
+    }
+    None
+}
+
 #[cfg(test)]
 mod classify_tests {
     use super::*;

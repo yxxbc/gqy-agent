@@ -472,3 +472,31 @@ async fn a_rate_limited_endpoint_still_fails_over_to_a_different_one() {
     first_server.abort();
     second_server.abort();
 }
+
+#[test]
+fn classify_failure_names_the_first_typed_link_in_the_chain() {
+    let content_policy = anyhow::anyhow!("upstream body").context(HttpStatusFailure {
+        status: 400,
+        kind: HttpFailureKind::ContentPolicy,
+    });
+    let wrapped = content_policy
+        .context("LLM stream failed after emitting output; endpoint failover was suppressed");
+    assert_eq!(
+        classify_failure(&wrapped).as_deref(),
+        Some("content_policy")
+    );
+
+    let timeout = anyhow::anyhow!("agy produced no output for 300s; the process was killed")
+        .context(TransportFailure {
+            stage: "antigravity.stream",
+            kind: TransportFailureKind::Timeout,
+        });
+    assert_eq!(
+        classify_failure(&timeout).as_deref(),
+        Some("transport_timeout")
+    );
+
+    // 认不出来就什么都别说:前端保留原文,别把未知失败塞进某个分类。
+    let plain = anyhow::anyhow!("some unexpected failure");
+    assert_eq!(classify_failure(&plain), None);
+}
