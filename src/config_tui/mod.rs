@@ -1,6 +1,7 @@
 mod antigravity_form;
 mod claude_code_form;
 mod cli_catalog;
+mod cline_form;
 mod codex_form;
 mod extensions;
 mod personas;
@@ -20,6 +21,7 @@ mod voice;
 mod widgets;
 use antigravity_form::*;
 use claude_code_form::*;
+use cline_form::*;
 use codex_form::*;
 use extensions::*;
 use personas::*;
@@ -595,13 +597,15 @@ impl<'a> ProviderBrowser<'a> {
         if let Some(provider) = self.config.providers.get(self.provider_idx).cloned() {
             let seq = self.fetch_seq;
             let cli_binary = cli_catalog::builtin_cli_binary(&self.config, &provider);
+            // 目录拉取要 `plugins.cline.provider`(cline 线),config 跟着进线程。
+            let config = self.config.clone();
             let (tx, rx) = mpsc::channel();
             self.fetch_rx = Some(rx);
             self.loading = true;
             self.status = t("Fetching model list...", "正在获取模型列表...").to_string();
             std::thread::spawn(move || {
-                let result =
-                    fetch_models(&provider, cli_binary.as_deref()).map_err(|err| err.to_string());
+                let result = fetch_models(&config, &provider, cli_binary.as_deref())
+                    .map_err(|err| err.to_string());
                 let _ = tx.send((seq, result));
             });
         } else {
@@ -840,6 +844,8 @@ impl<'a> ProviderBrowser<'a> {
                         )?
                     } else if provider.is_codex() {
                         edit_codex_provider_form(stdout, provider, &mut self.config.plugins.codex)?
+                    } else if provider.is_cline() {
+                        edit_cline_provider_form(stdout, provider, &mut self.config.plugins.cline)?
                     } else {
                         edit_provider_form(stdout, provider)?
                     };

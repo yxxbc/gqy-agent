@@ -19,8 +19,8 @@
       "reason": "层序表启用前的既有依赖：src/llm/openai_compatible/cli_relay/mod.rs"
     },
     "llm->tools": {
-      "count": 15,
-      "reason": "层序表启用前的既有依赖：src/llm/openai_compatible/antigravity/mod.rs, src/llm/openai_compatible/claude_code/mod.rs, src/llm/openai_compatible/cli_relay/process.rs, src/llm/openai_compatible/codex/mod.rs"
+      "count": 18,
+      "reason": "层序表启用前的既有依赖：src/llm/openai_compatible/antigravity/mod.rs, src/llm/openai_compatible/claude_code/mod.rs, src/llm/openai_compatible/cli_relay/process.rs, src/llm/openai_compatible/codex/mod.rs；09-26 cline 线按同一用法新增 3 处（工作目录/会话/回合来源，见 cline/mod.rs）"
     },
     "models_cache->runtime": {
       "count": 2,

@@ -1,9 +1,10 @@
-//! 本机 CLI 中转线(claude-code / antigravity / codex)的共用骨架。
+//! 本机 CLI 中转线(claude-code / antigravity / codex / cline)的共用骨架。
 //!
-//! 三条线的传输都是「拉起一个 CLI 子进程,喂一段 stdin,按行读结构化事件」,
-//! 工具循环都在 CLI 侧闭环,顾清影 的工具都经 `gqy mcp-serve` 桥挂进去。各线
-//! 只差三样:命令行怎么拼、stdin 长什么样、事件怎么解析。其余——工具作用域
-//! 裁决、逐消息哈希链续传、载荷转写、子进程泵、清空联动——都在这里。
+//! 四条线的传输都是「拉起一个 CLI 子进程,按行读结构化事件」(claude 与 codex
+//! 再喂一段 stdin,cline 的提示词走位置参数),工具循环都在 CLI 侧闭环,
+//! 顾清影 的工具都经 `gqy mcp-serve` 桥挂进去。各线只差三样:命令行怎么拼、
+//! stdin 长什么样、事件怎么解析。其余——工具作用域裁决、逐消息哈希链续传、
+//! 载荷转写、子进程泵、清空联动——都在这里。
 //!
 //! 续传驱动([`ResumePlan`])刻意做成两步 API 而不是回调:各线的 run 闭包
 //! 要可变借用 on_chunk 跨 await,塞进 FnMut→Future 的签名里表达不了;两步
@@ -267,7 +268,7 @@ impl ResumePlan {
     }
 }
 
-/// 清空 顾清影 会话时的联动(三条 CLI 中转线共用):丢弃它名下的续传映射,
+/// 清空 顾清影 会话时的联动(四条 CLI 中转线共用):丢弃它名下的续传映射,
 /// 并尽力删除各家 CLI 侧的会话转录。存储布局是各家 CLI 的内部实现,删不到
 /// 只记日志不报错——映射已丢弃,该会话无论如何不会再被续传。会话 id 都是
 /// 全局唯一,每家都试一遍不会误删。
@@ -280,6 +281,7 @@ pub(crate) fn forget_relay_sessions(gqy_session: &str) {
         super::claude_code::remove_transcript(gqy_session, relay_session);
         super::antigravity::remove_conversation_files(relay_session);
         super::codex::remove_rollout(relay_session);
+        super::cline::remove_session_files(relay_session);
     }
 }
 

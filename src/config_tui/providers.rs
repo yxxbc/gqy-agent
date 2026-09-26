@@ -55,8 +55,9 @@ impl ModelEntry {
 }
 
 /// `cli_binary`:内置 CLI 供应商列模型要跑的二进制(见 `cli_catalog`);
-/// HTTP 供应商忽略。
+/// HTTP 供应商忽略。`config` 供 cline 的目录读 `plugins.cline.provider`。
 pub(crate) fn fetch_models(
+    config: &AppConfig,
     provider: &ProviderConfig,
     cli_binary: Option<&str>,
 ) -> Result<Vec<String>> {
@@ -64,7 +65,7 @@ pub(crate) fn fetch_models(
         // 本机 CLI 后端没有 /models HTTP 端点:目录问 CLI 要(失败就报错),
         // 再并上配置里手工加的名字。只返回 `provider.models` 的话,用户一旦
         // 只激活一个模型,下次进来就只剩那一个可选(09-03)。
-        return crate::config_tui::cli_catalog::builtin_cli_catalog(provider, cli_binary);
+        return crate::config_tui::cli_catalog::builtin_cli_catalog(config, provider, cli_binary);
     }
     let api_key = provider.api_key.as_deref().unwrap_or_default();
     let mut api_key = if let Some(env_name) = api_key.strip_prefix("$env:") {

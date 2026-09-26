@@ -1,5 +1,5 @@
 //! CLI 中转子进程的生命周期:拉起、喂 stdin、按行读 stdout(带空闲看门狗)、
-//! 收 stderr 尾巴、收尾等待/击杀。三条线的事件语法各不相同,但进程这一层
+//! 收 stderr 尾巴、收尾等待/击杀。四条线的事件语法各不相同,但进程这一层
 //! 完全一样——尤其是「超时/出错必须显式杀进程组:drop future 只是弃 promise,
 //! 不杀子进程」这条,三处各抄一遍就会有一处漏。
 
@@ -32,13 +32,14 @@ pub(in crate::llm::openai_compatible) struct RelayProcess {
     label: &'static str,
 }
 
-/// 三条中转线各自的配置/登录态目录:claude(`~/.claude`、`~/.claude.json`)、
-/// codex(`~/.codex`)、agy(`~/.gemini`,或 `GQY_AGY_CONFIG_DIR`)。不存在的不给。
+/// 四条中转线各自的配置/登录态目录:claude(`~/.claude`、`~/.claude.json`)、
+/// codex(`~/.codex`)、agy(`~/.gemini`,或 `GQY_AGY_CONFIG_DIR`)、cline(`~/.cline`)。
+/// 不存在的不给。
 fn relay_config_grants() -> Vec<std::path::PathBuf> {
     let mut grants = Vec::new();
     if let Some(home) = std::env::var_os("HOME") {
         let home = std::path::PathBuf::from(home);
-        for name in [".claude", ".claude.json", ".codex", ".gemini"] {
+        for name in [".claude", ".claude.json", ".codex", ".gemini", ".cline"] {
             grants.push(home.join(name));
         }
     }

@@ -26,6 +26,8 @@ pub(in crate::llm::openai_compatible) enum ProviderProtocol {
     Antigravity,
     /// 本机 OpenAI Codex CLI 中转:`codex exec --json` 的 JSONL。
     Codex,
+    /// 本机 Cline CLI 中转:`cline --json` 的 NDJSON。
+    Cline,
 }
 
 impl ProviderProtocol {
@@ -42,6 +44,7 @@ impl ProviderProtocol {
             "claude-code" | "claude-code-cli" => Ok(Self::ClaudeCode),
             "antigravity" | "antigravity-cli" | "agy" => Ok(Self::Antigravity),
             "codex" | "codex-cli" => Ok(Self::Codex),
+            "cline" | "cline-cli" => Ok(Self::Cline),
             protocol => bail!("unsupported provider protocol: {protocol}"),
         }
     }
@@ -76,13 +79,22 @@ pub(in crate::llm::openai_compatible) fn provider_uses_codex(provider: &Provider
     )
 }
 
-/// 三条本机 CLI 中转线的合称:端点装配(无 API key)、keepalive 分流按它豁免。
+/// 该 provider 是否走 Cline CLI 中转。
+pub(in crate::llm::openai_compatible) fn provider_uses_cline(provider: &ProviderConfig) -> bool {
+    matches!(
+        ProviderProtocol::from_provider(provider),
+        Ok(ProviderProtocol::Cline)
+    )
+}
+
+/// 本机 CLI 中转线的合称:端点装配(无 API key)、keepalive 分流按它豁免。
 pub(in crate::llm::openai_compatible) fn provider_uses_cli_relay(
     provider: &ProviderConfig,
 ) -> bool {
     provider_uses_claude_code(provider)
         || provider_uses_antigravity(provider)
         || provider_uses_codex(provider)
+        || provider_uses_cline(provider)
 }
 
 /// Codex 的思考档:config 的 `model_reasoning_effort` 五档,所有模型通用。
@@ -90,6 +102,20 @@ pub(in crate::llm::openai_compatible) fn codex_reasoning_variants(
     _model: &str,
 ) -> Vec<ReasoningVariant> {
     ["minimal", "low", "medium", "high", "xhigh"]
+        .into_iter()
+        .map(|effort| ReasoningVariant {
+            id: effort.to_string(),
+            setting: ReasoningSetting::Effort(effort.to_string()),
+        })
+        .collect()
+}
+
+/// Cline 的思考档:CLI `--thinking` 的档位(none/low/medium/high/xhigh)。
+/// 选 `none` 时仍然要显式传旗标——不传是"用模型默认",不是"关掉思考"。
+pub(in crate::llm::openai_compatible) fn cline_reasoning_variants(
+    _model: &str,
+) -> Vec<ReasoningVariant> {
+    ["none", "low", "medium", "high", "xhigh"]
         .into_iter()
         .map(|effort| ReasoningVariant {
             id: effort.to_string(),
@@ -197,6 +223,9 @@ pub(in crate::llm::openai_compatible) fn supported_reasoning_variants(
     if provider_uses_codex(provider) {
         return codex_reasoning_variants(model);
     }
+    if provider_uses_cline(provider) {
+        return cline_reasoning_variants(model);
+    }
     let Some(info) = models_cache::reasoning_info(&provider.id, model) else {
         return Vec::new();
     };
@@ -226,8 +255,11 @@ pub(in crate::llm::openai_compatible) fn reasoning_variant_supported_for_protoco
     protocol: ProviderProtocol,
 ) -> bool {
     match protocol {
-        // Claude Code 只认 `--effort` 的档位语义。
-        ProviderProtocol::ClaudeCode | ProviderProtocol::Antigravity | ProviderProtocol::Codex => {
+        // Claude Code / Cline 只认 `--effort` / `--thinking` 的档位语义。
+        ProviderProtocol::ClaudeCode
+        | ProviderProtocol::Antigravity
+        | ProviderProtocol::Codex
+        | ProviderProtocol::Cline => {
             matches!(variant.setting, ReasoningSetting::Effort(_))
         }
         ProviderProtocol::OpenAiResponses => matches!(

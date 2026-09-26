@@ -55,6 +55,7 @@ impl OpenAiCompatibleClient {
         let claude_code = claude_code_runtime(&endpoints, config);
         let antigravity = antigravity_runtime(&endpoints, config);
         let codex = codex_runtime(&endpoints, config);
+        let cline = cline_runtime(&endpoints, config);
         let mut client = Self {
             client: first.client.clone(),
             provider: first.provider.clone(),
@@ -71,6 +72,7 @@ impl OpenAiCompatibleClient {
             claude_code,
             antigravity,
             codex,
+            cline,
             claude_code_dev_mode: false,
             zen_session: None,
         };
@@ -149,6 +151,7 @@ impl OpenAiCompatibleClient {
         let claude_code = claude_code_runtime(&endpoints, config);
         let antigravity = antigravity_runtime(&endpoints, config);
         let codex = codex_runtime(&endpoints, config);
+        let cline = cline_runtime(&endpoints, config);
         let mut client = Self {
             client: first.client.clone(),
             provider: first.provider.clone(),
@@ -165,6 +168,7 @@ impl OpenAiCompatibleClient {
             claude_code,
             antigravity,
             codex,
+            cline,
             claude_code_dev_mode: false,
             zen_session: None,
         };
@@ -282,6 +286,7 @@ impl OpenAiCompatibleClient {
         let claude_code = claude_code_runtime(&endpoints, config);
         let antigravity = antigravity_runtime(&endpoints, config);
         let codex = codex_runtime(&endpoints, config);
+        let cline = cline_runtime(&endpoints, config);
         let mut client = Self {
             client,
             provider: provider.clone(),
@@ -298,6 +303,7 @@ impl OpenAiCompatibleClient {
             claude_code,
             antigravity,
             codex,
+            cline,
             claude_code_dev_mode: false,
             zen_session: None,
         };
@@ -422,6 +428,7 @@ impl OpenAiCompatibleClient {
             claude_code: self.claude_code.clone(),
             antigravity: self.antigravity.clone(),
             codex: self.codex.clone(),
+            cline: self.cline.clone(),
             claude_code_dev_mode: self.claude_code_dev_mode,
             zen_session: self.zen_session.clone(),
         }
@@ -501,6 +508,17 @@ pub(in crate::llm::openai_compatible) fn claude_code_runtime(
         return None;
     }
     Some(Arc::new(ClaudeCodeRuntime::from_config(config)))
+}
+
+/// 端点池里出现 cline 协议端点时,解析一份共享运行时参数。
+pub(in crate::llm::openai_compatible) fn cline_runtime(
+    endpoints: &[LlmEndpoint],
+    config: &AppConfig,
+) -> Option<Arc<ClineRuntime>> {
+    endpoints
+        .iter()
+        .any(|endpoint| provider_uses_cline(&endpoint.provider))
+        .then(|| Arc::new(ClineRuntime::from_config(config)))
 }
 
 /// A client resolved from a tier pool plus the fallback facts a caller may

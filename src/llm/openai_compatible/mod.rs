@@ -5,6 +5,7 @@ mod chat;
 mod chat_consume;
 mod claude_code;
 mod cli_relay;
+mod cline;
 mod codex;
 mod dsml;
 mod endpoints;
@@ -19,6 +20,7 @@ pub(crate) use antigravity::remove_relay_files_now as remove_antigravity_relay_f
 use antigravity::AntigravityRuntime;
 use claude_code::ClaudeCodeRuntime;
 pub(crate) use cli_relay::forget_relay_sessions;
+use cline::ClineRuntime;
 use codex::CodexRuntime;
 use dsml::*;
 use endpoints::*;
@@ -104,6 +106,8 @@ pub struct OpenAiCompatibleClient {
     antigravity: Option<Arc<AntigravityRuntime>>,
     /// codex 协议的运行时参数;端点池里没有该协议的端点时为 None。
     codex: Option<Arc<CodexRuntime>>,
+    /// cline 协议的运行时参数;端点池里没有该协议的端点时为 None。
+    cline: Option<Arc<ClineRuntime>>,
     /// 本会话是否 dev 模式(Agent 构造时置位),claude-code 的双四档工具
     /// 作用域(native_tools/gqy_tools)按它判定。
     claude_code_dev_mode: bool,

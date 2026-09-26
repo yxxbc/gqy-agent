@@ -763,6 +763,13 @@ impl AppConfig {
             .any(|provider| provider.is_codex() && provider.enabled)
     }
 
+    /// 内置 Cline 特殊供应商是否启用(cline CLI 中转的总开关)。
+    pub fn cline_enabled(&self) -> bool {
+        self.providers
+            .iter()
+            .any(|provider| provider.is_cline() && provider.enabled)
+    }
+
     /// 内置 Antigravity 特殊供应商是否启用(agy CLI 中转的总开关)。
     pub fn antigravity_enabled(&self) -> bool {
         self.providers

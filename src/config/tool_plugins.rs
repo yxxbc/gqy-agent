@@ -42,6 +42,8 @@ pub struct PluginsConfig {
     pub antigravity: AntigravityPluginConfig,
     #[serde(default)]
     pub codex: CodexPluginConfig,
+    #[serde(default)]
+    pub cline: ClinePluginConfig,
 }
 
 /// 本机 Claude Code CLI 接入:`claude-code` 供应商协议的运行参数。CLI 用
@@ -181,6 +183,43 @@ impl Default for CodexPluginConfig {
             sandbox_mode: default_codex_sandbox_mode(),
             ignore_user_config: true,
             idle_timeout_seconds: default_codex_idle_timeout_seconds(),
+        }
+    }
+}
+
+/// 本机 Cline CLI 接入:`cline` 供应商协议的运行参数。CLI 用用户既有的
+/// `~/.cline` 登录态,顾清影 不经手凭据。人格经 `-s` 整体替换;顾清影 工具经
+/// `CLINE_MCP_SETTINGS_PATH` 指向的临时配置文件挂 MCP 桥——那份文件只含
+/// `gqy` 一条,用户自己的 MCP 服务器不进中转工具面(与 claude 线的
+/// `--strict-mcp-config` 同义)。
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ClinePluginConfig {
+    /// 空 = 从 PATH 解析 `cline`。
+    #[serde(default)]
+    pub binary: String,
+    /// 显式指定的 cline 供应商 id(`-P`,如 `cline`、`cline-pass`);空 = 让 CLI
+    /// 按自己的默认(上次使用的)供应商走。
+    #[serde(default)]
+    pub provider: String,
+    /// 哪些模式的会话让 cline 用自带原生工具:off/dev/normal/all,默认 all。
+    #[serde(default = "default_cline_native_tools")]
+    pub native_tools: String,
+    /// 哪些模式的会话把 顾清影 工具经 MCP 桥挂给 cline:off/dev/normal/all,默认 all。
+    #[serde(default = "default_cline_gqy_tools")]
+    pub gqy_tools: String,
+    /// 流空闲看门狗(秒):这么久没有任何输出就杀进程。
+    #[serde(default = "default_cline_idle_timeout_seconds")]
+    pub idle_timeout_seconds: u64,
+}
+
+impl Default for ClinePluginConfig {
+    fn default() -> Self {
+        Self {
+            binary: String::new(),
+            provider: String::new(),
+            native_tools: default_cline_native_tools(),
+            gqy_tools: default_cline_gqy_tools(),
+            idle_timeout_seconds: default_cline_idle_timeout_seconds(),
         }
     }
 }

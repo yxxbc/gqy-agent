@@ -48,6 +48,11 @@
 .st-chip.is-model { font-family: var(--font-mono); font-weight: 500; }
 .st-mark { display: inline-grid; place-items: center; width: 38px; height: 38px; flex: 0 0 38px; border-radius: var(--radius); background: hsl(var(--mark-hue, 220) 42% 30% / .9); color: hsl(var(--mark-hue, 220) 80% 88%); font-size: var(--fs-ui); font-weight: 800; letter-spacing: .02em; }
 .st-mark.is-small { width: 24px; height: 24px; flex-basis: 24px; border-radius: var(--radius); font-size: var(--fs-micro); }
+/* 品牌图标底板:去掉哈希底色,浅色圆角底、图标居中。单色图标是
+   `fill="currentColor"`,跟随这里的 color;彩色图标自带品牌色。 */
+.st-mark.is-icon { background: color-mix(in srgb, var(--surface-3) 62%, transparent); color: var(--text); }
+.st-mark.is-icon svg { width: 22px; height: 22px; display: block; }
+.st-mark.is-icon.is-small svg { width: 16px; height: 16px; }
 
 /* ── 卡片 / 行 ── */
 .st-card { overflow: visible; border-radius: var(--radius); background: var(--surface-1); box-shadow: var(--card-shadow); animation: st-fade-up .34s ease-out both; animation-delay: calc(var(--i, 0) * 40ms); }

@@ -5,6 +5,7 @@ mod embedded_assets;
 mod events_questions;
 mod http;
 mod ipc_bridge;
+mod provider_icons;
 mod session;
 pub(crate) mod settings_schema;
 mod shared;

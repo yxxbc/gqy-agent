@@ -1125,6 +1125,63 @@ fn claude_code_builtin_provider_is_injected_disabled_with_preset_models() {
     );
 }
 
+/// 09-26:Cline 是第四个内置 CLI 中转供应商——normalize 注入、排在 Codex
+/// 之后、默认禁用;模型 id 由用户自己的 cline 供应商决定,没有可列举的目录,
+/// 预置表为空(模型名在设置里手动添加);未启用不进选择器。
+#[test]
+fn cline_builtin_provider_is_injected_disabled_after_codex() {
+    let mut config = AppConfig::default();
+    config.normalize_builtin_providers();
+    assert!(config.providers[0].is_claude_code());
+    assert!(config.providers[1].is_antigravity());
+    assert!(config.providers[2].is_codex());
+    assert!(config.providers[3].is_cline(), "Cline 紧随 Codex 之后");
+    let provider = &config.providers[3];
+    assert_eq!(provider.id, "cline");
+    assert!(!provider.enabled, "默认必须是禁用态");
+    assert!(provider.models.is_empty() && provider.default_model.is_empty());
+    assert!(provider.preset_model_catalog().is_empty());
+    assert!(!config.cline_enabled());
+    assert!(!config
+        .text_provider_model_choices()
+        .iter()
+        .any(|choice| choice.provider_id == "cline"));
+    // 消息只收文本:内联媒体块在中转层被降级成占位符。
+    assert_eq!(
+        provider.message_input_modalities("anthropic/claude-sonnet-4.6"),
+        Some(vec!["text".to_string()])
+    );
+
+    // 存量配置把它排到后面:normalize 搬回第四位;重复 normalize 不二次注入。
+    let moved = config.providers.remove(3);
+    config.providers.push(moved);
+    config.normalize_builtin_providers();
+    assert!(config.providers[3].is_cline());
+    assert_eq!(
+        config
+            .providers
+            .iter()
+            .filter(|provider| provider.is_cline())
+            .count(),
+        1
+    );
+
+    for provider in &mut config.providers {
+        if provider.is_cline() {
+            provider.enabled = true;
+            provider.models = vec!["anthropic/claude-sonnet-4.6".to_string()];
+            provider.default_model = "anthropic/claude-sonnet-4.6".to_string();
+        }
+    }
+    assert!(config.cline_enabled());
+    assert!(config
+        .text_provider_model_choices()
+        .iter()
+        .any(
+            |choice| choice.provider_id == "cline" && choice.model == "anthropic/claude-sonnet-4.6"
+        ));
+}
+
 /// 09-03:Antigravity 是第二个内置 CLI 中转供应商——normalize 注入、紧随
 /// Claude Code 之后、默认禁用、模型预置 agy 别名;未启用不进选择器。
 #[test]

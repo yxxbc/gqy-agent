@@ -64,7 +64,7 @@ pub(in crate::web) async fn provider_models(
     let result = tokio::task::spawn_blocking(move || -> anyhow::Result<ProviderModelsResponse> {
         let (source, ids) = if fetch {
             let cli_binary = crate::config_tui::builtin_cli_binary(&current, &provider);
-            let ids = crate::config_tui::fetch_models(&provider, cli_binary.as_deref())?;
+            let ids = crate::config_tui::fetch_models(&current, &provider, cli_binary.as_deref())?;
             (
                 if provider.is_builtin_cli_provider() {
                     "cli"

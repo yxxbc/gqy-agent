@@ -510,6 +510,18 @@ pub(crate) fn default_codex_idle_timeout_seconds() -> u64 {
     300
 }
 
+pub(crate) fn default_cline_native_tools() -> String {
+    "all".to_string()
+}
+
+pub(crate) fn default_cline_gqy_tools() -> String {
+    "all".to_string()
+}
+
+pub(crate) fn default_cline_idle_timeout_seconds() -> u64 {
+    300
+}
+
 pub(crate) fn bool_is_true(value: &bool) -> bool {
     *value
 }

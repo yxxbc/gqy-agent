@@ -231,6 +231,8 @@ pub const CLAUDE_CODE_PROTOCOL: &str = "claude-code";
 pub const ANTIGRAVITY_PROTOCOL: &str = "antigravity";
 /// Codex(OpenAI codex CLI)特殊供应商的内部协议标识。
 pub const CODEX_PROTOCOL: &str = "codex";
+/// Cline CLI 特殊供应商的内部协议标识(不暴露成用户概念)。
+pub const CLINE_PROTOCOL: &str = "cline";
 
 /// CLI 中转线的工具作用域(off/dev/normal/all)在本模式下是否放行。
 /// 中转层与 agent 侧共用这一份判定,免得两边各写一套 match。
@@ -272,6 +274,11 @@ pub const ANTIGRAVITY_PRESET_MODELS: &[&str] = &[
     "claude-opus-4-6-thinking",
     "gpt-oss-120b-medium",
 ];
+/// Cline 预置模型:目录不预置——cline 的模型 id 由用户自己配置的供应商决定
+/// (如 `anthropic/claude-sonnet-4.6`),真实清单在列模型时读 cline 本体自带的
+/// `@cline/llms`(见 `config_tui::cli_catalog::cline_catalog`);这里留空,
+/// 免得把某个供应商的模型当成通用预置。
+pub const CLINE_PRESET_MODELS: &[&str] = &[];
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ProviderConfig {
@@ -634,6 +641,25 @@ impl ProviderConfig {
         protocol.eq_ignore_ascii_case(CODEX_PROTOCOL) || protocol.eq_ignore_ascii_case("codex-cli")
     }
 
+    /// 内置的 Cline 特殊供应商:本机 `cline` CLI 的登录态中转,形态与
+    /// Claude Code 完全同构(恒存在、默认禁用、无 HTTP 字段)。模型目录不预置:
+    /// 列模型时读 cline 本体自带的 `@cline/llms`(`config_tui::cli_catalog`)。
+    pub fn cline_template() -> Self {
+        Self {
+            enabled: false,
+            protocol: CLINE_PROTOCOL.to_string(),
+            models: Vec::new(),
+            default_model: String::new(),
+            ..Self::template("cline", "Cline", "")
+        }
+    }
+
+    /// 该条目是否 Cline 特殊供应商(按协议判定)。
+    pub fn is_cline(&self) -> bool {
+        let protocol = self.protocol.trim();
+        protocol.eq_ignore_ascii_case(CLINE_PROTOCOL) || protocol.eq_ignore_ascii_case("cline-cli")
+    }
+
     /// 该条目是否 Antigravity 特殊供应商(按协议判定)。
     pub fn is_antigravity(&self) -> bool {
         let protocol = self.protocol.trim();
@@ -642,10 +668,10 @@ impl ProviderConfig {
             || protocol.eq_ignore_ascii_case("agy")
     }
 
-    /// 内置的本机 CLI 中转供应商(Claude Code / Antigravity):没有 URL、
-    /// API key 概念,列表里恒存在且不可删除。
+    /// 内置的本机 CLI 中转供应商(Claude Code / Antigravity / Codex / Cline):
+    /// 没有 URL、API key 概念,列表里恒存在且不可删除。
     pub fn is_builtin_cli_provider(&self) -> bool {
-        self.is_claude_code() || self.is_antigravity() || self.is_codex()
+        self.is_claude_code() || self.is_antigravity() || self.is_codex() || self.is_cline()
     }
 
     /// 见 `tool_result_media` 字段。
@@ -678,6 +704,8 @@ impl ProviderConfig {
             ANTIGRAVITY_PRESET_MODELS
         } else if self.is_codex() {
             CODEX_PRESET_MODELS
+        } else if self.is_cline() {
+            CLINE_PRESET_MODELS
         } else {
             &[]
         }
@@ -705,10 +733,11 @@ impl ProviderConfig {
             Self::template("ollama", "Ollama", "http://localhost:11434/v1"),
             Self::template("lmstudio", "LMStudio", "http://localhost:1234/v1"),
         ]);
-        // Claude Code 置顶:用户拍板的列表次序;Antigravity 紧随其后。
+        // Claude Code 置顶:用户拍板的列表次序;四条本机 CLI 中转线紧随其后。
         providers.insert(0, Self::claude_code_template());
         providers.insert(1, Self::antigravity_template());
         providers.insert(2, Self::codex_template());
+        providers.insert(3, Self::cline_template());
         providers
     }
 
@@ -787,7 +816,10 @@ impl ProviderConfig {
     /// 不同,续传链逢图必断(09-04 群 130515298 实证)。内联、视觉旁路选客户端
     /// 都要问这个;池成员资格问 [`Self::input_modalities`]。
     pub fn message_input_modalities(&self, model: &str) -> Option<Vec<String>> {
-        if self.views_media_with_native_file_tool() {
+        // Cline 中转的提示词是纯文本(媒体块在中转层降级成占位符),和 agy 线
+        // 一样不能内联图片;但它不满足 `views_media_with_native_file_tool`——
+        // 那条判定还管视觉旁路要不要让位给原生 view_file,只有 agy 是定论。
+        if self.views_media_with_native_file_tool() || self.is_cline() {
             return Some(vec!["text".to_string()]);
         }
         self.input_modalities(model)

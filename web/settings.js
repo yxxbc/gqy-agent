@@ -1330,7 +1330,7 @@ window.GqySettings = (() => {
     { value: "openai-responses", label: "OpenAI Responses" },
     { value: "anthropic", label: "Anthropic Messages" }
   ];
-  const BUILTIN_PROTOCOLS = { "claude-code": "Claude Code", antigravity: "Antigravity", codex: "Codex" };
+  const BUILTIN_PROTOCOLS = { "claude-code": "Claude Code", antigravity: "Antigravity", codex: "Codex", cline: "Cline" };
   const MODALITY_ICONS = { text: "file-text", image: "image", audio: "mic", video: "film", pdf: "file-type" };
   const MODALITY_LABELS = { text: "文本", image: "图片", audio: "音频", video: "视频", pdf: "PDF" };
   function isBuiltinProvider(provider) { return Boolean(BUILTIN_PROTOCOLS[String(provider?.protocol || "").trim()]); }
@@ -1352,7 +1352,8 @@ window.GqySettings = (() => {
     if (!isBuiltinProvider(provider)) chips.push(chip(status.text === "未配置" ? "无密钥" : "密钥 ✓", status.text === "未配置" ? "is-warn" : "is-ok"));
     if (provider.enabled === false) chips.push(chip("已停用", "is-warn"));
     node.append(
-      mark(provider.display_name || provider.id),
+      // 认得出的品牌用图标(provider-icons.js 的内嵌 SVG,离线可用);认不出的照旧字母 + 哈希底色。
+      window.GqyProviderIcons?.providerMark(provider) || mark(provider.display_name || provider.id),
       el("span.st-provider-copy", null,
         el("strong", { text: provider.display_name || provider.id || `供应商 ${index + 1}` }),
         el("small", { text: provider.id || "尚未命名" }),
@@ -1842,7 +1843,7 @@ window.GqySettings = (() => {
         const rowNode = el("div.st-pool-member");
         rowNode.style.setProperty("--i", String(position));
         rowNode.append(...[
-          mark(provider?.display_name || item.provider_id, "is-small"),
+          window.GqyProviderIcons?.providerMark(provider || { id: item.provider_id }, "is-small") || mark(provider?.display_name || item.provider_id, "is-small"),
           el("span.st-pool-member-copy", null, el("strong", { text: item.model }), el("small", { text: provider?.display_name || item.provider_id })),
           implicit ? chip("默认模型", "is-soft") : null,
           iconButton("x", "移出池", () => { poolToggle(column, item, false); paint(); }, "is-danger")

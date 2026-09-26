@@ -53,6 +53,7 @@ fn context_breakdown_for(state: &DaemonState, session_id: &str) -> Result<Value>
         Ok(provider) if provider.is_claude_code() => "claude_code",
         Ok(provider) if provider.is_codex() => "codex",
         Ok(provider) if provider.is_antigravity() => "antigravity",
+        Ok(provider) if provider.is_cline() => "cline",
         _ => "native",
     };
     // 中转后端:CLI 自己的系统提示词与原生工具 顾清影 看不到,实测减估算就是

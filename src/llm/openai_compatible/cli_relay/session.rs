@@ -1,4 +1,4 @@
-//! CLI 侧会话与 顾清影 消息前缀的对应关系(三条中转线共用,键含 provider)。
+//! CLI 侧会话与 顾清影 消息前缀的对应关系(四条中转线共用,键含 provider)。
 //!
 //! 键是「逐消息哈希链」:chain[i] = 前 i 条会话消息的链哈希,种子掺入
 //! provider/model/system prompt。顾清影 的历史回放是字节级 append-only 的,

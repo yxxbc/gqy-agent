@@ -179,6 +179,11 @@ impl OpenAiCompatibleClient {
                 provider_npm: None,
                 variants: codex_reasoning_variants(&self.provider.default_model),
             }
+        } else if provider_uses_cline(&self.provider) {
+            ModelReasoningInfo {
+                provider_npm: None,
+                variants: cline_reasoning_variants(&self.provider.default_model),
+            }
         } else {
             models_cache::reasoning_info(&self.provider.id, &self.provider.default_model)?
         };

@@ -2,19 +2,22 @@
 //!
 //! 它们没有 /models HTTP 端点,但 CLI 自己能列:`agy models`(TSV,
 //! `slug<TAB>显示名`)、`codex debug models`(JSON,`models[].slug`,
-//! `visibility: hide` 的不列)。目录就问 CLI 要;CLI 不在、超时或输出不认识
-//! 一律报错让用户看见(09-03 裁定:不悄悄退回快照——预置表只在首次创建
-//! 供应商时当模板用)。配置里手工加的名字并进目录,去重保序。`claude` 没有
-//! 列模型的子命令(`--model` 只认 fable/opus/sonnet/haiku 别名或完整名),
-//! 它的目录就是那张别名表。
+//! `visibility: hide` 的不列)、cline 本体自带的 `@cline/llms`
+//! (`getModelsForProvider`,与 cline TUI 的模型选择器同源,经 node 打印成
+//! JSON)。目录就问 CLI 要;CLI 不在、超时或输出不认识一律报错让用户看见
+//! (09-03 裁定:不悄悄退回快照——预置表只在首次创建供应商时当模板用)。
+//! 配置里手工加的名字并进目录,去重保序。`claude` 没有列模型的子命令
+//! (`--model` 只认 fable/opus/sonnet/haiku 别名或完整名),它的目录就是那张
+//! 别名表。
 
 use crate::config::{AppConfig, ProviderConfig};
 use anyhow::{bail, Context, Result};
 use std::io::Read;
+use std::path::{Path, PathBuf};
 use std::process::{Command, Stdio};
 use std::time::{Duration, Instant};
 
-/// agy 要联网取目录,给足时间;超时就退回预置表,不让 TUI 干等。
+/// agy 要联网取目录,cline 要起 node 读包,给足时间;超时就不让 TUI 干等。
 const CLI_LIST_TIMEOUT: Duration = Duration::from_secs(20);
 
 /// 该供应商列模型要跑的二进制;`None` = 没有对应的 CLI 子命令。
@@ -31,6 +34,8 @@ pub(crate) fn builtin_cli_binary(config: &AppConfig, provider: &ProviderConfig) 
         Some(pick(&config.plugins.antigravity.binary, "agy"))
     } else if provider.is_codex() {
         Some(pick(&config.plugins.codex.binary, "codex"))
+    } else if provider.is_cline() {
+        Some(pick(&config.plugins.cline.binary, "cline"))
     } else {
         None
     }
@@ -38,12 +43,13 @@ pub(crate) fn builtin_cli_binary(config: &AppConfig, provider: &ProviderConfig) 
 
 /// 目录 = CLI 实时列表(claude:别名表)∪ 配置里手工加的。CLI 失败即失败。
 pub(in crate::config_tui) fn builtin_cli_catalog(
+    config: &AppConfig,
     provider: &ProviderConfig,
     binary: Option<&str>,
 ) -> Result<Vec<String>> {
     let mut catalog = match binary {
         Some(binary) => {
-            let models = live_catalog(provider, binary)?;
+            let models = live_catalog(config, provider, binary)?;
             if models.is_empty() {
                 bail!("{binary} listed no models");
             }
@@ -63,16 +69,113 @@ pub(in crate::config_tui) fn builtin_cli_catalog(
     Ok(catalog)
 }
 
-fn live_catalog(provider: &ProviderConfig, binary: &str) -> Result<Vec<String>> {
+fn live_catalog(
+    config: &AppConfig,
+    provider: &ProviderConfig,
+    binary: &str,
+) -> Result<Vec<String>> {
     if provider.is_antigravity() {
         let stdout = run_with_timeout(binary, &["models"], CLI_LIST_TIMEOUT)?;
         Ok(parse_agy_models(&stdout))
     } else if provider.is_codex() {
         let stdout = run_with_timeout(binary, &["debug", "models"], CLI_LIST_TIMEOUT)?;
         parse_codex_models(&stdout)
+    } else if provider.is_cline() {
+        cline_catalog(config, binary)
     } else {
         bail!("this CLI has no model listing command")
     }
+}
+
+/// cline 的模型目录:读 cline 本体自带的 `@cline/llms`(与 cline TUI 的模型
+/// 选择器同源),不连 Cline 的服务器。定位方式:把 cline 可执行文件解掉符号
+/// 链接,从它的祖先目录里找 `node_modules/@cline/llms`,再让 node 跑一段小
+/// 脚本把 `getModelsForProvider(<供应商 id>)` 的键打成 JSON。找不到 node 或
+/// 包就报错让用户看见(与另两条线一致:目录问题不悄悄降级)。
+fn cline_catalog(config: &AppConfig, binary: &str) -> Result<Vec<String>> {
+    let provider_id = {
+        let configured = config.plugins.cline.provider.trim();
+        if configured.is_empty() {
+            "cline"
+        } else {
+            configured
+        }
+    };
+    let resolved = resolve_binary_path(binary)?;
+    let entry = locate_cline_llms(&resolved).with_context(|| {
+        format!(
+            "cline's bundled @cline/llms was not found above {}; the install may be incomplete",
+            resolved.display()
+        )
+    })?;
+    let script = format!(
+        "const m = await import({});\n\
+         const models = await m.getModelsForProvider({});\n\
+         process.stdout.write(JSON.stringify(Object.keys(models ?? {{}})));",
+        serde_json::to_string(&entry.display().to_string())?,
+        serde_json::to_string(provider_id)?,
+    );
+    let stdout = run_with_timeout(
+        "node",
+        &["--input-type=module", "-e", &script],
+        CLI_LIST_TIMEOUT,
+    )
+    .context("running node for the cline model catalog")?;
+    parse_cline_models(&stdout)
+}
+
+/// 把裸名字/相对路径解析成实际文件路径(PATH 查找),供向上找包用。
+fn resolve_binary_path(binary: &str) -> Result<PathBuf> {
+    let path = PathBuf::from(binary);
+    if path.is_absolute() || binary.contains(std::path::MAIN_SEPARATOR) {
+        return Ok(path);
+    }
+    let search = std::env::var_os("PATH").unwrap_or_default();
+    for dir in std::env::split_paths(&search) {
+        let candidate = dir.join(binary);
+        if candidate.is_file() {
+            return Ok(candidate);
+        }
+    }
+    bail!("{binary} not found in PATH")
+}
+
+/// 从 cline 可执行文件(已解符号链接)向上找 `@cline/llms` 入口。
+/// 覆盖两种安装形态:npm 全局(`<prefix>/bin/cline` 符号链接到
+/// `<prefix>/lib/node_modules/cline/bin/cline`)与 bin 目录里放真实脚本的形态。
+fn locate_cline_llms(binary: &Path) -> Option<PathBuf> {
+    let resolved = std::fs::canonicalize(binary).unwrap_or_else(|_| binary.to_path_buf());
+    let mut dir = resolved.parent();
+    while let Some(base) = dir {
+        for suffix in [
+            "node_modules/@cline/llms/dist/index.js",
+            "lib/node_modules/cline/node_modules/@cline/llms/dist/index.js",
+            "lib/node_modules/@cline/llms/dist/index.js",
+        ] {
+            let candidate = base.join(suffix);
+            if candidate.is_file() {
+                return Some(candidate);
+            }
+        }
+        dir = base.parent();
+    }
+    None
+}
+
+/// `getModelsForProvider` 的键数组;输出前面可能混着 node 的杂音,从第一个
+/// `[` 起解析。
+fn parse_cline_models(stdout: &str) -> Result<Vec<String>> {
+    let trimmed = stdout.trim();
+    let start = trimmed
+        .find('[')
+        .context("the cline model catalog printed no JSON")?;
+    let ids: Vec<String> =
+        serde_json::from_str(&trimmed[start..]).context("the cline model catalog JSON")?;
+    Ok(ids
+        .into_iter()
+        .map(|id| id.trim().to_string())
+        .filter(|id| !id.is_empty())
+        .collect())
 }
 
 /// `agy models`:每行 `slug<TAB>显示名`;首行 "Fetching available models..."
@@ -172,18 +275,66 @@ mod tests {
 
     #[test]
     fn a_missing_cli_is_an_error_not_a_silent_preset() {
+        let config = AppConfig::default();
         let mut provider = ProviderConfig::antigravity_template();
         provider.models = vec!["custom-alias".to_string()];
-        let error = builtin_cli_catalog(&provider, Some("/nonexistent/agy-binary")).unwrap_err();
+        let error =
+            builtin_cli_catalog(&config, &provider, Some("/nonexistent/agy-binary")).unwrap_err();
         assert!(error.to_string().contains("failed to start"));
         // claude 没有列模型命令:目录就是别名表,并上手工加的。
         let mut claude = ProviderConfig::claude_code_template();
         claude.models = vec!["claude-fable-5".to_string()];
-        let config = AppConfig::default();
         assert!(builtin_cli_binary(&config, &claude).is_none());
-        let models = builtin_cli_catalog(&claude, None).unwrap();
+        let models = builtin_cli_catalog(&config, &claude, None).unwrap();
         assert_eq!(models.len(), claude.preset_model_catalog().len() + 1);
         assert_eq!(models.last().map(String::as_str), Some("claude-fable-5"));
+    }
+
+    #[test]
+    fn cline_catalog_is_custom_models_only() {
+        let config = AppConfig::default();
+        let mut provider = ProviderConfig::cline_template();
+        provider.models = vec!["anthropic/claude-sonnet-4.6".to_string()];
+        // cline 的目录走 `@cline/llms`(见 cline_catalog);预置表是空的,list
+        // 不可用时目录就等于手工加的模型。
+        let models = builtin_cli_catalog(&config, &provider, None).unwrap();
+        assert_eq!(models, ["anthropic/claude-sonnet-4.6"]);
+        assert_eq!(
+            builtin_cli_binary(&config, &provider).as_deref(),
+            Some("cline")
+        );
+    }
+
+    /// cline 的清单:node 的杂音在前、JSON 数组在后;空数组合法(调用方据此
+    /// 报"没列出模型"),不是 JSON 就报错。
+    #[test]
+    fn cline_listing_parses_the_json_array() {
+        let out = "some node noise\n[\"anthropic/claude-sonnet-4.6\",\" cline-pass/kimi-k3 \"]\n";
+        assert_eq!(
+            parse_cline_models(out).unwrap(),
+            vec![
+                "anthropic/claude-sonnet-4.6".to_string(),
+                "cline-pass/kimi-k3".to_string()
+            ]
+        );
+        assert!(parse_cline_models("[]").unwrap().is_empty());
+        assert!(parse_cline_models("nothing here").is_err());
+    }
+
+    /// `@cline/llms` 的定位:从 cline 可执行文件(解掉符号链接后)向上找,
+    /// npm 全局布局是 `<prefix>/lib/node_modules/cline/node_modules/@cline/llms`。
+    #[test]
+    fn cline_llms_is_located_by_walking_up_from_the_binary() {
+        let temp = tempfile::tempdir().unwrap();
+        let root = temp.path();
+        let dist = root.join("lib/node_modules/cline/node_modules/@cline/llms/dist");
+        std::fs::create_dir_all(&dist).unwrap();
+        std::fs::write(dist.join("index.js"), "// stub").unwrap();
+        let bin_dir = root.join("bin");
+        std::fs::create_dir_all(&bin_dir).unwrap();
+        let binary = bin_dir.join("cline");
+        std::fs::write(&binary, "#!/usr/bin/env node\n").unwrap();
+        assert_eq!(locate_cline_llms(&binary), Some(dist.join("index.js")));
     }
 }
 
@@ -199,9 +350,10 @@ mod live_probe {
         for provider in [
             ProviderConfig::antigravity_template(),
             ProviderConfig::codex_template(),
+            ProviderConfig::cline_template(),
         ] {
             let binary = builtin_cli_binary(&config, &provider);
-            match builtin_cli_catalog(&provider, binary.as_deref()) {
+            match builtin_cli_catalog(&config, &provider, binary.as_deref()) {
                 Ok(models) => eprintln!(
                     "{}: {} models: {}",
                     provider.id,

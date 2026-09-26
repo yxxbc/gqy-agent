@@ -238,7 +238,7 @@ pub(super) fn options(config: &AppConfig, has_cli: impl Fn(&str) -> bool) -> Vec
         &str,
         fn(&ProviderConfig) -> bool,
         fn() -> ProviderConfig,
-    ); 3] = [
+    ); 4] = [
         (
             "claude",
             "借 Claude Code 的订阅",
@@ -256,6 +256,12 @@ pub(super) fn options(config: &AppConfig, has_cli: impl Fn(&str) -> bool) -> Vec
             "借 Antigravity 的订阅",
             ProviderConfig::is_antigravity,
             ProviderConfig::antigravity_template,
+        ),
+        (
+            "cline",
+            "借 Cline 的登录态",
+            ProviderConfig::is_cline,
+            ProviderConfig::cline_template,
         ),
     ];
     for (binary, label, matches, fallback) in clis {
@@ -320,9 +326,11 @@ pub(super) struct CatalogJob {
 impl CatalogJob {
     pub fn spawn(config: &AppConfig, provider: ProviderConfig) -> Self {
         let binary = crate::config_tui::builtin_cli_binary(config, &provider);
+        // cline 的目录要 `plugins.cline.provider`;config 跟着进线程。
+        let config = config.clone();
         let (sender, receiver) = mpsc::channel();
         std::thread::spawn(move || {
-            let result = crate::config_tui::fetch_models(&provider, binary.as_deref())
+            let result = crate::config_tui::fetch_models(&config, &provider, binary.as_deref())
                 .map_err(|error| format!("{error:#}"));
             let _ = sender.send(result);
         });

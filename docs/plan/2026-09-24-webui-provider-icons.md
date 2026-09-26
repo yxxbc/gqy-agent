@@ -1,5 +1,19 @@
 # WebUI 供应商品牌图标（2026-09-24，待排期）
 
+> **09-26 施工记录**：按本文实施，与 Cline 中转线同批。要点与原文的差异：
+> ①图标源钉 `@lobehub/icons-static-svg 1.95.1`，实取 24 个（含新增的 `cline`；
+> `codex`/`antigravity` 有独立彩色图标，`xiaomimimo`/`ollama`/`openai`/`cline`
+> 等只有单色版，保持 `fill="currentColor"`）；`claude` 有彩色版，`anthropic`
+> 只有单色版——两家的 id 直配不同名，都进了表。②施工时 SVG 表一行一个字符串，
+> `src/web/tests/provider_icons.rs` 读字面量校验（完整性、`url(#id)` 有定义、
+> 元素 id 带 `lobe-icons-` 前缀、规则键都存在）。③输入框模型按钮那颗 mark 后来
+> 改成了纯色圆点（`12-stage-controls.css`：颜色不表达信息），不再放字母，
+> 也就没给它加图标——图标落在设置页的供应商卡片与模型池成员两处。
+> ④许可：不新增打包文件——图标内嵌在源码里，来源/版本/MIT 头注释随二进制分发；
+> 打包侧的 licenses 步骤（`nix/package.nix`、`publish-release.yml`）只装外置
+> 资源，此处无新增外置文件。⑤`web/provider-icons.js` 由 build.rs 自动收进资源
+> 表，`index.html` 在 `settings.js` 之前引入。
+
 来由：用户问「WebUI 的供应商为什么全是字母，不是图标」。09-24 定：换成**彩色品牌图标**，先写方案，不施工。
 
 ---

@@ -770,4 +770,48 @@ const toolPlugins = {
       },
     ],
   },
+  cline: {
+    title: "Cline 中转",
+    group: "CLI 中转",
+    description: "本机 cline CLI 登录态中转",
+    fields: [
+      {
+        key: "binary",
+        label: "cline 可执行文件",
+        hint: "空 = 从 PATH 解析",
+        kind: "text",
+        default: "",
+      },
+      {
+        key: "provider",
+        label: "cline 供应商 id",
+        hint: "对应 cline 的 -P;空 = 用 CLI 默认的那家",
+        kind: "text",
+        default: "",
+      },
+      {
+        key: "native_tools",
+        label: "cline 原生工具作用域",
+        kind: "select",
+        choices: TOOL_SCOPE_CHOICES,
+        default: "all",
+      },
+      {
+        key: "gqy_tools",
+        label: "顾清影 工具挂给 cline 的作用域",
+        kind: "select",
+        choices: TOOL_SCOPE_CHOICES,
+        default: "all",
+      },
+      {
+        key: "idle_timeout_seconds",
+        label: "流空闲看门狗(秒)",
+        kind: "number",
+        integer: true,
+        min: 1,
+        unit: "秒",
+        default: 300,
+      },
+    ],
+  },
 };
