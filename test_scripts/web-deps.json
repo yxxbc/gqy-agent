@@ -8,6 +8,11 @@
     },
     {
       "from": "accounts",
+      "to": "avatar-settings",
+      "reason": "账号面板里的头像卡：打开面板时按当前人格与账号刷新"
+    },
+    {
+      "from": "accounts",
       "to": "console",
       "reason": "P2 拆分前 app.js 闭包内已有"
     },
@@ -67,6 +72,11 @@
       "reason": "P2 拆分前 app.js 闭包内已有"
     },
     {
+      "from": "avatar-settings",
+      "to": "persona",
+      "reason": "头像取景变量、取景框与头像图片地址都由 persona.js 管"
+    },
+    {
       "from": "boot",
       "to": "appearance",
       "reason": "P2 拆分前 app.js 闭包内已有"
@@ -115,6 +125,11 @@
       "from": "boot",
       "to": "status",
       "reason": "P2 拆分前 app.js 闭包内已有"
+    },
+    {
+      "from": "boot",
+      "to": "today",
+      "reason": "登录拿到账号后拉一次首页天气(城市按账号存)"
     },
     {
       "from": "composer",
@@ -483,6 +498,11 @@
     },
     {
       "from": "sessions",
+      "to": "her-room",
+      "reason": "相识天数按会话列表算,列表重画时刷新她的房间"
+    },
+    {
+      "from": "sessions",
       "to": "jobs",
       "reason": "P2 拆分前 app.js 闭包内已有"
     },
@@ -495,6 +515,11 @@
       "from": "sessions",
       "to": "model-menu",
       "reason": "P2 拆分前 app.js 闭包内已有"
+    },
+    {
+      "from": "sessions",
+      "to": "persona",
+      "reason": "侧栏模式开关切换时同步输入框占位语（人格口吻 vs 开发模式）"
     },
     {
       "from": "sessions",
@@ -555,6 +580,16 @@
       "from": "sidebar",
       "to": "artifacts",
       "reason": "P2 拆分前 app.js 闭包内已有"
+    },
+    {
+      "from": "today",
+      "to": "her-room",
+      "reason": "信里与纪念日卡的相识天数和侧栏同一个算法"
+    },
+    {
+      "from": "today",
+      "to": "sessions",
+      "reason": "「上次你说」取最近的普通会话,点一下回到那段对话"
     },
     {
       "from": "tools",

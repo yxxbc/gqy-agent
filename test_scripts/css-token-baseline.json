@@ -12,7 +12,7 @@
     "z-index-literal": 0
   },
   "12-stage-controls.css": {
-    "font-size-px": 1,
+    "font-size-px": 0,
     "z-index-literal": 1
   },
   "14-goal-and-jobs.css": {
@@ -64,7 +64,7 @@
     "z-index-literal": 1
   },
   "42-context-panel.css": {
-    "font-size-px": 3,
+    "font-size-px": 2,
     "z-index-literal": 0
   },
   "44-selection-menu.css": {
@@ -88,11 +88,15 @@
     "z-index-literal": 0
   },
   "54-dialogs.css": {
-    "font-size-px": 1,
+    "font-size-px": 0,
     "z-index-literal": 0
   },
   "60-console.css": {
     "font-size-px": 5,
+    "z-index-literal": 0
+  },
+  "62-avatar-card.css": {
+    "font-size-px": 0,
     "z-index-literal": 0
   },
   "62-inline-content.css": {
@@ -140,6 +144,10 @@
     "z-index-literal": 0
   },
   "86-expresscard.css": {
+    "font-size-px": 0,
+    "z-index-literal": 0
+  },
+  "90-mode-dev.css": {
     "font-size-px": 0,
     "z-index-literal": 0
   }
