@@ -31,7 +31,7 @@ gqy 是**一个 Rust crate、两个可执行文件**（`Cargo.toml:9` 关掉 aut
 - **成员账号**：邀请码注册，只有自己的 `conversation.db`、工作区和私有 persona，回合套 Landlock（`src/web/sandbox_scope.rs:109-157`）。管理员看不到成员会话。
 - **聊天对面的第三方**：QQ / iMessage 里的昵称与正文，按不可信输入处理（`AGENTS.md` §4.1）。
 
-外部系统：**OneBot 端**（反向 WS 连进来）、**iMessage 桥**（macOS 上的 Python LaunchAgent，独立发布、调 `gqy ask`）、**上游模型供应商**、**播报供应商**（MiniMax / 小米 MiMo，远端合成）、**MCP 服务器**、**公网**、**本机工具链**（rg / chafa / sh / git / gh / pacman / notify-send / 中转线 CLI… 全部按 PATH 找，spawn 点见证据索引 §5）。
+外部系统：**OneBot 端**（反向 WS 连进来）、**iMessage 连接器**（macOS 上的 Python LaunchAgent，独立发布，经本机 WebSocket 连 daemon 的连接器端点）、**上游模型供应商**、**播报供应商**（MiniMax / 小米 MiMo，远端合成）、**MCP 服务器**、**公网**、**本机工具链**（rg / chafa / sh / git / gh / pacman / notify-send / 中转线 CLI… 全部按 PATH 找，spawn 点见证据索引 §5）。
 
 ## 六个进程形态（L2）
 

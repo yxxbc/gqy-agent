@@ -323,3 +323,97 @@ async fn reconnect_closes_the_old_connection() {
     let current = wait_connected(&state).await;
     assert_ne!(current.id, old.id);
 }
+
+mod commands {
+    use super::super::commands::{execute, load_prefs, parse, CommandScope};
+    use super::super::legacy;
+    use crate::platforms::tests::shared::test_paths;
+    use crate::platforms::{resolve_platform_session, ConversationKind, PlatformConversation};
+    use crate::runtime::DaemonState;
+
+    fn conversation() -> PlatformConversation {
+        PlatformConversation {
+            platform: "imessage".into(),
+            account_id: String::new(),
+            kind: ConversationKind::Private,
+            conversation_id: "me".into(),
+        }
+    }
+
+    fn run(state: &DaemonState, text: &str) -> String {
+        let conversation = conversation();
+        let command = parse("/", text, false).expect("command");
+        execute(
+            &CommandScope {
+                state,
+                conversation: &conversation,
+                persona: "default",
+            },
+            &command,
+        )
+    }
+
+    fn current_name(state: &DaemonState) -> String {
+        let session =
+            resolve_platform_session(state, &conversation(), "default", None, "imessage-me", None)
+                .unwrap();
+        state
+            .state_store
+            .session_record(&session)
+            .unwrap()
+            .unwrap()
+            .name
+    }
+
+    #[test]
+    fn new_and_topic_rebind_the_conversation() {
+        let temp = tempfile::tempdir().unwrap();
+        let state = DaemonState::for_test(test_paths(temp.path()), 0).unwrap();
+        assert_eq!(current_name(&state), "imessage-me");
+        assert!(run(&state, "/new").ends_with('2'));
+        assert_eq!(current_name(&state), "imessage-me-2");
+        assert!(run(&state, "/topics").contains("▶ 2."));
+        run(&state, "/topic 1");
+        assert_eq!(current_name(&state), "imessage-me");
+        assert!(run(&state, "/topic 9").contains('9'));
+        assert_eq!(current_name(&state), "imessage-me");
+    }
+
+    #[test]
+    fn pause_and_resume_persist() {
+        let temp = tempfile::tempdir().unwrap();
+        let state = DaemonState::for_test(test_paths(temp.path()), 0).unwrap();
+        run(&state, "/pause");
+        assert!(load_prefs(&state, &conversation()).paused);
+        run(&state, "/resume");
+        assert!(!load_prefs(&state, &conversation()).paused);
+    }
+
+    #[test]
+    fn legacy_bridge_topic_and_pause_are_migrated_once() {
+        let temp = tempfile::tempdir().unwrap();
+        let state = DaemonState::for_test(test_paths(temp.path()), 0).unwrap();
+        for name in ["imessage-me", "imessage-me-3"] {
+            state
+                .state_store
+                .create_session("default", name, "user", None)
+                .unwrap();
+        }
+        std::fs::create_dir_all(&state.paths.state_dir).unwrap();
+        std::fs::write(
+            state.paths.state_dir.join("imessage-contacts.json"),
+            r#"{"me": {"topic": 3, "paused": true, "model": "no-such-model"}}"#,
+        )
+        .unwrap();
+        let prefs = load_prefs(&state, &conversation());
+        legacy::migrate(&state, &conversation(), "default", &prefs);
+        assert_eq!(current_name(&state), "imessage-me-3");
+        let prefs = load_prefs(&state, &conversation());
+        assert!(prefs.paused && prefs.legacy_migrated);
+
+        // 搬过一次就不再读旧文件：用户切回话题 1 后不会被旧文件拽回去。
+        run(&state, "/topic 1");
+        legacy::migrate(&state, &conversation(), "default", &prefs);
+        assert_eq!(current_name(&state), "imessage-me");
+    }
+}

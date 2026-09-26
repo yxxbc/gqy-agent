@@ -1,27 +1,35 @@
 #!/usr/bin/env python3
-"""iMessage ⇄ 顾清影 桥接。
+"""iMessage 连接器:chat.db ⇄ gqy daemon。
 
-读本用户的 ~/Library/Messages/chat.db 收消息,交给 `gqy ask` 跑回合,
-再用 osascript 让 Messages 发回去。只认配置里白名单联系人的私聊。
+只做 I/O:读本用户的 ~/Library/Messages/chat.db 收消息,经通用连接器协议
+(gqy-connector/1,本机 WebSocket)交给 daemon;daemon 让发什么,就用 osascript
+让「信息」发出去。会话、指令、拆气泡、模型、记忆、语音都在 daemon 里
+(src/platforms/connector/,方案稿 docs/design/2026-09-26-connector-protocol.md)。
 
-运行方式见同目录 README.md。只依赖系统自带的 Python 3.9 标准库。
+联系人白名单、主人、气泡设置在 daemon 配置的 platforms.connectors.imessage;
+这里的 ~/.gqy/config/imessage.json 只管连哪、口令、轮询。
+
+daemon 回 ack 才推进读取水位:daemon 重启或断线时,没确认的消息重连后重发,
+不会丢。只依赖系统自带的 Python 3.9 标准库。运行方式见同目录 README.md。
 """
 from __future__ import annotations
 
+import base64
 import json
 import logging
 import os
 import queue
 import re
+import shutil
+import socket
 import sqlite3
 import subprocess
 import sys
 import tempfile
 import threading
 import time
-from dataclasses import dataclass, field
-
-import imessage_commands as commands
+import uuid
+from urllib.parse import urlsplit
 
 HOME = os.path.expanduser("~")
 CONFIG_PATH = os.environ.get(
@@ -30,7 +38,17 @@ CONFIG_PATH = os.environ.get(
 STATE_PATH = os.path.join(HOME, ".gqy", "state", "imessage-bridge.json")
 CHAT_DB = os.path.join(HOME, "Library", "Messages", "chat.db")
 SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
-HINT_PATH = os.path.join(SCRIPT_DIR, "hint.txt")
+
+PROTOCOL = "gqy-connector/1"
+CONNECTOR_VERSION = "2"
+CAPABILITIES = {
+    "reaction_in": True,
+    "reaction_out": False,
+    "image_out": True,
+    "audio_out": True,
+    "file_out": True,
+    "group": False,
+}
 
 # chat.date 是 2001-01-01 起的纳秒数
 APPLE_EPOCH = 978307200
@@ -39,36 +57,18 @@ CHAT_STYLE_GROUP = 43
 # message.associated_message_type:2000–2006 是加点按回应,3000 起是撤回点按回应
 TAPBACKS = {2000: "❤️", 2001: "👍", 2002: "👎", 2003: "😂", 2004: "‼️", 2005: "❓"}
 TAPBACK_CUSTOM = 2006
+# 与 daemon 的单个附件上限一致(src/platforms/connector/protocol.rs)
+MAX_ATTACHMENT_BYTES = 16 * 1024 * 1024
 
 DEFAULT_CONFIG = {
     "enabled": False,
-    "contacts": [],
-    "gqy_bin": os.path.join(HOME, ".cargo", "bin", "gqy"),
-    "tools": [
-        "web_search",
-        "web_fetch",
-        "vision_analyze",
-        "recall_memories",
-        "remember_fact",
-        "kb",
-        "search_knowledge_base",
-        "search_evicted_context",
-        "get_exchange_rate",
-        "use_meme",
-        "album",
-        "generate_image",
-    ],
+    "url": "ws://127.0.0.1:8300/api/connector/ws?platform=imessage",
+    "token": "",
     "poll_seconds": 2,
-    "batch_wait_seconds": 3,
-    "timeout_seconds": 300,
     "max_backlog_minutes": 30,
-    "split_paragraphs": True,
-    "max_bubbles": 6,
-    "bubble_pause_seconds": 2,
-    "max_memes": 2,
 }
 
-log = logging.getLogger("imessage-bridge")
+log = logging.getLogger("imessage-connector")
 
 
 # ---------------------------------------------------------------------------
@@ -77,7 +77,7 @@ log = logging.getLogger("imessage-bridge")
 
 
 def normalize_handle(raw: str) -> str:
-    """手机号去掉空格横线,11 位国内号补 +86;邮箱转小写。"""
+    """手机号去掉空格横线,11 位国内号补 +86;邮箱转小写(与 daemon 同一口径)。"""
     value = raw.strip()
     if "@" in value:
         return value.lower()
@@ -94,60 +94,28 @@ def mask_handle(handle: str) -> str:
     return handle[:4] + "****" + handle[-4:] if len(handle) > 8 else "****"
 
 
-@dataclass
-class Config:
-    enabled: bool
-    handle_to_contact: dict  # 规范化 handle → 联系人名
-    gqy_bin: str
-    tools: list
-    poll_seconds: float
-    batch_wait_seconds: float
-    timeout_seconds: int
-    max_backlog_minutes: int
-    split_paragraphs: bool
-    max_bubbles: int
-    bubble_pause_seconds: float
-    max_memes: int
-
-
-def load_config() -> Config:
+def load_config() -> dict:
     data = dict(DEFAULT_CONFIG)
     try:
         with open(CONFIG_PATH, encoding="utf-8") as f:
             data.update(json.load(f))
     except FileNotFoundError:
-        log.warning("config not found: %s (bridge stays disabled)", CONFIG_PATH)
-    handle_to_contact = {}
-    for contact in data.get("contacts", []):
-        name = str(contact.get("name", "")).strip()
-        if not name:
-            continue
-        for handle in contact.get("handles", []):
-            handle_to_contact[normalize_handle(handle)] = name
-    return Config(
-        enabled=bool(data["enabled"]),
-        handle_to_contact=handle_to_contact,
-        gqy_bin=os.path.expanduser(data["gqy_bin"]),
-        tools=list(data["tools"]),
-        poll_seconds=max(0.5, float(data["poll_seconds"])),
-        batch_wait_seconds=max(0.0, float(data["batch_wait_seconds"])),
-        timeout_seconds=int(data["timeout_seconds"]),
-        max_backlog_minutes=int(data["max_backlog_minutes"]),
-        split_paragraphs=bool(data["split_paragraphs"]),
-        max_bubbles=max(1, int(data["max_bubbles"])),
-        bubble_pause_seconds=max(0.0, float(data["bubble_pause_seconds"])),
-        max_memes=max(0, int(data["max_memes"])),
-    )
+        log.warning("config not found: %s (connector stays disabled)", CONFIG_PATH)
+    data["enabled"] = bool(data["enabled"])
+    data["url"] = str(data["url"]).strip()
+    data["token"] = str(data["token"]).strip()
+    data["poll_seconds"] = max(0.5, float(data["poll_seconds"]))
+    data["max_backlog_minutes"] = int(data["max_backlog_minutes"])
+    return data
 
 
 class ConfigWatcher:
     """每次取用时按 mtime 判断要不要重读,改完配置即生效。"""
 
     def __init__(self) -> None:
-        self._mtime = None
+        self._lock = threading.Lock()
         self._config = load_config()
         self._mtime = self._stat()
-        self._lock = threading.Lock()
 
     @staticmethod
     def _stat():
@@ -156,17 +124,13 @@ class ConfigWatcher:
         except OSError:
             return None
 
-    def get(self) -> Config:
+    def get(self) -> dict:
         with self._lock:
             mtime = self._stat()
             if mtime != self._mtime:
                 try:
                     self._config = load_config()
-                    log.info(
-                        "config reloaded: enabled=%s contacts=%d",
-                        self._config.enabled,
-                        len(set(self._config.handle_to_contact.values())),
-                    )
+                    log.info("config reloaded: enabled=%s", self._config["enabled"])
                 except (ValueError, KeyError, TypeError) as error:
                     log.error("config invalid, keeping previous: %s", error)
                 self._mtime = mtime
@@ -174,15 +138,14 @@ class ConfigWatcher:
 
 
 # ---------------------------------------------------------------------------
-# 状态:已处理完的 ROWID 水位
+# 水位:daemon 确认过的 ROWID 才算处理完
 # ---------------------------------------------------------------------------
 
 
 class Watermark:
-    """poller 读到哪里(seen)与真正处理完到哪里(durable)分开记。
+    """poller 读到哪里(seen)与 daemon 确认到哪里(durable)分开记。
 
-    落盘的是 durable:回合还没跑完的消息不算处理完,进程中途退出后重启会
-    重新处理它们,不会悄悄丢掉。
+    落盘的是 durable:没收到 ack 的消息不算处理完,重启后会重新读到、重新发。
     """
 
     def __init__(self, initial: int) -> None:
@@ -195,9 +158,9 @@ class Watermark:
         with self._lock:
             self._pending.add(rowid)
 
-    def release(self, rowids) -> None:
+    def release(self, rowid: int) -> None:
         with self._lock:
-            self._pending.difference_update(rowids)
+            self._pending.discard(rowid)
         self.flush()
 
     def flush(self) -> None:
@@ -232,17 +195,6 @@ def save_state(state: dict) -> None:
 # ---------------------------------------------------------------------------
 # chat.db 读取
 # ---------------------------------------------------------------------------
-
-
-@dataclass
-class Inbound:
-    rowid: int
-    handle: str
-    text: str
-    date_unix: float
-    attachments: list = field(default_factory=list)  # [(path, mime, name)]
-    reaction: str = ""  # 非空 = 这是一条点按回应,只作下一轮的上下文,不触发回复
-    quote: str = ""  # 对方长按某条消息回复时,被回复那条的摘要
 
 
 def open_chat_db() -> sqlite3.Connection:
@@ -310,8 +262,8 @@ WHERE maj.message_id = ?
 """
 
 
-def message_snippet(conn: sqlite3.Connection, guid: str, limit: int = 60):
-    """按 guid 取一条消息的 (摘要, 是否她发的)。取不到返回 None。"""
+def message_quote(conn: sqlite3.Connection, guid: str):
+    """按 guid 取一条消息,返回协议里的 Quote(id/text/from_me)。取不到返回 None。"""
     if not guid:
         return None
     row = conn.execute(
@@ -320,25 +272,15 @@ def message_snippet(conn: sqlite3.Connection, guid: str, limit: int = 60):
     ).fetchone()
     if row is None:
         return None
-    text = (row["text"] or decode_attributed_body(row["attributedBody"])).replace("\ufffc", "")
+    text = (row["text"] or decode_attributed_body(row["attributedBody"])).replace("￼", "")
     text = " ".join(text.split())
-    if not text:
-        text = "[image]" if row["cache_has_attachments"] else ""
-    if len(text) > limit:
-        text = text[:limit] + "…"
-    return text, bool(row["is_from_me"])
+    if not text and row["cache_has_attachments"]:
+        text = "[image]"
+    return {"id": guid, "text": text, "from_me": bool(row["is_from_me"])}
 
 
-def quoted_text(conn: sqlite3.Connection, guid) -> str:
-    found = message_snippet(conn, guid)
-    if not found or not found[0]:
-        return ""
-    text, from_me = found
-    return f'[replying to {"your" if from_me else "their own"} message: "{text}"]'
-
-
-def tapback_note(conn: sqlite3.Connection, row) -> str:
-    """点按回应 → 一行上下文。目标 guid 形如 p:0/GUID 或 bp:GUID。"""
+def tapback(conn: sqlite3.Connection, row):
+    """点按回应 → (表情, 被点的那条)。目标 guid 形如 p:0/GUID 或 bp:GUID。"""
     kind = int(row["associated_message_type"])
     emoji = TAPBACKS.get(kind, "")
     if kind == TAPBACK_CUSTOM:
@@ -350,22 +292,75 @@ def tapback_note(conn: sqlite3.Connection, row) -> str:
         except sqlite3.Error:
             emoji = ""
     if not emoji:
-        return ""
+        return None
     target = (row["associated_message_guid"] or "").split("/")[-1]
     if target.startswith("bp:"):
         target = target[3:]
-    found = message_snippet(conn, target)
-    if not found:
-        return f"[reacted {emoji} to a message]"
-    text, from_me = found
-    return f'[reacted {emoji} to {"your" if from_me else "their own"} message: "{text}"]'
+    return emoji, message_quote(conn, target)
+
+
+def wait_for_file(path: str, seconds: float = 20) -> bool:
+    """附件行先落库、文件后下载完,等一会儿。"""
+    deadline = time.time() + seconds
+    while time.time() < deadline:
+        if os.path.exists(path) and os.path.getsize(path) > 0:
+            return True
+        time.sleep(1)
+    return os.path.exists(path)
+
+
+IMAGE_EXTENSIONS = (".jpg", ".jpeg", ".png", ".gif", ".webp")
+
+
+def read_image(path: str, mime: str):
+    """图片 → (mime, bytes)。HEIC 等先用 sips 转成 JPEG。不是图片返回 None。"""
+    lower = path.lower()
+    if not (mime.startswith("image/") or lower.endswith(IMAGE_EXTENSIONS + (".heic", ".heif"))):
+        return None
+    if lower.endswith(IMAGE_EXTENSIONS):
+        with open(path, "rb") as f:
+            data = f.read(MAX_ATTACHMENT_BYTES + 1)
+        return (mime or "image/jpeg"), data
+    with tempfile.TemporaryDirectory() as workdir:
+        out = os.path.join(workdir, "converted.jpg")
+        result = subprocess.run(
+            ["/usr/bin/sips", "-s", "format", "jpeg", path, "--out", out],
+            capture_output=True,
+            text=True,
+            timeout=60,
+        )
+        if result.returncode != 0:
+            raise RuntimeError("sips conversion failed")
+        with open(out, "rb") as f:
+            return "image/jpeg", f.read(MAX_ATTACHMENT_BYTES + 1)
+
+
+def attachment_entry(path: str, mime: str, name: str) -> dict:
+    """一个附件 → 协议里的 attachment。只有图片带内容,语音和文件 daemon 只要名字。"""
+    lower = path.lower()
+    if mime.startswith("audio/") or lower.endswith((".m4a", ".caf", ".mp3", ".wav", ".aac", ".ogg")):
+        return {"kind": "audio", "name": name, "mime": mime}
+    entry = {"kind": "image", "name": name, "mime": mime}
+    try:
+        if not wait_for_file(path):
+            raise RuntimeError("attachment not downloaded")
+        image = read_image(path, mime)
+        if image is None:
+            return {"kind": "file", "name": name, "mime": mime}
+        entry["mime"], data = image
+        if len(data) > MAX_ATTACHMENT_BYTES:
+            raise RuntimeError("image too large")
+        entry["data"] = base64.b64encode(data).decode("ascii")
+    except (OSError, RuntimeError, subprocess.SubprocessError) as error:
+        entry["error"] = str(error)
+    return entry
 
 
 def fetch_new(conn: sqlite3.Connection, after: int):
-    """返回 (新水位, 需要处理的入站消息列表)。其余行只推进水位。"""
+    """返回 (新水位, [(rowid, 事件帧)])。群聊、自己发的、非正文行只推进水位。"""
     rows = conn.execute(NEW_MESSAGES_SQL, (after,)).fetchall()
     top = after
-    inbound = []
+    events = []
     seen = set()
     for row in rows:
         rowid = int(row["rowid"])
@@ -374,17 +369,22 @@ def fetch_new(conn: sqlite3.Connection, after: int):
         if rowid in seen:
             continue
         seen.add(rowid)
-        if row["is_from_me"] or not row["handle"]:
+        if row["is_from_me"] or not row["handle"] or row["chat_style"] == CHAT_STYLE_GROUP:
             continue
-        if row["chat_style"] == CHAT_STYLE_GROUP:
-            continue
+        handle = normalize_handle(row["handle"])
+        base = {
+            "type": "event",
+            "id": str(rowid),
+            "conversation": {"kind": "private", "id": handle},
+            "sender": {"id": handle},
+        }
         kind = int(row["associated_message_type"] or 0)
         if kind:
-            # 加点按回应记成下一轮的上下文;撤回回应、贴纸等其余关联消息跳过
-            reaction = tapback_note(conn, row) if 2000 <= kind <= TAPBACK_CUSTOM else ""
-            if reaction:
-                inbound.append(Inbound(rowid=rowid, handle=normalize_handle(row["handle"]),
-                                       text="", date_unix=0, reaction=reaction))
+            # 加点按回应报上去;撤回回应、贴纸等其余关联消息跳过
+            found = tapback(conn, row) if 2000 <= kind <= TAPBACK_CUSTOM else None
+            if found:
+                emoji, target = found
+                events.append((rowid, dict(base, kind="reaction", reaction=emoji, target=target)))
             continue
         # 群事件等不是正文消息
         if row["item_type"]:
@@ -396,29 +396,25 @@ def fetch_new(conn: sqlite3.Connection, after: int):
         if row["cache_has_attachments"]:
             for a in conn.execute(ATTACHMENTS_SQL, (rowid,)).fetchall():
                 if a["filename"]:
-                    attachments.append(
-                        (
-                            os.path.expanduser(a["filename"]),
-                            a["mime_type"] or "",
-                            a["transfer_name"] or os.path.basename(a["filename"]),
-                        )
-                    )
+                    path = os.path.expanduser(a["filename"])
+                    name = a["transfer_name"] or os.path.basename(path)
+                    attachments.append(attachment_entry(path, a["mime_type"] or "", name))
         if not text and not attachments:
             continue
-        quote = quoted_text(conn, row["thread_originator_guid"])
         date = row["date"] or 0
         seconds = date / 1e9 if date > 1e12 else date
-        inbound.append(
-            Inbound(
-                rowid=rowid,
-                handle=normalize_handle(row["handle"]),
-                text=text,
-                date_unix=seconds + APPLE_EPOCH,
-                attachments=attachments,
-                quote=quote,
-            )
+        event = dict(
+            base,
+            kind="message",
+            text=text,
+            attachments=attachments,
+            timestamp=int(seconds + APPLE_EPOCH),
         )
-    return top, inbound
+        quote = message_quote(conn, row["thread_originator_guid"])
+        if quote:
+            event["reply_to"] = quote
+        events.append((rowid, event))
+    return top, events
 
 
 # ---------------------------------------------------------------------------
@@ -436,26 +432,6 @@ on run argv
 end run
 """
 
-
-def osascript_error(result) -> str:
-    """只保留 AppleScript 错误码,不把 stderr 原文(可能含消息正文)写进日志。"""
-    codes = re.findall(r"\((-?\d+)\)", result.stderr or "")
-    return f"osascript exit {result.returncode}, code {codes[-1] if codes else 'unknown'}"
-
-
-def send_text(handle: str, text: str) -> None:
-    # 正文走 argv,不拼进脚本源码,无需转义
-    result = subprocess.run(
-        ["/usr/bin/osascript", "-", text, handle],
-        input=SEND_TEXT_SCRIPT,
-        capture_output=True,
-        text=True,
-        timeout=30,
-    )
-    if result.returncode != 0:
-        raise RuntimeError(osascript_error(result))
-
-
 SEND_FILE_SCRIPT = """
 on run argv
     set filePath to item 1 of argv
@@ -467,7 +443,6 @@ on run argv
 end run
 """
 
-
 # macOS 15+ 的 Messages 受沙盒限制,只能读少数目录里的文件。放错位置时 osascript
 # 照样返回成功,附件却发不出去。本机(macOS 27)实测:
 # - ~/Pictures/...:Messages 读不到,消息里没有附件
@@ -477,22 +452,27 @@ end run
 OUTBOX_DIR = os.path.join(HOME, "Library", "Messages", ".gqy-send-staging")
 
 
-def stage_for_messages(path: str) -> str:
-    """复制到 Messages 读得到的暂存目录再发(见 OUTBOX_DIR)。"""
-    import shutil
-    import uuid
+def osascript_error(result) -> str:
+    """只保留 AppleScript 错误码,不把 stderr 原文(可能含消息正文)写进日志。"""
+    codes = re.findall(r"\((-?\d+)\)", result.stderr or "")
+    return f"osascript exit {result.returncode}, code {codes[-1] if codes else 'unknown'}"
 
-    target_dir = os.path.join(OUTBOX_DIR, uuid.uuid4().hex)
-    os.makedirs(target_dir, exist_ok=True)
-    target = os.path.join(target_dir, os.path.basename(path))
-    shutil.copyfile(path, target)
-    return target
+
+def run_osascript(script: str, first: str, handle: str, timeout: int) -> None:
+    # 正文和路径走 argv,不拼进脚本源码,无需转义
+    result = subprocess.run(
+        ["/usr/bin/osascript", "-", first, handle],
+        input=script,
+        capture_output=True,
+        text=True,
+        timeout=timeout,
+    )
+    if result.returncode != 0:
+        raise RuntimeError(osascript_error(result))
 
 
 def cleanup_outbox(max_age_seconds: float = 3600) -> None:
     """删掉一小时前的暂存副本。Messages 发送时已经把文件另存进自己的附件库。"""
-    import shutil
-
     try:
         entries = os.listdir(OUTBOX_DIR)
     except OSError:
@@ -507,25 +487,51 @@ def cleanup_outbox(max_age_seconds: float = 3600) -> None:
             continue
 
 
-def send_file(handle: str, path: str) -> None:
+def safe_file_name(name: str, fallback: str) -> str:
+    name = os.path.basename(name or "").strip().lstrip(".")
+    name = re.sub(r"[^\w.\-]+", "_", name)
+    return name[:80] or fallback
+
+
+def stage_attachment(part: dict) -> str:
+    """把 daemon 发来的附件写进 Messages 读得到的暂存目录(见 OUTBOX_DIR)。
+
+    语音转成 Apple 原生的 caf(opus),手机上能直接播;转不了就发原文件。
+    """
     cleanup_outbox()
-    staged = stage_for_messages(path)
-    result = subprocess.run(
-        ["/usr/bin/osascript", "-", staged, handle],
-        input=SEND_FILE_SCRIPT,
-        capture_output=True,
-        text=True,
-        timeout=60,
-    )
-    if result.returncode != 0:
-        raise RuntimeError(osascript_error(result))
+    data = base64.b64decode(part.get("data", ""), validate=True)
+    if len(data) > MAX_ATTACHMENT_BYTES:
+        raise RuntimeError("attachment too large")
+    target_dir = os.path.join(OUTBOX_DIR, uuid.uuid4().hex)
+    os.makedirs(target_dir, exist_ok=True)
+    kind = part.get("kind")
+    target = os.path.join(target_dir, safe_file_name(part.get("name", ""), kind or "attachment"))
+    with open(target, "wb") as f:
+        f.write(data)
+    if kind == "audio" and not target.lower().endswith((".caf", ".m4a")):
+        converted = os.path.splitext(target)[0] + ".caf"
+        result = subprocess.run(
+            ["/usr/bin/afconvert", "-f", "caff", "-d", "opus", target, converted],
+            capture_output=True,
+            timeout=30,
+        )
+        if result.returncode == 0 and os.path.exists(converted) and os.path.getsize(converted) > 0:
+            os.unlink(target)
+            return converted
+    return target
+
+
+def send_part(to: str, part: dict) -> None:
+    if part.get("kind") == "text":
+        run_osascript(SEND_TEXT_SCRIPT, part.get("text", ""), to, 30)
+    else:
+        run_osascript(SEND_FILE_SCRIPT, stage_attachment(part), to, 60)
 
 
 DELIVERY_SQL = """
 SELECT m.ROWID AS rowid, m.error, m.is_sent, m.is_delivered, m.cache_has_attachments,
-       h.id AS handle, a.transfer_state, a.total_bytes, a.mime_type
+       a.transfer_state
 FROM message m
-LEFT JOIN handle h ON h.ROWID = m.handle_id
 LEFT JOIN message_attachment_join maj ON maj.message_id = m.ROWID
 LEFT JOIN attachment a ON a.ROWID = maj.attachment_id
 WHERE m.ROWID > ? AND m.is_from_me = 1
@@ -533,11 +539,8 @@ ORDER BY m.ROWID
 """
 
 
-def check_delivery(handle: str, before_rowid: int, expected: int, wait_seconds: float = 30) -> None:
-    """osascript 成功不代表送达。回查 chat.db 里新写入的己方消息。
-
-    等到条数够了(或超时)再逐条记录状态,附件带上传输状态,便于排查。
-    """
+def check_delivery(handle: str, before_rowid: int, wait_seconds: float = 30) -> None:
+    """osascript 成功不代表送达:回查 chat.db 里新写入的己方消息,只记日志。"""
     deadline = time.time() + wait_seconds
     rows = []
     while time.time() < deadline:
@@ -551,683 +554,284 @@ def check_delivery(handle: str, before_rowid: int, expected: int, wait_seconds: 
         except sqlite3.Error as error:
             log.warning("delivery check failed: %s", error)
             return
-        # 送达回执通常 1~4 秒内回来,附件消息会慢一点;等到都有结果再记日志
-        settled = all(r["is_delivered"] or r["error"] for r in rows)
-        if len(rows) >= expected and settled:
+        if rows and all(r["is_delivered"] or r["error"] for r in rows):
             break
-    if len(rows) < expected:
-        log.warning(
-            "only %d of %d sent messages to %s appeared in chat.db",
-            len(rows),
-            expected,
-            mask_handle(handle),
-        )
+    if not rows:
+        log.warning("sent message to %s did not appear in chat.db", mask_handle(handle))
     for r in rows:
         level = logging.ERROR if r["error"] else logging.INFO
         log.log(
             level,
-            "sent rowid=%s error=%s is_sent=%s delivered=%s attachment=%s "
-            "transfer_state=%s bytes=%s mime=%s handle=%s",
+            "sent rowid=%s error=%s is_sent=%s delivered=%s attachment=%s transfer_state=%s",
             r["rowid"],
             r["error"],
             r["is_sent"],
             r["is_delivered"],
             r["cache_has_attachments"],
             r["transfer_state"],
-            r["total_bytes"],
-            r["mime_type"],
-            mask_handle(normalize_handle(r["handle"])) if r["handle"] else None,
         )
 
 
 # ---------------------------------------------------------------------------
-# 文本整形
+# WebSocket 客户端(RFC 6455 的最小子集:文本帧、分片、ping/pong、close)
 # ---------------------------------------------------------------------------
 
-LINK_RE = re.compile(r"\[([^\]]+)\]\(([^)\s]+)\)")
+
+def apply_mask(payload: bytes, mask: bytes) -> bytes:
+    """按 RFC 6455 异或掩码。整块做大整数异或,几十 MB 的图也不会逐字节慢慢算。"""
+    if not payload:
+        return payload
+    size = len(payload)
+    key = (mask * (size // 4 + 1))[:size]
+    return (int.from_bytes(payload, "big") ^ int.from_bytes(key, "big")).to_bytes(size, "big")
 
 
-SPEAK_RE = re.compile(r"<voice>(.*?)</voice>|<speak>(.*?)</speak>", re.DOTALL | re.IGNORECASE)
+class ConnectionClosed(Exception):
+    pass
 
 
-def synthesize_voice(text: str, workdir: str = None):
-    """把文本合成为 macOS 原生兼容的语音音频文件（.caf / .m4a），优先走 MiniMax / MiMo TTS。"""
-    import shutil
-    import urllib.request
-    clean = text.strip()
-    if not clean:
-        return None
-    cache_dir = os.path.join(HOME, ".gqy", "cache", "voice")
-    os.makedirs(cache_dir, exist_ok=True)
-    temp_dir = tempfile.gettempdir()
-    ts = int(time.time() * 1000)
-    dest_dir = workdir or cache_dir
-    os.makedirs(dest_dir, exist_ok=True)
-    dest_path = os.path.join(dest_dir, f"voice-{ts}.caf")
+class HandshakeRejected(Exception):
+    pass
 
-    # 1. 尝试从 config.jsonc 读取 TTS 配置 (MiniMax 优先)
-    try:
-        if os.path.exists(GQY_CONFIG_PATH):
-            with open(GQY_CONFIG_PATH, encoding="utf-8") as f:
-                raw_cfg = json.loads(strip_jsonc(f.read()), strict=False)
-            tts_cfg = raw_cfg.get("ui", {}).get("tts", {})
-            if tts_cfg.get("enabled"):
-                minimax_cfg = tts_cfg.get("minimax", {})
-                api_key = minimax_cfg.get("api_key", "").strip()
-                if api_key.startswith("$env:"):
-                    api_key = os.environ.get(api_key[5:], "").strip()
-                if api_key:
-                    base_url = (minimax_cfg.get("base_url") or "https://api.minimaxi.com/v1").rstrip("/")
-                    url = f"{base_url}/t2a_v2"
-                    voice_setting = {
-                        "voice_id": minimax_cfg.get("voice_id", "female-shaonv"),
-                        "speed": float(minimax_cfg.get("speed", 1.0)),
-                        "vol": float(minimax_cfg.get("vol", 1.0)),
-                        "pitch": int(minimax_cfg.get("pitch", 0)),
-                    }
-                    if minimax_cfg.get("emotion"):
-                        voice_setting["emotion"] = minimax_cfg.get("emotion")
-                    payload = {
-                        "model": minimax_cfg.get("model", "speech-2.6-turbo"),
-                        "text": clean,
-                        "stream": False,
-                        "output_format": "hex",
-                        "language_boost": minimax_cfg.get("language_boost", "auto"),
-                        "voice_setting": voice_setting,
-                        "audio_setting": {"sample_rate": 24000, "format": "wav", "channel": 1},
-                    }
-                    req = urllib.request.Request(
-                        url,
-                        data=json.dumps(payload).encode("utf-8"),
-                        headers={
-                            "Authorization": f"Bearer {api_key}",
-                            "Content-Type": "application/json",
-                        },
-                        method="POST",
-                    )
-                    with urllib.request.urlopen(req, timeout=30) as resp:
-                        res_data = json.loads(resp.read().decode("utf-8"))
-                        status_code = res_data.get("base_resp", {}).get("status_code", -1)
-                        if status_code == 0 and res_data.get("data", {}).get("audio"):
-                            raw_hex = res_data["data"]["audio"].strip()
-                            wav_bytes = bytes.fromhex(raw_hex)
-                            temp_wav = os.path.join(temp_dir, f"voice-{ts}.wav")
-                            with open(temp_wav, "wb") as wf:
-                                wf.write(wav_bytes)
-                            # 使用 afconvert 将 wav 转为 Apple 原生兼容的 opus/alac caf
-                            conv = subprocess.run(
-                                ["/usr/bin/afconvert", "-f", "caff", "-d", "opus", temp_wav, dest_path],
-                                capture_output=True,
-                                timeout=15,
-                            )
-                            try:
-                                os.unlink(temp_wav)
-                            except OSError:
-                                pass
-                            if conv.returncode == 0 and os.path.exists(dest_path) and os.path.getsize(dest_path) > 0:
-                                log.info("MiniMax TTS audio synthesized successfully: %s", dest_path)
-                                return dest_path
-                            # 若 afconvert 失败，直接把 wav 改名存过去
-                            dest_wav = os.path.join(dest_dir, f"voice-{ts}.wav")
-                            with open(dest_wav, "wb") as wf:
-                                wf.write(wav_bytes)
-                            return dest_wav
-                        log.warning("MiniMax TTS returned error: %s", res_data)
-    except Exception as e:
-        log.warning("MiniMax TTS request failed: %s, falling back to local say", e)
 
-    # 2. 本地 say 兜底
-    temp_caf = os.path.join(temp_dir, f"voice-{ts}.caf")
-    try:
-        res = subprocess.run(
-            ["/usr/bin/say", "-v", "Tingting", clean, "-o", temp_caf],
-            capture_output=True,
-            text=True,
-            timeout=30,
+class WebSocket:
+    def __init__(self, url: str, token: str, timeout: float = 10) -> None:
+        parts = urlsplit(url)
+        if parts.scheme != "ws":
+            raise ValueError("only ws:// URLs are supported")
+        host = parts.hostname or "127.0.0.1"
+        port = parts.port or 80
+        path = (parts.path or "/") + (f"?{parts.query}" if parts.query else "")
+        self.sock = socket.create_connection((host, port), timeout=timeout)
+        self._send_lock = threading.Lock()
+        key = base64.b64encode(os.urandom(16)).decode("ascii")
+        request = (
+            f"GET {path} HTTP/1.1\r\n"
+            f"Host: {host}:{port}\r\n"
+            "Upgrade: websocket\r\n"
+            "Connection: Upgrade\r\n"
+            f"Sec-WebSocket-Key: {key}\r\n"
+            "Sec-WebSocket-Version: 13\r\n"
+            f"Authorization: Bearer {token}\r\n\r\n"
         )
-        if res.returncode == 0 and os.path.exists(temp_caf) and os.path.getsize(temp_caf) > 0:
-            if temp_caf != dest_path:
-                shutil.copyfile(temp_caf, dest_path)
-                try:
-                    os.unlink(temp_caf)
-                except OSError:
-                    pass
-            return dest_path
-        log.warning("say synthesis failed: code=%d stderr=%s", res.returncode, res.stderr.strip() if res.stderr else "")
-    except Exception as e:
-        log.warning("local voice synthesis failed: %s", e)
-    return None
+        self.sock.sendall(request.encode("utf-8"))
+        response = b""
+        while b"\r\n\r\n" not in response:
+            chunk = self.sock.recv(4096)
+            if not chunk:
+                raise ConnectionClosed("closed during handshake")
+            response += chunk
+            if len(response) > 65536:
+                raise HandshakeRejected("oversized handshake response")
+        head, _, self._buffer = response.partition(b"\r\n\r\n")
+        status = head.split(b"\r\n", 1)[0].decode("latin-1")
+        if " 101 " not in status + " ":
+            raise HandshakeRejected(status)
+        # daemon 30 秒发一次 ping:超过 95 秒什么都没收到,当它没了,重连
+        self.sock.settimeout(95)
 
+    def _read_exact(self, count: int) -> bytes:
+        while len(self._buffer) < count:
+            chunk = self.sock.recv(max(65536, count - len(self._buffer)))
+            if not chunk:
+                raise ConnectionClosed("connection closed")
+            self._buffer += chunk
+        data, self._buffer = self._buffer[:count], self._buffer[count:]
+        return data
 
-def markdown_to_plain(text: str) -> tuple:
-    """与 src/platforms/reply.rs 同一口径，返回 (纯文本, 提取出的要念的语音文本)。"""
-    voice_snippets = []
-    def _extract_voice(match):
-        val = match.group(1) or match.group(2) or ""
-        if val.strip():
-            voice_snippets.append(val.strip())
-        return ""
-        
-    raw_text = SPEAK_RE.sub(_extract_voice, text)
-    out = []
-    in_fence = False
-    for line in raw_text.splitlines():
-        stripped = line.lstrip()
-        if stripped.startswith("```") or stripped.startswith("~~~"):
-            in_fence = not in_fence
-            continue
-        if in_fence:
-            out.append(line)
-            continue
-        if stripped.startswith("#"):
-            line = stripped.lstrip("#").lstrip()
-        elif stripped.startswith("> "):
-            line = stripped[2:]
-        line = LINK_RE.sub(r"\1 (\2)", line)
-        for token in ("**", "__", "~~", "`"):
-            line = line.replace(token, "")
-        out.append(line)
-    return "\n".join(out).strip(), "\n".join(voice_snippets).strip()
+    def _send_frame(self, opcode: int, payload: bytes) -> None:
+        header = bytearray([0x80 | opcode])
+        length = len(payload)
+        if length < 126:
+            header.append(0x80 | length)
+        elif length < 65536:
+            header.append(0x80 | 126)
+            header += length.to_bytes(2, "big")
+        else:
+            header.append(0x80 | 127)
+            header += length.to_bytes(8, "big")
+        mask = os.urandom(4)
+        with self._send_lock:
+            self.sock.sendall(bytes(header) + mask + apply_mask(payload, mask))
 
+    def send_text(self, text: str) -> None:
+        self._send_frame(0x1, text.encode("utf-8"))
 
-def split_bubbles(text: str, max_bubbles: int) -> list:
-    """按空行拆成气泡。段落多于上限时，把相邻段落按长度均衡地并成 max_bubbles 条，
-    让最长的一条尽量短。以前是多出来的全塞进最后一条，实测一半回合超过上限，
-    最后一条中位 175 字、最长 646 字。"""
-    parts = [p.strip() for p in re.split(r"\n\s*\n", text) if p.strip()]
-    if len(parts) <= max_bubbles:
-        return parts
-    return ["\n\n".join(group) for group in balanced_groups(parts, max_bubbles)]
-
-
-def balanced_groups(parts: list, count: int) -> list:
-    """把 parts 按原顺序切成 count 段连续分组，使字数最多的一组尽量少（线性划分 DP）。"""
-    n = len(parts)
-    prefix = [0]
-    for part in parts:
-        prefix.append(prefix[-1] + len(part))
-
-    def span(i: int, j: int) -> int:  # parts[i:j] 合成一条的字数，含段间的两个换行
-        return prefix[j] - prefix[i] + 2 * (j - i - 1)
-
-    # best[k][j]：前 j 段分成 k 组时最长一组的最小字数；cut 记下最后一组的起点
-    inf = float("inf")
-    best = [[inf] * (n + 1) for _ in range(count + 1)]
-    cut = [[0] * (n + 1) for _ in range(count + 1)]
-    best[0][0] = 0
-    for k in range(1, count + 1):
-        for j in range(k, n + 1):
-            for i in range(k - 1, j):
-                cost = max(best[k - 1][i], span(i, j))
-                if cost < best[k][j]:
-                    best[k][j], cut[k][j] = cost, i
-    groups, j = [], n
-    for k in range(count, 0, -1):
-        i = cut[k][j]
-        groups.append(parts[i:j])
-        j = i
-    return groups[::-1]
-
-
-def bubble_pause(text: str, ceiling: float) -> float:
-    """发下一条前停一下，像在打字：越长停得越久，不超过 ceiling；0 表示不停。"""
-    if ceiling <= 0:
-        return 0.0
-    return min(ceiling, 0.5 + len(text) / 100)
-
-
-# ---------------------------------------------------------------------------
-# 回合
-# ---------------------------------------------------------------------------
-
-
-def prepare_image(path: str, mime: str, workdir: str):
-    """HEIC 等转成 JPEG,其余图片复制到 workdir 避免子进程遇到 FDA 权限拦截。"""
-    lower = path.lower()
-    if not (mime.startswith("image/") or lower.endswith((".heic", ".heif", ".jpg", ".jpeg", ".png", ".gif", ".webp"))):
-        return None
-    if lower.endswith((".jpg", ".jpeg", ".png", ".gif", ".webp")):
-        out = os.path.join(workdir, os.path.basename(path))
-        try:
-            import shutil
-            shutil.copyfile(path, out)
-            return out
-        except OSError:
-            return None
-    out = os.path.join(workdir, os.path.basename(path) + ".jpg")
-    result = subprocess.run(
-        ["/usr/bin/sips", "-s", "format", "jpeg", path, "--out", out],
-        capture_output=True,
-        text=True,
-        timeout=60,
-    )
-    return out if result.returncode == 0 else None
-
-
-def prepare_media(path: str, mime: str, workdir: str) -> tuple:
-    """分类提取附件：(图片路径, 音频或媒体描述文本)。"""
-    lower = path.lower()
-    # 1. 尝试作为图像处理
-    img = prepare_image(path, mime, workdir)
-    if img:
-        return img, None
-    # 2. 尝试作为音频/语音备忘录处理
-    if mime.startswith("audio/") or lower.endswith((".m4a", ".caf", ".mp3", ".wav", ".aac", ".ogg")):
-        out = os.path.join(workdir, os.path.basename(path))
-        try:
-            import shutil
-            shutil.copyfile(path, out)
-            return None, f"[voice/audio message attached at: {out}]"
-        except OSError:
-            return None, f"[audio attachment: {os.path.basename(path)}]"
-    return None, None
-
-
-def wait_for_file(path: str, seconds: float = 20) -> bool:
-    """附件行先落库、文件后下载完,等一会儿。"""
-    deadline = time.time() + seconds
-    while time.time() < deadline:
-        if os.path.exists(path) and os.path.getsize(path) > 0:
-            return True
-        time.sleep(1)
-    return os.path.exists(path)
-
-
-MEME_ROOT = os.path.join(HOME, ".gqy", "data", "memes")
-MEME_SENT_RE = re.compile(r"sent meme ([0-9a-f]{4,64})")
-MAX_MEME_BYTES = 20 * 1024 * 1024
-
-
-def resolve_meme(short_id: str):
-    """按短 id 在本机表情包库里找图片文件。
-
-    只认 MEME_ROOT 下各库 index.json 登记过的文件,且真实路径必须仍在该库
-    目录内,防止 index 里的 `file` 字段被写成库外路径。匹配不唯一时放弃。
-    """
-    matches = []
-    try:
-        libraries = os.listdir(MEME_ROOT)
-    except OSError:
-        return None
-    for library in libraries:
-        lib_dir = os.path.realpath(os.path.join(MEME_ROOT, library))
-        try:
-            with open(os.path.join(lib_dir, "index.json"), encoding="utf-8") as f:
-                items = json.load(f).get("memes", [])
-        except (OSError, ValueError, AttributeError):
-            continue
-        for item in items:
-            digest = str(item.get("id", "")).split(":")[-1]
-            if digest.startswith(short_id) and item.get("file"):
-                path = safe_library_file(lib_dir, item["file"])
-                if path:
-                    matches.append(path)
-    matches = list(dict.fromkeys(matches))
-    return matches[0] if len(matches) == 1 else None
-
-
-ALBUM_GLOB_ROOT = os.path.join(HOME, ".gqy", "home")
-ALBUM_SENT_RE = re.compile(r"^sent .* \(id ([0-9A-Za-z_-]{4,64})\)\s*$", re.S)
-IMAGE_MAGIC = (
-    b"\xff\xd8\xff",  # JPEG
-    b"\x89PNG\r\n\x1a\n",
-    b"GIF87a",
-    b"GIF89a",
-)
-
-
-def is_image_file(path: str) -> bool:
-    """按文件头判断是不是图片,不信扩展名。"""
-    try:
-        with open(path, "rb") as f:
-            head = f.read(16)
-    except OSError:
-        return False
-    if head.startswith(IMAGE_MAGIC):
-        return True
-    if head[:4] == b"RIFF" and head[8:12] == b"WEBP":
-        return True
-    # HEIC/HEIF:ftyp 盒子
-    return head[4:8] == b"ftyp" and head[8:12] in (b"heic", b"heix", b"mif1", b"msf1")
-
-
-def safe_library_file(lib_dir: str, relative: str):
-    """库内相对路径 → 真实路径。必须仍在库目录内、是图片、不超过上限。"""
-    lib_dir = os.path.realpath(lib_dir)
-    path = os.path.realpath(os.path.join(lib_dir, relative))
-    if not path.startswith(lib_dir + os.sep):
-        return None
-    if not os.path.isfile(path) or os.path.getsize(path) > MAX_MEME_BYTES:
-        return None
-    return path if is_image_file(path) else None
-
-
-def resolve_album(entry_id: str):
-    """按 id 在本机各人格图库里找图片。匹配不唯一时放弃。"""
-    matches = []
-    try:
-        homes = os.listdir(ALBUM_GLOB_ROOT)
-    except OSError:
-        return None
-    for home in homes:
-        album_root = os.path.join(ALBUM_GLOB_ROOT, home, "pictures", "album")
-        try:
-            scopes = os.listdir(album_root)
-        except OSError:
-            continue
-        for scope in scopes:
-            lib_dir = os.path.join(album_root, scope)
-            try:
-                with open(os.path.join(lib_dir, "index.json"), encoding="utf-8") as f:
-                    entries = json.load(f)
-            except (OSError, ValueError):
+    def recv_text(self) -> str:
+        """下一条完整的文本消息。ping 自动回 pong,close 抛 ConnectionClosed。"""
+        message = b""
+        while True:
+            first, second = self._read_exact(2)
+            fin, opcode = first & 0x80, first & 0x0F
+            length = second & 0x7F
+            if length == 126:
+                length = int.from_bytes(self._read_exact(2), "big")
+            elif length == 127:
+                length = int.from_bytes(self._read_exact(8), "big")
+            mask = self._read_exact(4) if second & 0x80 else None
+            payload = self._read_exact(length)
+            if mask:
+                payload = apply_mask(payload, mask)
+            if opcode == 0x8:
+                raise ConnectionClosed("server closed the connection")
+            if opcode == 0x9:
+                self._send_frame(0xA, payload)
                 continue
-            if not isinstance(entries, list):
+            if opcode == 0xA:
                 continue
-            for entry in entries:
-                if isinstance(entry, dict) and entry.get("id") == entry_id and entry.get("file"):
-                    path = safe_library_file(lib_dir, entry["file"])
-                    if path:
-                        matches.append(path)
-    matches = list(dict.fromkeys(matches))
-    return matches[0] if len(matches) == 1 else None
+            message += payload
+            if fin:
+                return message.decode("utf-8")
 
-
-def run_turn(config: Config, session: str, model, content: str, images: list):
-    """跑一个回合,返回 (最终正文, 本回合要发的图片文件列表)。"""
-    cmd = [
-        config.gqy_bin,
-        "ask",
-        "--session",
-        session,
-        "--create",
-        "--output-format",
-        "stream-json",
-        "--timeout",
-        str(config.timeout_seconds),
-        "--cwd",
-        HOME,
-        "--tools",
-        ",".join(config.tools),
-        "--stdin",
-    ]
-    if os.path.exists(HINT_PATH):
-        cmd += ["--append-system-prompt", "@" + HINT_PATH]
-    if model:
-        cmd += ["--model", model]
-    for image in images:
-        cmd += ["--image", image]
-
-    for attempt in range(3):
-        result = subprocess.run(
-            cmd,
-            input=content,
-            capture_output=True,
-            text=True,
-            timeout=config.timeout_seconds + 60,
-        )
-        events = parse_events(result.stdout)
-        final = events[-1] if events else None
-        if result.returncode == 0 and final and final.get("type") == "done":
-            return final.get("text") or "", collect_memes(events)
-        # 只取错误类别与前 120 字,避免把回合内容带进日志
-        message = ((final or {}).get("message") or result.stderr.strip())[:120]
-        if "busy" in (message or "").lower() and attempt < 2:
-            time.sleep(5)
-            continue
-        raise RuntimeError(f"gqy ask exit {result.returncode}: {message}")
-    return "", []
-
-
-def parse_events(output: str) -> list:
-    events = []
-    for line in output.splitlines():
+    def close(self) -> None:
         try:
-            value = json.loads(line)
-        except ValueError:
-            continue
-        if isinstance(value, dict):
-            events.append(value)
-    return events
+            self._send_frame(0x8, b"")
+        except OSError:
+            pass
+        try:
+            self.sock.shutdown(socket.SHUT_RDWR)
+        except OSError:
+            pass
+        self.sock.close()
 
 
-GQY_CONFIG_PATH = os.path.join(HOME, ".gqy", "config", "config.jsonc")
+# ---------------------------------------------------------------------------
+# 连接器:收发两头接到 daemon
+# ---------------------------------------------------------------------------
 
 
-def strip_jsonc(text: str) -> str:
-    """去掉 JSONC 的注释与尾逗号;字符串里的 // 与 /* 原样保留(URL 里常见)。"""
-    out, i, n = [], 0, len(text)
-    while i < n:
-        ch = text[i]
-        if ch == '"':
-            j = i + 1
-            while j < n and text[j] != '"':
-                j += 2 if text[j] == "\\" else 1
-            out.append(text[i : j + 1])
-            i = j + 1
-        elif text.startswith("//", i):
-            i = text.find("\n", i)
-            i = n if i < 0 else i
-        elif text.startswith("/*", i):
-            i = text.find("*/", i + 2)
-            i = n if i < 0 else i + 2
-        else:
-            out.append(ch)
-            i += 1
-    return re.sub(r",(\s*[}\]])", r"\1", "".join(out))
+class Connector:
+    """连 daemon、握手、发事件、收 ack 与发送请求。断线指数退避重连,
+    重连后把没收到 ack 的事件按顺序重发。"""
 
-
-def generated_image_dir():
-    """生图插件的输出目录(gqy 配置里的 plugins.image_generation.output_dir)。"""
-    try:
-        with open(GQY_CONFIG_PATH, encoding="utf-8") as f:
-            config = json.loads(strip_jsonc(f.read()), strict=False)
-        folder = config["plugins"]["image_generation"]["output_dir"]
-    except (OSError, ValueError, KeyError, TypeError):
-        return None
-    return os.path.realpath(os.path.expanduser(folder)) if folder else None
-
-
-def resolve_generated(output: str):
-    """generate_image 的输出是 JSON:{"status": "ok", "path": …}。只发输出目录里、
-    文件头确认是图片、不超过上限的文件。"""
-    try:
-        raw = json.loads(output).get("path") or ""
-    except (ValueError, AttributeError):
-        return None
-    path = os.path.realpath(raw)
-    folder = generated_image_dir()
-    if not folder or os.path.dirname(path) != folder:
-        log.warning("generated image outside the output dir, not sent")
-        return None
-    try:
-        too_big = os.path.getsize(path) > MAX_MEME_BYTES
-    except OSError:
-        return None
-    return path if not too_big and is_image_file(path) else None
-
-
-def collect_memes(events: list) -> list:
-    """本回合她「发出」的图:表情包(use_meme)、图库(album show)与她新生成的图(generate_image)。
-
-    表情包和图库只认工具成功输出里的 id,再到本机库里按 index 解析;生成的图只认
-    生图插件输出目录里的文件。都不接受任意路径。
-    """
-    pictures = []
-    for event in events:
-        if not (event.get("type") == "tool" and event.get("phase") == "end" and event.get("ok")):
-            continue
-        name = event.get("name")
-        output = str(event.get("output", "")).strip()
-        if name == "use_meme":
-            match = MEME_SENT_RE.search(output)
-            resolve, kind = resolve_meme, "meme"
-        elif name == "album":
-            match = ALBUM_SENT_RE.match(output)
-            resolve, kind = resolve_album, "album picture"
-        elif name == "generate_image":
-            path = resolve_generated(output)
-            if path:
-                pictures.append(path)
-            continue
-        else:
-            continue
-        if not match:
-            continue
-        path = resolve(match.group(1))
-        if path:
-            pictures.append(path)
-        else:
-            log.warning("%s %s not found in local library", kind, match.group(1))
-    return pictures
-
-
-class ContactWorker(threading.Thread):
-    """每个联系人一条串行队列。回合进行中新到的消息攒到下一轮一起发。"""
-
-    def __init__(self, contact: str, watcher: ConfigWatcher, watermark: Watermark) -> None:
-        super().__init__(name=f"contact-{contact}", daemon=True)
-        self.contact = contact
+    def __init__(self, watcher: ConfigWatcher, watermark: Watermark) -> None:
         self.watcher = watcher
         self.watermark = watermark
-        self.inbox: queue.Queue = queue.Queue()
-        self._notes: list = []  # 点按回应,攒到下一轮开头一起告诉她
-        self._notes_lock = threading.Lock()
+        self._lock = threading.Lock()
+        self._pending: dict = {}  # rowid → 事件帧(JSON),等 ack
+        self._ws = None
+        self._ready = threading.Event()
+        self._sends: queue.Queue = queue.Queue()
+        threading.Thread(target=self._connection_loop, name="connection", daemon=True).start()
+        threading.Thread(target=self._send_loop, name="sender", daemon=True).start()
 
-    def add_note(self, note: str) -> None:
-        with self._notes_lock:
-            self._notes = (self._notes + [note])[-10:]
-        log.info("reaction noted for %s", self.contact)
+    def submit(self, rowid: int, event: dict) -> None:
+        frame = json.dumps(event, ensure_ascii=False)
+        self.watermark.claim(rowid)
+        with self._lock:
+            self._pending[rowid] = frame
+            ws = self._ws if self._ready.is_set() else None
+        if ws is not None:
+            self._send(ws, frame)
 
-    def take_notes(self) -> list:
-        with self._notes_lock:
-            notes, self._notes = self._notes, []
-        return notes
+    def idle(self) -> bool:
+        with self._lock:
+            return not self._pending and self._sends.empty()
 
-    def run(self) -> None:
+    def _send(self, ws: WebSocket, frame: str) -> None:
+        try:
+            ws.send_text(frame)
+        except OSError as error:
+            log.warning("sending to the daemon failed: %s", error)
+            ws.close()
+
+    def _connection_loop(self) -> None:
+        backoff = 1.0
         while True:
-            batch = [self.inbox.get()]
             config = self.watcher.get()
-            # 连发几条时等对方说完
-            deadline = time.time() + config.batch_wait_seconds
-            while True:
-                remaining = deadline - time.time()
-                if remaining <= 0:
-                    break
-                try:
-                    batch.append(self.inbox.get(timeout=remaining))
-                    deadline = time.time() + config.batch_wait_seconds
-                except queue.Empty:
-                    break
-            try:
-                self.handle_batch(config, batch)
-            except Exception:  # noqa: BLE001 — 单轮失败不能拖死整条队列
-                log.exception("turn for %s failed", self.contact)
-            finally:
-                self.watermark.release(m.rowid for m in batch)
-
-    def handle_batch(self, config: Config, batch: list) -> None:
-        reply_handle = batch[-1].handle
-        # 快捷指令由桥接直接回复,不进回合
-        chat = []
-        for message in batch:
-            parsed = None if message.attachments else commands.parse_command(message.text)
-            if parsed is None:
-                chat.append(message)
+            if not config["enabled"]:
+                time.sleep(5)
+                continue
+            if not config["token"]:
+                log.error("no token in %s; set it to platforms.connectors.imessage.token", CONFIG_PATH)
+                time.sleep(30)
                 continue
             try:
-                answer = commands.run_command(*parsed, self.contact, config.gqy_bin)
-            except Exception as error:  # noqa: BLE001 — 指令失败要让对方知道
-                log.warning("command /%s failed: %s", parsed[0], error)
-                answer = "这条指令没执行成功，稍后再试。"
-            log.info("command /%s for %s", parsed[0], self.contact)
-            send_text(message.handle, answer)
-        if not chat:
-            return
-        prefs = commands.prefs(self.contact)
-        if prefs["paused"]:
-            log.info("paused, skipped %d message(s) from %s", len(chat), self.contact)
-            return
-        batch = chat
-        with tempfile.TemporaryDirectory(prefix="gqy-imessage-") as workdir:
-            lines, images = self.take_notes(), []
-            for message in batch:
-                if message.quote:
-                    lines.append(message.quote)
-                if message.text:
-                    lines.append(message.text)
-                for path, mime, name in message.attachments:
-                    if not wait_for_file(path):
-                        lines.append(f"[attachment unavailable: {name}]")
-                        continue
-                    img, audio_desc = prepare_media(path, mime, workdir)
-                    if img:
-                        images.append(img)
-                        if not message.text:
-                            lines.append("[image]")
-                    elif audio_desc:
-                        lines.append(audio_desc)
-                    else:
-                        lines.append(f"[attachment: {name}]")
-            content = "\n".join(lines).strip() or "[image]"
-            log.info(
-                "turn start: contact=%s messages=%d chars=%d images=%d",
-                self.contact,
-                len(batch),
-                len(content),
-                len(images),
-            )
-            started = time.time()
-            reply, memes = run_turn(
-                config,
-                commands.session_name(self.contact, prefs["topic"]),
-                prefs["model"],
-                content,
-                images,
-            )
-            plain, voice_text = markdown_to_plain(reply)
-            voice_file = None
-            # 仅在模型显式输出 <voice> 标签时发送语音条，防止提到“语音”或“别发语音”时被关键词误触发
+                ws = WebSocket(config["url"], config["token"])
+            except HandshakeRejected as error:
+                log.error(
+                    "daemon refused the connection (%s); check the token and that "
+                    "platforms.connectors.imessage is enabled",
+                    error,
+                )
+                time.sleep(30)
+                continue
+            except (OSError, ConnectionClosed, ValueError) as error:
+                log.info("daemon not reachable (%s); retrying in %.0fs", error, backoff)
+                time.sleep(backoff)
+                backoff = min(backoff * 2, 30)
+                continue
+            backoff = 1.0
+            self._serve(ws, config)
+            self._ready.clear()
+            with self._lock:
+                self._ws = None
+            time.sleep(1)
 
-            if voice_text:
-                voice_file = synthesize_voice(voice_text)
-                log.info("voice synthesized: %s (text=%s)", voice_file, voice_text[:30])
-        if not plain and not memes and not voice_file:
-            log.info("turn done with empty reply (%.1fs)", time.time() - started)
-            return
-        bubbles = []
-        if plain:
-            bubbles = (
-                split_bubbles(plain, config.max_bubbles) if config.split_paragraphs else [plain]
-            )
-        conn = open_chat_db()
+    def _serve(self, ws: WebSocket, config: dict) -> None:
+        hello = {
+            "type": "hello",
+            "protocol": PROTOCOL,
+            "platform": "imessage",
+            "display_name": "iMessage",
+            "connector": {"name": "gqy-imessage", "version": CONNECTOR_VERSION},
+            "capabilities": CAPABILITIES,
+        }
         try:
-            before = max_rowid(conn)
+            ws.send_text(json.dumps(hello))
+            while True:
+                if self.watcher.get() is not config:
+                    log.info("config changed; reconnecting")
+                    break
+                frame = json.loads(ws.recv_text())
+                kind = frame.get("type")
+                if kind == "welcome":
+                    log.info("connected to the daemon (connection %s)", frame.get("connection"))
+                    with self._lock:
+                        self._ws = ws
+                        self._ready.set()
+                        backlog = [self._pending[rowid] for rowid in sorted(self._pending)]
+                    for pending in backlog:
+                        self._send(ws, pending)
+                elif kind == "ack":
+                    rowid = int(frame.get("id", "0"))
+                    with self._lock:
+                        self._pending.pop(rowid, None)
+                    self.watermark.release(rowid)
+                elif kind == "send":
+                    self._sends.put((ws, frame))
+                elif kind == "ping":
+                    ws.send_text('{"type":"pong"}')
+                elif kind == "error":
+                    log.error("daemon error %s: %s", frame.get("code"), frame.get("message"))
+        except (OSError, ConnectionClosed, ValueError) as error:
+            log.info("disconnected from the daemon: %s", error)
         finally:
-            conn.close()
-        for index, bubble in enumerate(bubbles):
-            if index:
-                time.sleep(bubble_pause(bubble, config.bubble_pause_seconds))
-            send_text(reply_handle, bubble)
-        # 发送语音条附件
-        if voice_file:
-            if bubbles:
-                time.sleep(bubble_pause("", config.bubble_pause_seconds))
-            send_file(reply_handle, voice_file)
-        for index, meme in enumerate(memes[: config.max_memes]):
-            if bubbles or voice_file or index:
-                time.sleep(bubble_pause("", config.bubble_pause_seconds))
-            send_file(reply_handle, meme)
-        sent_files = (1 if voice_file else 0) + min(len(memes), config.max_memes)
-        log.info(
-            "turn done: contact=%s bubbles=%d files=%d chars=%d (%.1fs)",
-            self.contact,
-            len(bubbles),
-            sent_files,
-            len(plain),
-            time.time() - started,
-        )
-        check_delivery(reply_handle, before, len(bubbles) + sent_files)
+            ws.close()
+
+    def _send_loop(self) -> None:
+        while True:
+            ws, frame = self._sends.get()
+            part = frame.get("part") or {}
+            to = str(frame.get("to", ""))
+            result = {"type": "send_result", "req": frame.get("req"), "ok": True}
+            try:
+                conn = open_chat_db()
+                try:
+                    before = max_rowid(conn)
+                finally:
+                    conn.close()
+                send_part(to, part)
+                threading.Thread(
+                    target=check_delivery, args=(to, before), name="delivery", daemon=True
+                ).start()
+            except (OSError, RuntimeError, ValueError, sqlite3.Error, subprocess.SubprocessError) as error:
+                log.warning("send %s to %s failed: %s", part.get("kind"), mask_handle(to), error)
+                result = {"type": "send_result", "req": frame.get("req"), "ok": False, "error": str(error)}
+            try:
+                ws.send_text(json.dumps(result))
+            except OSError as error:
+                log.warning("could not report a send result: %s", error)
 
 
 # ---------------------------------------------------------------------------
@@ -1236,85 +840,34 @@ class ContactWorker(threading.Thread):
 
 
 class SelfReloader:
-    """脚本目录里的 .py(本脚本与 imessage_commands.py)被改动且都能编译通过时,
-    空闲下来就用新代码替换本进程。"""
+    """本脚本被改动且能编译通过时,空闲下来就用新代码替换本进程。"""
 
     def __init__(self) -> None:
         self.path = os.path.abspath(__file__)
-        self.mtimes = self._scan()
+        self.mtime = self._stat()
 
-    @staticmethod
-    def _scan() -> dict:
-        found = {}
-        for name in os.listdir(SCRIPT_DIR):
-            if name.endswith(".py"):
-                path = os.path.join(SCRIPT_DIR, name)
-                try:
-                    found[path] = os.stat(path).st_mtime
-                except OSError:
-                    pass
-        return found
+    def _stat(self):
+        try:
+            return os.stat(self.path).st_mtime
+        except OSError:
+            return None
 
     def changed(self) -> bool:
-        mtimes = self._scan()
-        if mtimes == self.mtimes:
+        mtime = self._stat()
+        if mtime == self.mtime:
             return False
-        for path in mtimes:
-            try:
-                with open(path, encoding="utf-8") as f:
-                    compile(f.read(), path, "exec")
-            except (SyntaxError, ValueError, OSError) as error:
-                log.error("script changed but does not compile, keeping old code: %s", error)
-                self.mtimes = mtimes
-                return False
+        try:
+            with open(self.path, encoding="utf-8") as f:
+                compile(f.read(), self.path, "exec")
+        except (SyntaxError, ValueError, OSError) as error:
+            log.error("script changed but does not compile, keeping old code: %s", error)
+            self.mtime = mtime
+            return False
         return True
 
     def exec(self) -> None:
         log.info("script changed, reloading")
         os.execv(sys.executable, [sys.executable, self.path] + sys.argv[1:])
-
-
-DEBUG_REQUEST = os.path.join(HOME, ".gqy", "state", "imessage-debug-rowids.json")
-
-
-def run_debug_request() -> None:
-    """排查用:发现请求文件就把指定 ROWID 的消息与附件字段写进日志,然后删掉请求。
-
-    只读、只查固定字段,不记录正文内容(只记长度)。请求文件格式 {"rowids": [1, 2]}。
-    """
-    try:
-        with open(DEBUG_REQUEST, encoding="utf-8") as f:
-            rowids = [int(r) for r in json.load(f).get("rowids", [])][:20]
-    except (OSError, ValueError, TypeError, AttributeError):
-        return
-    finally:
-        try:
-            os.remove(DEBUG_REQUEST)
-        except OSError:
-            pass
-    conn = open_chat_db()
-    try:
-        for rowid in rowids:
-            m = conn.execute(
-                "SELECT ROWID, guid, error, is_sent, is_delivered, is_finished, item_type, "
-                "associated_message_type, balloon_bundle_id, cache_has_attachments, "
-                "length(text) AS text_len, length(attributedBody) AS body_len, service, "
-                "datetime(date/1000000000 + 978307200, 'unixepoch', 'localtime') AS sent_at, "
-                "CASE WHEN date_delivered > 0 THEN datetime(date_delivered/1000000000 + 978307200, 'unixepoch', 'localtime') END AS delivered_at "
-                "FROM message WHERE ROWID = ?",
-                (rowid,),
-            ).fetchone()
-            log.info("debug message %s: %s", rowid, dict(m) if m else None)
-            for a in conn.execute(
-                "SELECT a.ROWID, a.transfer_state, a.total_bytes, a.mime_type, a.uti, "
-                "a.is_outgoing, a.hide_attachment, a.filename "
-                "FROM attachment a JOIN message_attachment_join j ON j.attachment_id = a.ROWID "
-                "WHERE j.message_id = ?",
-                (rowid,),
-            ).fetchall():
-                log.info("debug attachment of %s: %s", rowid, dict(a))
-    finally:
-        conn.close()
 
 
 def db_signature():
@@ -1329,13 +882,13 @@ def db_signature():
     return tuple(sig)
 
 
-def initial_rowid(conn: sqlite3.Connection, config: Config) -> int:
+def initial_rowid(conn: sqlite3.Connection, config: dict) -> int:
     current = max_rowid(conn)
     saved = load_state().get("last_rowid")
     if saved is None or saved > current:
         return current
     # 停机太久时不回灌陈旧消息
-    cutoff_ns = (time.time() - APPLE_EPOCH - config.max_backlog_minutes * 60) * 1e9
+    cutoff_ns = (time.time() - APPLE_EPOCH - config["max_backlog_minutes"] * 60) * 1e9
     row = conn.execute(
         "SELECT MAX(ROWID) AS max FROM message WHERE ROWID > ? AND date < ?",
         (saved, cutoff_ns),
@@ -1359,9 +912,7 @@ def setup_logging() -> None:
     handler = RotatingFileHandler(
         LOG_PATH, maxBytes=LOG_MAX_BYTES, backupCount=LOG_BACKUPS, encoding="utf-8"
     )
-    handler.setFormatter(
-        logging.Formatter("%(asctime)s %(levelname)s %(threadName)s %(message)s")
-    )
+    handler.setFormatter(logging.Formatter("%(asctime)s %(levelname)s %(threadName)s %(message)s"))
     root = logging.getLogger()
     root.handlers[:] = [handler]
     root.setLevel(logging.INFO)
@@ -1413,7 +964,7 @@ def main() -> int:
     watermark = Watermark(initial_rowid(conn, watcher.get()))
     watermark.flush()
     log.info("watching from rowid %d", watermark.seen)
-    workers: dict = {}
+    connector = Connector(watcher, watermark)
     last_sig = None
 
     while True:
@@ -1422,42 +973,30 @@ def main() -> int:
         if sig != last_sig:
             last_sig = sig
             try:
-                top, inbound = fetch_new(conn, watermark.seen)
+                top, events = fetch_new(conn, watermark.seen)
             except sqlite3.Error as error:
                 log.warning("query failed, reopening db: %s", error)
                 conn.close()
-                time.sleep(config.poll_seconds)
+                time.sleep(config["poll_seconds"])
                 conn = open_chat_db()
                 last_sig = None
                 continue
-            for message in inbound:
-                contact = config.handle_to_contact.get(message.handle)
-                if not config.enabled or contact is None:
-                    continue
-                worker = workers.get(contact)
-                if worker is None:
-                    worker = ContactWorker(contact, watcher, watermark)
-                    worker.start()
-                    workers[contact] = worker
-                if message.reaction:
-                    worker.add_note(message.reaction)
-                    continue
-                watermark.claim(message.rowid)
-                worker.inbox.put(message)
+            # 关着的时候照样推进水位:打开时不回灌关着期间的消息
+            if config["enabled"]:
+                for rowid, event in events:
+                    connector.submit(rowid, event)
             watermark.seen = top
             watermark.flush()
 
-        run_debug_request()
-        if watermark.idle() and reloader.changed():
+        if watermark.idle() and connector.idle() and reloader.changed():
             conn.close()
             reloader.exec()
-            
-        # 敏捷事件等待：按 0.25s 切片检测 db_signature 变化，一旦检测到变动立即打断等待开始处理，兼顾低 CPU 与极速响应
-        poll_step = 0.25
+
+        # 按 0.25s 切片检查 chat.db 有没有变,一变就马上去读,兼顾省电与响应
         elapsed = 0.0
-        while elapsed < config.poll_seconds:
-            time.sleep(poll_step)
-            elapsed += poll_step
+        while elapsed < config["poll_seconds"]:
+            time.sleep(0.25)
+            elapsed += 0.25
             if db_signature() != last_sig:
                 break
 

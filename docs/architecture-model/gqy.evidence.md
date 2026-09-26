@@ -14,7 +14,7 @@ confidence 取值沿用 `architecture-contract.md`：**high** = 代码/配置/�
 | `member` | actor | high | `src/state/mod.rs:224-229`（成员库路径）；`src/web/sandbox_scope.rs:109-157` |
 | `outsider` | actor | high | `AGENTS.md` §4.1（trusted/untrusted 分离）；`src/platforms/plugins/real_context.rs` 的 `safe_prompt_field`，亦见 `src/lib.rs:67-69` fuzz 入口 |
 | `onebot` | external | high | `src/platforms/onebot/connection.rs:236-246,342-343,355`；`src/web/server.rs:709,713` |
-| `imsgBridge` | external | high | `scripts/imessage/README.md:6-10`；`imessage_bridge.py:801,823`；`AGENTS.md` §4.5 |
+| `imsgBridge` | external | high | `scripts/imessage/README.md`；`src/web/server.rs:721`（`/api/connector/ws`）；`src/platforms/connector/server.rs`；`AGENTS.md` §4.5 |
 | `llmProvider` | external | high | `src/llm/openai_compatible/`；`src/llm/provider_capabilities.rs:16,33` |
 | `mcpServers` | external | high | `src/config/mod.rs:882-895`（servers 字段）；`src/tools/mcp.rs:213-260,393` |
 | `ttsProvider` | external | high | `src/web/voice_tts.rs:1-10`（MiniMax t2a_v2 / MiMo chat/completions） |

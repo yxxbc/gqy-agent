@@ -44,9 +44,9 @@ mkdir -p "$HOME/Library/LaunchAgents" "$(dirname "$CONFIG")" "$(dirname "$LOG")"
 
 if [ ! -f "$CONFIG" ]; then
     cp "$SCRIPT_DIR/config.example.json" "$CONFIG"
-    # 模板里 enabled=true,先关掉,填好联系人再打开
+    # 模板里 enabled=true,先关掉,填好口令再打开
     /usr/bin/sed -i '' 's/"enabled": true/"enabled": false/' "$CONFIG"
-    echo "已生成配置 $CONFIG(默认关闭),填好 contacts 后把 enabled 改成 true"
+    echo "已生成配置 $CONFIG(默认关闭)。填好 token(与 gqy 配置 platforms.connectors.imessage.token 相同)后把 enabled 改成 true"
 fi
 
 # 专用启动器:完全磁盘访问权限只授给它(见 launcher.c)。

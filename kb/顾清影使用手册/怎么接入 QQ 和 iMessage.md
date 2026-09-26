@@ -27,22 +27,23 @@ QQ 用哪些模型，在同一个设置页的「配置模型」里单独设置�
 
 ## iMessage（仅 macOS）
 
-iMessage 桥接是项目仓库里的独立脚本，不在安装包里，需要先克隆项目仓库。
+iMessage 分两半：后台服务里的 iMessage 平台（管联系人、话题、指令、模型、记忆），加上项目仓库里的一个连接器脚本（只负责读「信息」的新消息、把回复发出去）。脚本不在安装包里，需要先克隆项目仓库。
 
 1. 在「信息」App 里登录一个给顾清影用的 Apple ID（可以和系统的 iCloud 账号不同）。
-2. 运行 `scripts/imessage/install.sh`。第一次运行会生成 `~/.gqy/config/imessage.json`。
-3. 编辑这个文件：在 `contacts` 里填允许和她私聊的联系人，把 `enabled` 改成 `true`。保存即生效，不用重启。
-4. 授权：「系统设置 → 隐私与安全性 → 完全磁盘访问权限」，加入 `~/.local/bin/gqy-imessage`。
+2. 编辑 `~/.gqy/config/config.jsonc`，在 `platforms.connectors.imessage` 里把 `enabled` 设为 `true`，填一个 `token`（随机字符串，可以用 `openssl rand -hex 24` 生成），在 `contacts` 里写允许和她私聊的联系人：`name` 是名字，`handles` 是手机号或邮箱，你本人加 `"owner": true`。改完运行 `gqy reload`。
+3. 运行 `scripts/imessage/install.sh`。第一次运行会生成 `~/.gqy/config/imessage.json`。
+4. 编辑这个文件：`token` 填和上一步一样的口令，把 `enabled` 改成 `true`。保存即生效，不用重启。
+5. 授权：「系统设置 → 隐私与安全性 → 完全磁盘访问权限」，加入 `~/.local/bin/gqy-imessage`。第一次回复时系统会问「gqy-imessage 想要控制 信息」，点允许。
 
-只回复白名单里的联系人。后台服务要在运行。安装后不要挪动 `scripts/imessage/` 目录，挪了桥接就会断，重装还要重新授权。
+只回复名单里的联系人。后台服务要在运行。你本人的对话和终端、网页共用同一份记忆，但默认不能在 iMessage 里让她跑命令、读写文件（`owner_host_tools` 可以打开）。安装后不要挪动 `scripts/imessage/` 目录，挪了连接器就会断，重装还要重新授权。
 
 ### 在 iMessage 里能做什么
 
-- 收发文字、看你发来的照片；她会发表情包、图库里的图，也能把刚画好的图直接发给你。
+- 收发文字、看你发来的照片；她会发表情包、图库里的图，也能把刚画好的图直接发给你，开了语音播报时还能发语音。你发来的语音和文件她只知道收到了，听不到、打不开。
 - 你长按她的某条消息回复，她知道你在回哪一句；你给她点 ❤️ 之类的回应，她也看得到（点回应本身不会让她回一条）。她自己没法给你点回应，这是「信息」App 的限制。
 - 在聊天里发下面这些指令，会马上得到回复，不会记进聊天内容：
   - `/new` 开一个新话题，旧话题都保留；`/topics` 看所有话题；`/topic 2` 切到第 2 个话题。
-  - `/model` 看能用哪些模型；`/model 5` 或 `/model 模型名` 切换，只对这个聊天生效；`/model default` 恢复默认。
+  - `/model` 看能用哪些模型；`/model 5` 或 `/model 模型名` 切换，只对当前话题生效；`/model default` 恢复默认。
   - `/pause` 暂停回复，`/resume` 恢复。
   - `/help` 看指令说明。
 - 群聊不支持，只和白名单里的人私聊。

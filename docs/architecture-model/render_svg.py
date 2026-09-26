@@ -162,11 +162,11 @@ PEOPLE = [("属主 / 管理员", "Owner · 默认不套沙盒"),
 PERSON_REL = ["终端 REPL · gqy ask · shellhook · 两个 TUI",
               "浏览器 WebUI :8300（默认绑 0.0.0.0）",
               "经 OneBot / iMessage 间接进来"]
-EXTS = [("OneBot v11 端", "QQ 协议实现"), ("iMessage 桥", "Python LaunchAgent"),
+EXTS = [("OneBot v11 端", "QQ 协议实现"), ("iMessage 连接器", "Python LaunchAgent"),
         ("上游模型供应商", "OpenAI 兼容 · Anthropic · 中转"), ("MCP 服务器", "stdio 子进程"),
         ("播报供应商", "MiniMax · 小米 MiMo"), ("公网", "search / fetch / AUR / GitHub"),
         ("本机工具链", "rg chafa sh git pacman gh")]
-EXT_REL = ["反向 WebSocket 连入 /ws", "gqy ask --session imessage-*", "流式补全 + 工具调用",
+EXT_REL = ["反向 WebSocket 连入 /ws", "连接器 WS /api/connector/ws", "流式补全 + 工具调用",
            "tools/list 与调用", "合成播报音频", "搜索与取页", "起子进程干活"]
 
 

@@ -69,7 +69,7 @@ src/platforms/
 - 收 `send` 帧 → osascript 发出 → `send_result`；回查送达状态。
 - 断线重连（指数退避）、脚本热重载、日志。
 
-删掉：`gqy ask` 调用、指令、会话命名、气泡拆分、表情包/图库/生图解析、语音合成——全搬进 daemon。预计从 1466 行降到 500 行左右。`imessage_commands.py`、`hint.txt` 删除（提示词进 daemon 的平台上下文，英文）。
+删掉：`gqy ask` 调用、指令、会话命名、气泡拆分、表情包/图库/生图解析、语音合成——全搬进 daemon。`imessage_commands.py`、`hint.txt` 删除（提示词进 daemon 的平台上下文，英文）。实际约 1000 行，比预估多，多在标准库手写的 WebSocket 客户端（启动器用系统 Python，不引入 pip 依赖）。
 
 ## 五、分步与验收
 

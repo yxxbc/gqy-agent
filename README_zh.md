@@ -143,7 +143,7 @@ gqy
 - **浏览器**：运行 `gqy web`，用打印出来的地址打开，同一 Wi-Fi 下手机平板也行。第一次用账号 `gqy`、密码 `GQY520` 登录，然后创建你自己的账号。设置在「控制台 → 设置」里；「界面 → 配色方案」可以换配色，也可以让她照你的描述写一套新的。
 - **命令行里直接问**：运行 `gqy zsh-init`（bash、fish 也支持），之后在命令行里就能直接和她说话。
 - **语音**：在设置里打开「语音功能」，喊「清影」唤醒。安装包暂时不带语音，需要从源码编译，详见 [语音功能](docs/voice.md)。
-- **QQ 与 iMessage**：在手机上和她聊，QQ 还能拉进群里。QQ 在网页端控制台的「平台」页设置；iMessage（仅 macOS）是仓库里 `scripts/imessage/` 的独立桥接。详见 [QQ 与通讯平台](docs/wiki/13-QQ与通讯平台.md) 与 [iMessage 桥接说明](scripts/imessage/README.md)。
+- **QQ 与 iMessage**：在手机上和她聊，QQ 还能拉进群里。QQ 在网页端控制台的「平台」页设置；iMessage（仅 macOS）在配置里的 `platforms.connectors.imessage` 设置，另跑仓库里 `scripts/imessage/` 的连接器脚本收发消息。详见 [QQ 与通讯平台](docs/wiki/13-QQ与通讯平台.md) 与 [iMessage 连接器说明](scripts/imessage/README.md)。
 
 ## 🔄 升级、备份与卸载
 

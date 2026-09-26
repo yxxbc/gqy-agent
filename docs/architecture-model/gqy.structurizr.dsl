@@ -9,7 +9,7 @@ workspace "顾清影 gqy — 当前架构 (as-built)" "Current-state model, 2026
 
     // ── L1 external systems ────────────────────────────────────
     onebot = softwareSystem "OneBot v11 端" "QQ 协议实现。连进 daemon 的 /ws 或 /onebot/v11/ws；配置了不同端口时 daemon 另开一个监听。" { tags "External" }
-    imsgBridge = softwareSystem "iMessage 桥" "scripts/imessage/ 里的 Python LaunchAgent，读 macOS 信息库，用 gqy ask --session imessage-* 进话。路径被 install.sh 编译进启动器，独立于 gqy 发布。" { tags "External,Bridge" }
+    imsgBridge = softwareSystem "iMessage 桥" "scripts/imessage/ 里的 Python LaunchAgent 连接器，只做 I/O：读 macOS 信息库、osascript 发送，经 gqy-connector/1 连 daemon。会话、指令、拆气泡在 daemon。路径被 install.sh 编译进启动器，独立于 gqy 发布。" { tags "External,Bridge" }
     llmProvider = softwareSystem "上游模型供应商" "OpenAI 兼容 / Anthropic / 中转线三族协议；四档池 Lite · Cheap · Standard · Flagship。" { tags "External" }
     mcpServers = softwareSystem "MCP 服务器" "config.mcp.servers 声明的外部进程（id/command/args/env/timeout）。stdio 起子进程。" { tags "External" }
     ttsProvider = softwareSystem "播报供应商" "MiniMax t2a_v2（hex wav）或小米 MiMo chat/completions（base64 wav）。" { tags "External" }
@@ -21,7 +21,7 @@ workspace "顾清影 gqy — 当前架构 (as-built)" "Current-state model, 2026
       tags "System"
 
       cli = container "gqy CLI" "前台入口与一次性客户端：REPL、gqy ask、shellhook、stdio 宿主协议、gqy web、daemon 启停、config_tui / question_tui、OOBE、mcp-serve。自己不跑回合，一律经 IPC 交给 daemon。" "Rust · clap · tokio" { tags "Process,Entry" }
-      daemon = container "gqy __daemon" "唯一的常驻进程，也是唯一跑回合的地方。axum HTTP/SSE + OneBot 反向 WS + unix socket IPC + 单 actor 准入。默认 0.0.0.0:8300。" "Rust · axum · rusqlite" {
+      daemon = container "gqy __daemon" "唯一的常驻进程，也是唯一跑回合的地方。axum HTTP/SSE + OneBot 反向 WS + 连接器 WS + unix socket IPC + 单 actor 准入。默认 0.0.0.0:8300。" "Rust · axum · rusqlite" {
         tags "Process,Daemon"
 
         // ── L3 components inside the daemon ──────────────────
@@ -36,7 +36,7 @@ workspace "顾清影 gqy — 当前架构 (as-built)" "Current-state model, 2026
         llmClient = component "模型池 llm/" "OpenAI 兼容 / Anthropic / 中转线；池优先级 回合覆盖 > 平台引用 > 全局；前缀逐字节稳定吃缓存；cache-usage 日志。" "Rust" { tags "Core" }
         stores = component "StoreRegistry 身份路由" "admin store 加 members/owners 两张表；principal = blake3(入口,账号,用户 id) 取 24 hex，随会话冻结。Web/actor/IPC 都按会话所属 store 走。" "Rust" { tags "State" }
         memorySub = component "记忆子系统" "三个挂接点：A 联想注入、B 逐出库归档、C 回合后写事实/经历/日记。" "Rust" { tags "Subsystem" }
-        platformAdapt = component "平台适配 platforms/" "OneBot 分发与回复、turn_context 解析、access control、群管、赞助特效、scheduled_messages、real_context（情绪/好感度）。" "Rust" { tags "Subsystem" }
+        platformAdapt = component "平台适配 platforms/" "OneBot 分发与回复、connector/ 通用连接器（iMessage）、turn_context 解析、access control、群管、赞助特效、scheduled_messages、real_context（情绪/好感度）。" "Rust" { tags "Subsystem" }
       }
       voice = container "gqy-voice" "语音前端：麦克风、唤醒词、VAD、SenseVoice 本地识别、提示音与播报播放。只有 --features voice 才构建，sherpa-onnx 永不进主二进制。" "Rust · sherpa-onnx · cpal" { tags "Process,Optional" }
       rendererW = container "gqy __renderer-worker" "长图渲染子进程（Markdown→PNG）。env GQY_INTERNAL_RENDERER_WORKER=1 触发，空闲 10 分钟退出；RLIMIT_AS 512MB（debug 2GB）仅 Linux 生效，macOS 上 setrlimit 回 EINVAL 故不设。" "Rust" { tags "Process,Worker" }
@@ -65,7 +65,7 @@ workspace "顾清影 gqy — 当前架构 (as-built)" "Current-state model, 2026
     daemon -> rendererW "spawn 渲长图" "child process"
     daemon -> embedW "spawn 算向量" "child process"
     daemon -> alarmW "spawn（detached，闹钟到点触发 job-wake）" "child process"
-    imsgBridge -> cli "gqy ask --session imessage-* --output-format json" "CLI"
+    imsgBridge -> daemon "连接器 WebSocket /api/connector/ws?platform=imessage（Bearer 口令）" "WebSocket"
     onebot -> daemon "反向 WebSocket 连入 /ws、/onebot/v11/ws" "WebSocket"
     daemon -> llmProvider "调模型：流式补全 + 工具调用" "HTTPS" { tags "TrustBoundary" }
     daemon -> ttsProvider "合成播报音频" "HTTPS"

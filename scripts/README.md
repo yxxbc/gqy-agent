@@ -4,7 +4,7 @@
 
 | 目录 | 作用 |
 |---|---|
-| `imessage/` | iMessage 双向桥接（LaunchAgent 守护进程）：`imessage_bridge.py` 收发消息，`imessage_commands.py` 处理手机上的 `/new` `/topic` `/model` `/pause` 等指令。见其 README 与 `docs/wiki/13-QQ与通讯平台.md`。改成 gqy 原生平台的方案稿在 `docs/design/2026-09-26-imessage-platform.md`，尚未施工 |
+| `imessage/` | iMessage 连接器（LaunchAgent 守护进程）：`imessage_bridge.py` 读 chat.db、用 osascript 发消息，经通用连接器协议接到 gqy daemon（`platforms.connectors.imessage`）；会话、指令、拆气泡都在 daemon。见其 README 与 `docs/design/2026-09-26-connector-protocol.md` |
 
 **不要挪动或改名这里的目录。** `imessage/install.sh` 会把桥接脚本的绝对路径编译进启动器，路径一变，已安装的桥接就会失效，重装后还要手动重新授予「完全磁盘访问权限」。
 

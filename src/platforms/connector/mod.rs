@@ -6,12 +6,16 @@
 //! - `registry`：已连上的连接器、事件去重、攒着的点按回应。
 //! - `inbound`：事件 → 回合。
 //! - `adapter`：出站消息 → `send` 帧（拆气泡、打字停顿、附件）。
+//! - `commands`：/new /topics /topic /model /pause /resume /help。
+//! - `legacy`：旧 iMessage 桥接偏好的一次性搬家。
 //! - `policy`：`platforms.connectors.<平台>` 的平台策略。
 //!
 //! 方案：`docs/design/2026-09-26-connector-protocol.md`。
 
 mod adapter;
+mod commands;
 mod inbound;
+mod legacy;
 mod policy;
 pub(crate) mod protocol;
 mod registry;

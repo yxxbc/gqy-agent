@@ -8,11 +8,13 @@
 //!   （`active_turn_update_mode`，08-29 「先装瞎再答题」取证）。
 //! - 点按回应不开回合，攒着跟下一条消息一起给她看。
 //!
-//! 平台指令（/new /topics /model …）见 commands.rs（P2b）。
+//! 平台指令（/new /topics /model …）不开回合，见 commands.rs；暂停中的对话
+//! 消息直接丢（和旧桥接一样不补回）。
 
 use super::adapter::ConnectorAdapter;
 use super::protocol::{Event, EventKind, Quote, MAX_ATTACHMENT_BYTES};
 use super::registry::ConnectorHandle;
+use super::{commands, legacy};
 use crate::config::{ConnectorContact, PlatformSessionLimits, PromptAudience};
 use crate::i18n::text as t;
 use crate::ipc::ImageAttachment;
@@ -72,6 +74,41 @@ pub(super) async fn handle_event(
         }
         return;
     }
+    let persona = app_config.active_persona_scope();
+    let prefs = commands::load_prefs(state, &conversation);
+    if !prefs.legacy_migrated {
+        legacy::migrate(state, &conversation, &persona, &prefs);
+    }
+    let adapter = Arc::new(ConnectorAdapter::new(
+        handle.clone(),
+        event.sender.id.clone(),
+        &settings,
+    ));
+    if let Some(command) = commands::parse(
+        &app_config.platforms.command_prefix,
+        &event.text,
+        !event.attachments.is_empty(),
+    ) {
+        let reply = commands::execute(
+            &commands::CommandScope {
+                state,
+                conversation: &conversation,
+                persona: &persona,
+            },
+            &command,
+        );
+        if let Err(error) = adapter
+            .send(OutboundMessage::text(OutboundOrigin::Command, reply))
+            .await
+        {
+            tracing::warn!(target: "gqy::platform", error = %error, "{}", t("connector command reply failed", "连接器指令回复失败"));
+        }
+        return;
+    }
+    if commands::load_prefs(state, &conversation).paused {
+        tracing::debug!(target: "gqy::platform", platform = %handle.platform, "{}", t("connector conversation is paused; message ignored", "连接器对话已暂停，消息已忽略"));
+        return;
+    }
     let Some(order_slot) = state.platforms.turn_order.enter(
         &scope,
         ingress_order,
@@ -84,11 +121,6 @@ pub(super) async fn handle_event(
     let notes = state.platforms.connectors.take_notes(&scope);
     let input = build_input(&event, notes);
     let inbound_event = inbound_event(&conversation, &contact, &event, &input.text, ingress_order);
-    let adapter = Arc::new(ConnectorAdapter::new(
-        handle.clone(),
-        event.sender.id.clone(),
-        &settings,
-    ));
     let plugins = match state.platforms.plugins() {
         Ok(plugins) => plugins,
         Err(error) => {
@@ -96,7 +128,6 @@ pub(super) async fn handle_event(
             return;
         }
     };
-    let persona = app_config.active_persona_scope();
     let context = Arc::new(
         PlatformTurnContext::new(
             conversation.clone(),
@@ -258,7 +289,7 @@ pub(super) async fn handle_event(
 }
 
 /// 会话名：`<平台>-<联系人>`，第一个话题沿用旧桥接起的名字（`imessage-<联系人>`），
-/// 历史直接接上。之后的话题由 /new 另起（P2b）。
+/// 历史直接接上。之后的话题由 /new 另起（`-2`、`-3`……）。
 pub(crate) fn session_name(platform: &str, contact: &str) -> String {
     format!("{platform}-{contact}")
 }
@@ -310,6 +341,18 @@ fn build_input(event: &Event, notes: Vec<String>) -> TurnInput {
     let mut images = Vec::new();
     for attachment in &event.attachments {
         let name = safe_prompt_field(attachment.name.trim());
+        // 语音和文件第一版只给占位（不转写、不下载），连接器也不必传内容。
+        match attachment.kind.as_str() {
+            "audio" => {
+                lines.push("[voice message]".into());
+                continue;
+            }
+            "image" => {}
+            _ => {
+                lines.push(format!("[attachment: {name}]"));
+                continue;
+            }
+        }
         if !attachment.error.trim().is_empty() || attachment.data.is_empty() {
             lines.push(format!("[attachment unavailable: {name}]"));
             continue;
@@ -321,18 +364,15 @@ fn build_input(event: &Event, notes: Vec<String>) -> TurnInput {
                 continue;
             }
         };
-        match attachment.kind.as_str() {
-            "image" if images.len() < MAX_INBOUND_IMAGES => {
-                let mime = sniff_image_mime(&bytes);
-                if mime == "application/octet-stream" {
-                    lines.push(format!("[attachment unavailable: {name}]"));
-                } else {
-                    images.push((mime.to_string(), bytes));
-                }
-            }
-            "image" => lines.push("[image not shown: too many images in one message]".into()),
-            "audio" => lines.push("[voice message]".into()),
-            _ => lines.push(format!("[attachment: {name}]")),
+        if images.len() >= MAX_INBOUND_IMAGES {
+            lines.push("[image not shown: too many images in one message]".into());
+            continue;
+        }
+        let mime = sniff_image_mime(&bytes);
+        if mime == "application/octet-stream" {
+            lines.push(format!("[attachment unavailable: {name}]"));
+        } else {
+            images.push((mime.to_string(), bytes));
         }
     }
     TurnInput {
@@ -480,6 +520,20 @@ mod tests {
         let input = build_input(&event, Vec::new());
         assert!(input.images.is_empty());
         assert!(input.text.ends_with("[attachment unavailable: b.heic]"));
+    }
+
+    #[test]
+    fn voice_and_files_need_no_content() {
+        let mut event = message("");
+        for (kind, name) in [("audio", "Audio Message.caf"), ("file", "报告.pdf")] {
+            event.attachments.push(Attachment {
+                kind: kind.into(),
+                name: name.into(),
+                ..Default::default()
+            });
+        }
+        let input = build_input(&event, Vec::new());
+        assert_eq!(input.text, "[voice message]\n[attachment: 报告.pdf]");
     }
 
     #[test]

@@ -1,35 +1,7 @@
 {
   "enabled": true,
-  "contacts": [
-    {
-      "name": "owner",
-      "handles": [
-        "+8613800000000",
-        "someone@icloud.com"
-      ]
-    }
-  ],
-  "gqy_bin": "~/.cargo/bin/gqy",
-  "tools": [
-    "web_search",
-    "web_fetch",
-    "vision_analyze",
-    "recall_memories",
-    "remember_fact",
-    "kb",
-    "search_knowledge_base",
-    "search_evicted_context",
-    "get_exchange_rate",
-    "use_meme",
-    "album",
-    "generate_image"
-  ],
+  "url": "ws://127.0.0.1:8300/api/connector/ws?platform=imessage",
+  "token": "",
   "poll_seconds": 2,
-  "batch_wait_seconds": 3,
-  "timeout_seconds": 300,
-  "max_backlog_minutes": 30,
-  "split_paragraphs": true,
-  "max_bubbles": 6,
-  "bubble_pause_seconds": 2,
-  "max_memes": 2
+  "max_backlog_minutes": 30
 }

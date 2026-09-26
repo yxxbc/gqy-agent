@@ -166,7 +166,7 @@ First-time launch guides you through a friendly setup: pick a persona (Selene or
 - **Web Dashboard**: Run `gqy web` and open the URL in your browser. First login: `gqy` / `GQY520`, then create your own admin account. Settings live under 控制台 (Console) → 设置 (Settings); color themes are under 界面 (Interface) → 配色方案, and Selene can write new ones for you.
 - **Shell Direct Prompt**: Run `gqy zsh-init` (supports bash and fish too) to query Selene directly from your command line.
 - **Voice Mode**: Enable in settings and wake with "清影" (Selene). See [Voice Setup (中文)](docs/voice.md).
-- **QQ & iMessage**: Chat with Selene on mobile or add her to QQ groups. QQ is set up in the Web UI's 平台 (Platforms) page; iMessage (macOS only) is a standalone bridge in `scripts/imessage/`. See [QQ & Platforms Guide (中文)](docs/wiki/13-QQ与通讯平台.md) and [scripts/imessage/README.md](scripts/imessage/README.md).
+- **QQ & iMessage**: Chat with Selene on mobile or add her to QQ groups. QQ is set up in the Web UI's 平台 (Platforms) page; iMessage (macOS only) goes through a small connector script in `scripts/imessage/` that talks to the daemon (`platforms.connectors.imessage`). See [QQ & Platforms Guide (中文)](docs/wiki/13-QQ与通讯平台.md) and [scripts/imessage/README.md](scripts/imessage/README.md).
 
 ---
 
