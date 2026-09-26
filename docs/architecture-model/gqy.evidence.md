@@ -55,7 +55,7 @@ confidence 取值沿用 `architecture-contract.md`：**high** = 代码/配置/�
 | `flatState` | 机器级 | high | `src/state/mod.rs:306,312-317`；`src/state/usage.rs:165`；`src/web/server.rs:144`；`src/paths/mod.rs:533,537`；`src/models_cache/mod.rs:73`；`src/llm/cache_log.rs:22-23` |
 | `homeTree` | 混合 | high | `src/paths/mod.rs:148-151,280-288,360,386,392-393,471-476` |
 
-**身份解析链**（模型里最重要的一条边）：principal = `blake3(入口, 账号 id, 用户 id)` 长度前缀编码、取 24 hex → `src/platform_types.rs:50-64`；由回合上下文构造 `src/platforms/turn_context.rs:164-169`；随请求冻结进记忆访问 `src/agent/setup.rs:460-464`、`src/memory/mod.rs:218`。store 路由：`StoreRegistry` `src/runtime/stores.rs:17-24`，`for_owner:41` / `for_identity:58` / `owner_of_session:63`（>8192 清缓存 `:69`）/ `locate_session:85-113`，写在 `src/web/sessions.rs:158,446`。
+**身份解析链**（模型里最重要的一条边）：principal = `blake3(入口, 账号 id, 用户 id)` 长度前缀编码、取 24 hex → `src/platform_types.rs:50-64`；由回合上下文构造 `src/platforms/common/turn_context.rs:164-169`；随请求冻结进记忆访问 `src/agent/setup.rs:460-464`、`src/memory/mod.rs:218`。store 路由：`StoreRegistry` `src/runtime/stores.rs:17-24`，`for_owner:41` / `for_identity:58` / `owner_of_session:63`（>8192 清缓存 `:69`）/ `locate_session:85-113`，写在 `src/web/sessions.rs:158,446`。
 
 **迁移**：`MIGRATIONS` `src/state/migrations/mod.rs:29`，37 条、`LATEST_VERSION = 37` `:217`，`PRAGMA user_version` 逐条一事务 `:222-292`。回合读列按名不按位：`TURN_COLUMNS` `src/state/conversation_db/rows.rs:48`、`map_turn_row:50-88`。
 
@@ -78,7 +78,7 @@ confidence 取值沿用 `architecture-contract.md`：**high** = 代码/配置/�
 | `llmClient` | high | `src/llm/openai_compatible/*`；`src/llm/provider_capabilities.rs:16,33`；`src/llm/cache_log.rs:22-23`；`src/agent/turn_loop/mod.rs:139-146` |
 | `stores` | high | `src/runtime/stores.rs:17-118`；`src/runtime/state.rs:43,75,270-276`；`src/platform_types.rs:50-64` |
 | `memorySub` | high | A：`src/agent/turn_loop/stream.rs:86-122`；B：`src/agent/context.rs:796-830` ← `src/agent/history.rs:82`、`src/web/actor/mod.rs:351`；C：`src/memory/write.rs:102` ← `src/agent/turn_loop/stream.rs:201-211` |
-| `platformAdapt` | high | `src/platforms/onebot/dispatch.rs:422`；`turn.rs:297`；`src/platforms/turn_run.rs:35,107`；`src/platforms/turn_context.rs:33-38,164-169`；`src/platforms/access_control.rs`；`src/platforms/plugins/scheduled_messages`；`src/platforms/plugins/real_context/{emotion,affection,inject,judge}` |
+| `platformAdapt` | high | `src/platforms/onebot/dispatch.rs:422`；`turn.rs:297`；`src/platforms/common/turn_run.rs:35,107`；`src/platforms/common/turn_context.rs:33-38,164-169`；`src/platforms/common/access_control.rs`；`src/platforms/plugins/scheduled_messages`；`src/platforms/plugins/real_context/{emotion,affection,inject,judge}` |
 
 ## 5. 子进程清单（`toolchain` / MCP / 自身 worker 的全部 spawn 点）
 

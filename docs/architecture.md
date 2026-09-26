@@ -52,6 +52,13 @@
 ### 场所层 —— 入口只声明两件事
 不拥有工具，只附胶水、按信任过滤。见「四」。
 
+IM 平台都在 `src/platforms/` 下，分三块：`common/` 是平台中立的回合机器（会话解析与限流、
+回合上下文与投递幂等闸、回合驱动、回复整形、平台指令与工具）；每个平台一个目录（现在只有
+`onebot/`，即 QQ）；两个接缝把平台差异挡在外面——`PlatformDriver`（`driver.rs`，连接起停与
+配置热重载，daemon 遍历所有驱动）和 `PlatformPolicy`（`policy.rs`，回合里按平台而定的问题：
+插件开关、主人、白名单、宿主工具、中间消息）。平台插件声明自己服务哪些平台（缺省只服务 QQ）。
+平台标识表在 `platform_types::PLATFORM_IDS`。加平台的步骤见 wiki 15 §4。
+
 ### 模块分层（门禁）
 上面三层是概念划分；代码里按顶层模块再细分成八层，由 `test_scripts/arch_dep_check.py`
 的 `LAYERS` 表检查依赖方向（只许高层引用低层，现存的反向边记在
@@ -133,7 +140,7 @@ dev persona 启用集为空：第 3 步只有骨架和一行提示词，第 4 �
 
 iMessage 不是场所层的一员：它是 `scripts/imessage/` 下的独立桥接进程，经 `gqy ask` 进来，
 走的是 stdio / ask 那一行。改成原生平台的方案稿在
-`design/2026-09-26-imessage-platform.md`，尚未施工。
+`design/2026-09-26-imessage-platform.md`：第一期（上面的平台层整理）已完成，接 iMessage 从第二期开始。
 
 **信任解析顺带产出 principal**：入口、账号、用户 id 三元组哈希得到的稳定键，随会话冻结；
 记忆隔离、用量归属、沙盒根都从它派生。跨端进同一会话不重算工具面，用不了的工具报
