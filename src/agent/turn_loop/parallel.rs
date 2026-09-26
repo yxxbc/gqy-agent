@@ -225,7 +225,11 @@ impl Agent {
         // 提示原样跟随。live 推进 messages 的就是这同一份 tail,活体与化石
         // 逐字节一致——少了这一步,下一轮回放在 followup 处比活体短一截,
         // 缓存前缀与 CLI 续传链都在这里掰断(09-04 codex 线实证)。
-        let runtime = runtime_context(mode, self.platform_context.is_some());
+        let runtime = runtime_context_with(
+            mode,
+            self.platform_context.is_some(),
+            Some(self.runtime_client_label()),
+        );
         let runtime_block = (last_fossil_with_prefix(messages, "<runtime ")
             != Some(runtime.as_str()))
         .then(|| ChatMessage::turn_context(runtime));

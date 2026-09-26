@@ -405,9 +405,10 @@ impl Agent {
                                 &self.system_prompt,
                                 self.mode,
                             )),
-                            ChatMessage::turn_context(runtime_context(
+                            ChatMessage::turn_context(runtime_context_with(
                                 self.mode,
                                 self.platform_context.is_some(),
+                                Some(self.runtime_client_label()),
                             )),
                         ],
                     ));
@@ -1212,9 +1213,10 @@ impl Agent {
                                     &self.system_prompt,
                                     self.mode,
                                 )),
-                                ChatMessage::turn_context(runtime_context(
+                                ChatMessage::turn_context(runtime_context_with(
                                     self.mode,
                                     self.platform_context.is_some(),
+                                    Some(self.runtime_client_label()),
                                 )),
                             ],
                         ));

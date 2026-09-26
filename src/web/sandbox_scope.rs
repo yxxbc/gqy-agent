@@ -61,6 +61,11 @@ pub(in crate::web) fn session_scope(
     }
     let workspace = client_cwd
         .filter(|path| path.is_dir())
+        .or_else(|| {
+            // WebUI 等未显式传递客户端工作目录的会话默认回到用户家目录,
+            // 避免随 daemon 启动路径漂移到源码仓库。
+            directories::BaseDirs::new().map(|dirs| dirs.home_dir().to_path_buf())
+        })
         .or_else(|| std::env::current_dir().ok())
         .unwrap_or_else(|| PathBuf::from("."));
     TurnScope {

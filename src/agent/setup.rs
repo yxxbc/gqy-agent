@@ -263,6 +263,19 @@ impl Agent {
             .is_some_and(|context| !context.owner_bound())
     }
 
+    /// 回合客户端来源(终端 CLI、WebUI、平台或内部子代理)。
+    pub(in crate::agent) fn runtime_client_label(&self) -> &'static str {
+        if self.platform_context.is_some() {
+            "platform"
+        } else if self.prompt_audience == PromptAudience::External {
+            "webui"
+        } else if self.prompt_audience == PromptAudience::Internal {
+            "subagent"
+        } else {
+            "cli"
+        }
+    }
+
     pub fn prepare_for_turn(&mut self) -> Result<()> {
         // (档案进不进由 user_profile_applies 决定:平台回合不进。)
         let mode_prompt = mode_system_prompt(

@@ -537,9 +537,7 @@ pub(in crate::web) async fn list_jobs_http(
         .collect::<Vec<_>>();
     Ok(Json(json!({
         "jobs": jobs,
-        // 后台还晾着一个 agy 预热进程(plugins.antigravity.warm_idle_seconds):
-        // 它不是任务,但确实占着一个进程,前端在任务条上如实显示。
-        "warm": crate::llm::antigravity_warm_snapshot(),
+        "warm": serde_json::Value::Null,
     }))
     .into_response())
 }

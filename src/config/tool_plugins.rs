@@ -125,8 +125,7 @@ pub struct AntigravityPluginConfig {
     /// 这里给 24 小时,真正的活性判定交给看门狗。
     #[serde(default = "default_antigravity_print_timeout_seconds")]
     pub print_timeout_seconds: u64,
-    /// 预热进程(秒):一轮结束后把下一轮的 agy 提前拉起来晾着,省掉约 6 秒启动。
-    /// 这么久没人领就收摊;0 = 关掉预热。晾着的是一个 agy 加一条 MCP 桥。
+    /// (已废弃，预热逻辑已彻底移除；保留反序列化兼容)
     #[serde(default = "default_antigravity_warm_idle_seconds")]
     pub warm_idle_seconds: u64,
 }

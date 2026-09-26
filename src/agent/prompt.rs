@@ -174,24 +174,41 @@ pub(crate) fn host_environment_for(config: &AppConfig, paths: &GqyPaths) -> Stri
 /// 时间格式:终端小时级、平台分钟级——同粒度内整块字节不变,配合"变了才
 /// 注入"的投影(见 `chat_messages`)。ISO 日期比中文日期短,星期用三字母。
 pub(in crate::agent) fn runtime_context(mode: AgentMode, platform: bool) -> String {
+    runtime_context_with(mode, platform, None)
+}
+
+pub(in crate::agent) fn runtime_context_with(
+    mode: AgentMode,
+    platform: bool,
+    client: Option<&str>,
+) -> String {
     // 时区随时间一起给(%:z 固定 6 字符,同粒度内字节稳定):模型换算
     // 绝对时间/跨时区事件时不用再猜本机时区。带 UTC 前缀写成
     // "UTC+09:00"——裸偏移量容易被当成时间的一部分读(08-26 用户点名)。
     if platform {
-        return format!(
-            "<runtime now=\"{}\"/>",
-            Local::now().format("%Y-%m-%d %a %H:%M UTC%:z")
-        );
+        let now = Local::now().format("%Y-%m-%d %a %H:%M UTC%:z");
+        if let Some(client) = client.filter(|s| !s.trim().is_empty()) {
+            return format!("<runtime now=\"{now}\" client=\"{}\"/>", xml_attr_escape(client));
+        }
+        return format!("<runtime now=\"{now}\"/>");
     }
     let cwd = crate::tools::workspace::effective_workdir()
         .display()
         .to_string();
     let _ = mode;
-    format!(
-        "<runtime now=\"{}\" cwd=\"{}\"/>",
-        Local::now().format("%Y-%m-%d %a %H:00 UTC%:z"),
-        xml_attr_escape(&cwd),
-    )
+    let now = Local::now().format("%Y-%m-%d %a %H:00 UTC%:z");
+    if let Some(client) = client.filter(|s| !s.trim().is_empty()) {
+        format!(
+            "<runtime now=\"{now}\" cwd=\"{}\" client=\"{}\"/>",
+            xml_attr_escape(&cwd),
+            xml_attr_escape(client),
+        )
+    } else {
+        format!(
+            "<runtime now=\"{now}\" cwd=\"{}\"/>",
+            xml_attr_escape(&cwd),
+        )
+    }
 }
 
 /// 语音对话协议(见 `web::voice_tts`):模型在 `<speak>` 块里给可朗读的口语版。

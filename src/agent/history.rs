@@ -153,7 +153,11 @@ impl Agent {
         // dsh 式投影(08-16 缓存调研):运行时上下文"变了才注入"。终端面
         // 时间已降到小时级,同一小时内 cwd/环境不变 → 与历史里最近一份
         // 化石逐字节相同 → 本轮零新增;平台面保留分钟级,人格报时靠它。
-        let runtime = runtime_context(self.mode, self.platform_context.is_some());
+        let runtime = runtime_context_with(
+            self.mode,
+            self.platform_context.is_some(),
+            Some(self.runtime_client_label()),
+        );
         if last_fossil_with_prefix(&messages, "<runtime ") != Some(runtime.as_str()) {
             messages.push(ChatMessage::turn_context(runtime));
         }

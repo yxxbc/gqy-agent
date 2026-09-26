@@ -18,7 +18,6 @@
 
 mod setup;
 mod stream;
-mod warm;
 
 use crate::llm::openai_compatible::cli_relay::{
     self, payload, RelayOutcome, ResumePlan, ToolScopes,
@@ -29,29 +28,7 @@ pub(in crate::llm::openai_compatible) use setup::remove_conversation_files;
 
 /// 供应商在表单里被关掉时的清理:代理目录与全局 mcp_config 里的桥条目。
 pub(crate) fn remove_relay_files_now() {
-    warm::discard();
     setup::remove_relay_files(&setup::default_config_dir());
-}
-
-/// 预热池快照:给 WebUI 显示「后台还晾着一个进程」用。它不是任务,也不该
-/// 神秘地出现在活动监视器里——晾着谁、还能晾多久,前端如实展示。
-#[derive(Debug, Clone, serde::Serialize)]
-pub(crate) struct WarmSnapshot {
-    /// 距离自动收摊还剩多少秒。
-    pub(crate) seconds_left: u64,
-}
-
-/// 当前晾着的 agy 预热进程;没晾(或晾着的那只已经死了)就是 None。
-pub(crate) fn warm_snapshot() -> Option<WarmSnapshot> {
-    warm::snapshot()
-}
-
-/// daemon 关停时把晾着的预热进程显式收掉。
-///
-/// 它躺在 static 池里,而进程退出不会对 static 跑析构——不主动杀就只能靠
-/// 管道断开让 agy 自己退(不保证)。重启后留下的孤儿 agy 就是这么来的。
-pub(crate) fn discard_warm_process() {
-    warm::discard();
 }
 
 /// 桥上按 eager 常驻的内置工具：以 `mcp_gqy_<名>` 原生名直接可调，完整说明
@@ -118,8 +95,6 @@ pub(in crate::llm::openai_compatible) struct AntigravityRuntime {
     pub(in crate::llm::openai_compatible) gqy_tools_eager_extra: Vec<String>,
     pub(in crate::llm::openai_compatible) idle_timeout: Duration,
     pub(in crate::llm::openai_compatible) print_timeout: Duration,
-    /// 预热进程晾多久没人领就收摊;零 = 不预热。
-    pub(in crate::llm::openai_compatible) warm_idle: Duration,
     /// agy 的用户配置根(`~/.gemini/config`):代理文件与 MCP 注册都落这里。
     /// 测试经 `GQY_AGY_CONFIG_DIR` 改道,免得碰真实配置。
     pub(in crate::llm::openai_compatible) config_dir: PathBuf,
@@ -146,7 +121,6 @@ impl AntigravityRuntime {
                 .collect(),
             idle_timeout: Duration::from_secs(plugin.idle_timeout_seconds.max(30)),
             print_timeout: Duration::from_secs(plugin.print_timeout_seconds.max(60)),
-            warm_idle: Duration::from_secs(plugin.warm_idle_seconds),
             config_dir: setup::default_config_dir(),
         }
     }
@@ -190,7 +164,7 @@ pub(in crate::llm::openai_compatible) const BRIDGE_DUPLICATE_TOOLS: &[&str] =
 const RELAY_ENVIRONMENT_NOTE: &str = "\n\n<relay-environment>\nThis session runs inside GQY's relay: each turn is a fresh agy process that exits when the turn ends. Work backgrounded through the built-in tools (run_command background runs, manage_task, schedule, subagents) dies with the process, and its completion notifications never arrive. The built-in ask_question and generate_image tools are not wired to the user here. Messages reach you as text only: images, videos, audio and documents the user sends are saved to local files and the message carries their absolute paths. Open such a path with view_file to see or hear the media itself.\n</relay-environment>";
 
 /// gqy 工具桥在场时的补充事实。
-const RELAY_GQY_TOOLS_NOTE: &str = "\n<relay-environment-tools>\nThe mcp_gqy_ tools live in the persistent GQY daemon and survive across turns: mcp_gqy_subagent runs a background subagent that wakes a follow-up turn when it finishes, mcp_gqy_job inspects or stops those, mcp_gqy_alarm schedules timed reminders, mcp_gqy_ask_question actually reaches the user and waits for the answer, and mcp_gqy_generate_image delivers the picture to the user.\n</relay-environment-tools>";
+const RELAY_GQY_TOOLS_NOTE: &str = "\n<relay-environment-tools>\nThe gqy MCP server provides tools to this session:\n- Eager tools are registered directly with the mcp_gqy_<name> prefix (e.g. mcp_gqy_github, mcp_gqy_job, mcp_gqy_todowrite, mcp_gqy_vision_analyze, mcp_gqy_subagent, mcp_gqy_ask_question, mcp_gqy_alarm, etc.).\n- Lazy-loaded tools listed under \"# gqy Lazy:\" in <mcp_servers> are called on-demand using call_mcp_tool(ServerName=\"gqy\", ToolName=\"<name>\"). Do NOT call load_tools for MCP tools.\n- Persistent capabilities (mcp_gqy_subagent runs background subagents waking a follow-up turn, mcp_gqy_job inspects/stops them, mcp_gqy_alarm schedules timed reminders, mcp_gqy_ask_question reaches the user, mcp_gqy_generate_image delivers pictures) live in the persistent GQY daemon and survive across turns.\n</relay-environment-tools>";
 
 /// 续传目标在 agy 侧已不存在:agy 不报错,静默新开了别的会话。
 #[derive(Debug)]
@@ -315,22 +289,6 @@ impl OpenAiCompatibleClient {
             if let Some(conversation_id) = &outcome.session_id {
                 setup::remove_conversation_files(conversation_id);
             }
-        } else if crate::paths::is_resident()
-            && gqy_session.is_some()
-            && !runtime.warm_idle.is_zero()
-        {
-            // 会话回合才预热:辅助请求不续传,单次 CLI 一退进程就成孤儿。
-            if let Some(conversation_id) = &outcome.session_id {
-                self.prewarm_next_turn(
-                    &runtime,
-                    &model,
-                    &workdir,
-                    &env,
-                    &agent_name,
-                    conversation_id,
-                )
-                .await;
-            }
         }
         plan.record(&outcome);
         Ok(outcome.result)
@@ -353,14 +311,6 @@ impl OpenAiCompatibleClient {
     {
         let payload = render_stdin_line(plan.delta());
         let args = self.antigravity_args(runtime, model, workdir, agent_name, plan.resume_id());
-        // 上一轮给这一轮晾好的进程:命令行、环境、工作目录逐字节相同才认。
-        let key = warm::WarmKey {
-            binary: runtime.binary.clone(),
-            args: args.clone(),
-            env: env.to_vec(),
-            workdir: workdir.to_path_buf(),
-        };
-        let warm_process = warm::take(&key);
         crate::llm::request_log::record(
             &self.provider.id,
             model,
@@ -369,8 +319,7 @@ impl OpenAiCompatibleClient {
             &runtime.binary.display().to_string(),
             &json!({ "args": args, "stdin": payload, "conversation": plan.conversation() }),
         );
-        let used_warm = warm_process.is_some();
-        let outcome = stream::run_agy_turn(
+        stream::run_agy_turn(
             runtime,
             workdir,
             &args,
@@ -379,59 +328,9 @@ impl OpenAiCompatibleClient {
             agent_name,
             plan.resume_id(),
             request_id,
-            warm_process,
             on_chunk,
         )
-        .await;
-        // 晾着的那个死了:一个字都没吐过,冷启动再来一次,用户看不出区别。
-        if used_warm && outcome.as_ref().is_err_and(stream::warm_process_dead) {
-            tracing::debug!(
-                request_id,
-                "antigravity warm process was dead; spawning a fresh one"
-            );
-            return stream::run_agy_turn(
-                runtime,
-                workdir,
-                &args,
-                env,
-                &payload,
-                agent_name,
-                plan.resume_id(),
-                request_id,
-                None,
-                on_chunk,
-            )
-            .await;
-        }
-        outcome
-    }
-
-    /// 给下一轮晾一个进程:参数与这一轮相同,只把续传目标换成刚拿到的会话 id。
-    /// 失败(agy 缺失、fork 不出来)只记一行 debug——预热本就是锦上添花。
-    async fn prewarm_next_turn(
-        &self,
-        runtime: &AntigravityRuntime,
-        model: &str,
-        workdir: &std::path::Path,
-        env: &[(String, Option<String>)],
-        agent_name: &str,
-        conversation_id: &str,
-    ) {
-        let args =
-            self.antigravity_args(runtime, model, workdir, agent_name, Some(conversation_id));
-        match stream::spawn_warm_agy(runtime, workdir, &args, env).await {
-            Ok(process) => warm::stash(
-                warm::WarmKey {
-                    binary: runtime.binary.clone(),
-                    args,
-                    env: env.to_vec(),
-                    workdir: workdir.to_path_buf(),
-                },
-                process,
-                runtime.warm_idle,
-            ),
-            Err(error) => tracing::debug!(%error, "antigravity pre-warm failed"),
-        }
+        .await
     }
 
     fn antigravity_args(

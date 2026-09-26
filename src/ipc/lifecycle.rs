@@ -508,6 +508,10 @@ pub(crate) fn start_daemon_process(
     let mut command = std::process::Command::new(executable);
     command.arg("__daemon");
     append_daemon_process_args(&mut command, launch);
+    let daemon_cwd = directories::BaseDirs::new()
+        .map(|dirs| dirs.home_dir().to_path_buf())
+        .unwrap_or_else(|| paths.root_dir.clone());
+    command.current_dir(&daemon_cwd);
     command
         .stdin(Stdio::null())
         .stdout(Stdio::from(log.try_clone()?))

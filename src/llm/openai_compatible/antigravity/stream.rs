@@ -17,50 +17,7 @@ use crate::llm::openai_compatible::cli_relay::{
 };
 use crate::llm::openai_compatible::*;
 
-/// 预热进程在被领走之前就死了。判据严格:一行 stdout 都没有过,所以模型一定
-/// 还没被调用,上层可以安心冷启动重来。
-#[derive(Debug)]
-pub(super) struct WarmProcessDead;
 
-impl std::fmt::Display for WarmProcessDead {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "the pre-warmed agy process died before it was used")
-    }
-}
-
-impl std::error::Error for WarmProcessDead {}
-
-pub(super) fn warm_process_dead(error: &anyhow::Error) -> bool {
-    error
-        .chain()
-        .any(|cause| cause.downcast_ref::<WarmProcessDead>().is_some())
-}
-
-/// 只拉起进程、不喂载荷:给下一轮晾着用。
-pub(super) async fn spawn_warm_agy(
-    runtime: &AntigravityRuntime,
-    workdir: &std::path::Path,
-    args: &[String],
-    env: &[(String, Option<String>)],
-) -> Result<RelayProcess> {
-    RelayProcess::spawn_idle(
-        &runtime.binary,
-        args,
-        workdir,
-        env,
-        runtime.idle_timeout,
-        "antigravity.stream",
-        "agy",
-        || {
-            t(
-                "Antigravity CLI (agy) not found; install it or set plugins.antigravity.binary",
-                "找不到 Antigravity CLI(agy);请安装它或配置 plugins.antigravity.binary",
-            )
-            .to_string()
-        },
-    )
-    .await
-}
 
 /// 把登录态/额度类失败翻译成端点调度认识的分类。只看 result 级的错误文本:
 /// stderr 每次启动都打一行 "not logged into Antigravity" 再静默鉴权成功,
@@ -144,46 +101,33 @@ pub(super) async fn run_agy_turn<F>(
     expected_agent: &str,
     expected_conversation: Option<&str>,
     request_id: &str,
-    warm: Option<RelayProcess>,
     on_chunk: &mut F,
 ) -> Result<RelayOutcome>
 where
     F: FnMut(ChatStreamChunk) -> Result<()>,
 {
-    // 预热进程早就把登录与 MCP 握手跑完了(init 已经在路上),只差这口载荷。
-    let was_warm = warm.is_some();
-    let mut process = match warm {
-        Some(mut process) => {
-            process.send_payload(stdin_payload);
-            process
-        }
-        None => {
-            RelayProcess::spawn(
-                &runtime.binary,
-                args,
-                workdir,
-                env,
-                stdin_payload,
-                runtime.idle_timeout,
-                "antigravity.stream",
-                "agy",
-                || {
-                    t(
-                    "Antigravity CLI (agy) not found; install it or set plugins.antigravity.binary",
-                    "找不到 Antigravity CLI(agy);请安装它或配置 plugins.antigravity.binary",
-                )
-                .to_string()
-                },
+    let mut process = RelayProcess::spawn(
+        &runtime.binary,
+        args,
+        workdir,
+        env,
+        stdin_payload,
+        runtime.idle_timeout,
+        "antigravity.stream",
+        "agy",
+        || {
+            t(
+                "Antigravity CLI (agy) not found; install it or set plugins.antigravity.binary",
+                "找不到 Antigravity CLI(agy);请安装它或配置 plugins.antigravity.binary",
             )
-            .await?
-        }
-    };
+            .to_string()
+        },
+    )
+    .await?;
     let mut state = StreamState::default();
     let mut conversation_id: Option<String> = None;
     let mut final_frame: Option<Value> = None;
-    let mut saw_output = false;
     while let Some(line) = process.next_line().await? {
-        saw_output = true;
         let trimmed = line.trim();
         if trimmed.is_empty() {
             continue;
@@ -237,11 +181,6 @@ where
     let (exit_code, stderr_text) = process.finish().await;
 
     let Some(final_frame) = final_frame else {
-        // 晾着的进程在被领走之前就死了(agy 自己超时、被系统回收)。一个字都没
-        // 吐过就说明模型还没被调用,重跑一次冷启动不会多花额度。
-        if was_warm && !saw_output {
-            return Err(anyhow::Error::new(WarmProcessDead));
-        }
         bail!(
             "agy exited (code {exit_code}) without a result event: {} {}",
             state.error_text.trim(),

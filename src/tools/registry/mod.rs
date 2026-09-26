@@ -416,7 +416,11 @@ impl ToolRegistry {
         sender: mpsc::UnboundedSender<ToolProgressEvent>,
         guard_ctx: &GuardCtx,
     ) -> Result<ToolFuture> {
-        let Some(tool) = self.tools.get(name) else {
+        let tool = self
+            .tools
+            .get(name)
+            .or_else(|| self.tools.get(normalize_tool_target(name)));
+        let Some(tool) = tool else {
             return Err(self.unknown_tool_error(name));
         };
         let mut args: Value = if arguments.trim().is_empty() {
@@ -425,7 +429,7 @@ impl ToolRegistry {
             serde_json::from_str(arguments)?
         };
         coerce_declared_shapes(&tool.parameters, &mut args);
-        if name == "load_tools" {
+        if tool.name == "load_tools" {
             let result = super::load_tools::execute(args, self);
             return Ok(Box::pin(async move { result }));
         }
@@ -448,18 +452,27 @@ impl ToolRegistry {
     }
 
     pub fn display_name(&self, name: &str) -> Option<String> {
-        self.tools.get(name).and_then(|t| t.display_name.clone())
+        self.tools
+            .get(name)
+            .or_else(|| self.tools.get(normalize_tool_target(name)))
+            .and_then(|t| t.display_name.clone())
     }
 
     #[allow(dead_code)]
     pub fn get(&self, name: &str) -> Option<&ToolSpec> {
-        self.tools.get(name).map(Arc::as_ref)
+        self.tools
+            .get(name)
+            .or_else(|| self.tools.get(normalize_tool_target(name)))
+            .map(Arc::as_ref)
     }
 
     /// 取走一件工具的共享定义(情境化工具的回合级增删要用:摘掉之后还得
     /// 放得回来,而 spec 里裹着闭包,重建一份不如把原件留在手上)。
     pub(crate) fn shared(&self, name: &str) -> Option<Arc<ToolSpec>> {
-        self.tools.get(name).cloned()
+        self.tools
+            .get(name)
+            .or_else(|| self.tools.get(normalize_tool_target(name)))
+            .cloned()
     }
 
     /// 把 [`Self::shared`] 取出的定义原样放回。与 `register` 不同:描述已在
@@ -473,7 +486,7 @@ impl ToolRegistry {
     }
 
     pub fn contains(&self, name: &str) -> bool {
-        self.tools.contains_key(name)
+        self.tools.contains_key(name) || self.tools.contains_key(normalize_tool_target(name))
     }
 
     /// 拼错工具名时的近似候选:子串命中优先,其余按编辑距离,太远不猜。
@@ -509,6 +522,12 @@ impl ToolRegistry {
     }
 
     pub fn unknown_tool_error(&self, name: &str) -> anyhow::Error {
+        let canonical = normalize_tool_target(name);
+        if is_native_host_tool(canonical) {
+            return anyhow::anyhow!(
+                "tool `{name}` is a native host tool, already available in your environment directly without calling through agent internal tools"
+            );
+        }
         let suggestions = self.suggest_similar(name);
         if suggestions.is_empty() {
             anyhow::anyhow!("unknown tool: {name}")
@@ -566,8 +585,16 @@ impl ToolRegistry {
                 continue;
             }
 
-            let Some(tool) = self.tools.get(target) else {
-                skipped.push(format!("{target}: unknown tool or script"));
+            let canonical = normalize_tool_target(target);
+            let tool = self.tools.get(target).or_else(|| self.tools.get(canonical));
+            let Some(tool) = tool else {
+                if is_native_host_tool(canonical) {
+                    skipped.push(format!(
+                        "{target}: native host tool, already directly available without load_tools"
+                    ));
+                } else {
+                    skipped.push(format!("{target}: unknown tool or script"));
+                }
                 continue;
             };
             if tool.name == "load_tools" || tool.always_loaded {
@@ -688,6 +715,46 @@ impl ToolRegistry {
         }
         registry
     }
+}
+
+pub(crate) fn normalize_tool_target(target: &str) -> &str {
+    if let Some(rest) = target.strip_prefix("mcp__gqy__") {
+        rest
+    } else if let Some(rest) = target.strip_prefix("mcp_gqy_") {
+        rest
+    } else if let Some(rest) = target.strip_prefix("mcp_") {
+        rest
+    } else if let Some(rest) = target.strip_prefix("gqy:") {
+        rest
+    } else {
+        target
+    }
+}
+
+pub(crate) fn is_native_host_tool(name: &str) -> bool {
+    matches!(
+        name,
+        "run_command"
+            | "view_file"
+            | "write_to_file"
+            | "replace_file_content"
+            | "find_by_name"
+            | "grep_search"
+            | "list_dir"
+            | "read_url_content"
+            | "search_web"
+            | "call_mcp_tool"
+            | "manage_task"
+            | "schedule"
+            | "bash"
+            | "read"
+            | "edit"
+            | "write"
+            | "glob"
+            | "grep"
+            | "web_search"
+            | "web_fetch"
+    )
 }
 
 #[cfg(test)]
@@ -1183,4 +1250,51 @@ mod manifest_tests {
             .unwrap();
         assert_eq!(allowed, "installed");
     }
+
+    #[test]
+    fn prefix_stripping_and_native_tool_detection_in_expand_load_targets() {
+        let mut registry = ToolRegistry::new();
+        registry.register(
+            ToolSpec::new(
+                "alarm",
+                "set an alarm",
+                json!({"type":"object","properties":{}}),
+                |_| async { Ok("alarm set".to_string()) },
+            )
+            .with_always_loaded(false),
+        );
+        registry.register(
+            ToolSpec::new(
+                "custom_always_loaded",
+                "manage things",
+                json!({"type":"object","properties":{}}),
+                |_| async { Ok("ok".to_string()) },
+            )
+            .with_always_loaded(true),
+        );
+
+        let requested = vec![
+            "mcp_gqy_alarm".to_string(),
+            "mcp__gqy__custom_always_loaded".to_string(),
+            "run_command".to_string(),
+            "mcp_gqy_view_file".to_string(),
+            "completely_unknown_tool".to_string(),
+        ];
+        let loaded = BTreeSet::new();
+        let (targets, tools, skipped) = registry.expand_load_targets(&requested, &loaded);
+
+        assert_eq!(targets, vec!["alarm".to_string()]);
+        assert_eq!(tools, vec!["alarm".to_string()]);
+
+        assert!(skipped.iter().any(|s| s.contains("custom_always_loaded: already available (always loaded)")));
+        assert!(skipped.iter().any(|s| s.contains("run_command: native host tool, already directly available")));
+        assert!(skipped.iter().any(|s| s.contains("mcp_gqy_view_file: native host tool, already directly available")));
+        assert!(skipped.iter().any(|s| s.contains("completely_unknown_tool: unknown tool or script")));
+
+        // registry.contains and registry.get also work with prefixed names
+        assert!(registry.contains("mcp_gqy_alarm"));
+        assert!(registry.contains("alarm"));
+        assert!(registry.get("mcp_gqy_alarm").is_some());
+    }
 }
+

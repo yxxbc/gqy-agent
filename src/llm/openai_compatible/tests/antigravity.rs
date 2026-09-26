@@ -93,7 +93,6 @@ fn antigravity_client(
         gqy_tools_eager_extra: Vec::new(),
         idle_timeout: Duration::from_secs(30),
         print_timeout: Duration::from_secs(600),
-        warm_idle: Duration::ZERO,
         config_dir: dir.join("agyconfig"),
     }));
     client

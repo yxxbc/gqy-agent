@@ -646,6 +646,10 @@ pub(in crate::web) fn attach_owner_turn_tools(
     if mode == AgentMode::Normal && session_is_running_local_webui(state, session_id) {
         crate::tools::register_webui_artifact_tools(registry, config, &state.paths, session_id);
         crate::tools::register_webui_share_tools(registry, config, state.state_store.clone());
+        // 寄信(WebUI 专属)也走这两条路:桥这条服务于 CLI 中转会话
+        // (agy / claude-code / cline / codex),漏了它那边就会
+        // 「unknown tool: send_letter」——信封同样只在网页里点得开。
+        crate::tools::register_webui_letter_tools(registry);
     }
 }
 

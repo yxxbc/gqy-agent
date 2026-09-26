@@ -171,6 +171,13 @@ pub(crate) fn host_environment_block_full(
     if let Some(kernel) = kernel {
         block.push_str(&format!(" kernel=\"{}\"", xml_attr_escape(kernel)));
     }
+    let user_home = directories::BaseDirs::new()
+        .map(|dirs| dirs.home_dir().to_path_buf())
+        .unwrap_or_else(|| root_dir.to_path_buf());
+    block.push_str(&format!(
+        " user_home=\"{}\"",
+        xml_attr_escape(&user_home.display().to_string())
+    ));
     block.push_str(&format!(
         " gqy_home=\"{}\"",
         xml_attr_escape(&root_dir.display().to_string())
