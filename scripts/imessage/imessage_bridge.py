@@ -587,11 +587,131 @@ def check_delivery(handle: str, before_rowid: int, expected: int, wait_seconds: 
 LINK_RE = re.compile(r"\[([^\]]+)\]\(([^)\s]+)\)")
 
 
-def markdown_to_plain(text: str) -> str:
-    """与 src/platforms/reply.rs 的 markdown_to_plain 同一口径,另外去掉 ~~。"""
+SPEAK_RE = re.compile(r"<voice>(.*?)</voice>|<speak>(.*?)</speak>", re.DOTALL | re.IGNORECASE)
+
+
+def synthesize_voice(text: str, workdir: str = None):
+    """把文本合成为 macOS 原生兼容的语音音频文件（.caf / .m4a），优先走 MiniMax / MiMo TTS。"""
+    import shutil
+    import urllib.request
+    clean = text.strip()
+    if not clean:
+        return None
+    cache_dir = os.path.join(HOME, ".gqy", "cache", "voice")
+    os.makedirs(cache_dir, exist_ok=True)
+    temp_dir = tempfile.gettempdir()
+    ts = int(time.time() * 1000)
+    dest_dir = workdir or cache_dir
+    os.makedirs(dest_dir, exist_ok=True)
+    dest_path = os.path.join(dest_dir, f"voice-{ts}.caf")
+
+    # 1. 尝试从 config.jsonc 读取 TTS 配置 (MiniMax 优先)
+    try:
+        if os.path.exists(GQY_CONFIG_PATH):
+            with open(GQY_CONFIG_PATH, encoding="utf-8") as f:
+                raw_cfg = json.loads(strip_jsonc(f.read()), strict=False)
+            tts_cfg = raw_cfg.get("ui", {}).get("tts", {})
+            if tts_cfg.get("enabled"):
+                minimax_cfg = tts_cfg.get("minimax", {})
+                api_key = minimax_cfg.get("api_key", "").strip()
+                if api_key.startswith("$env:"):
+                    api_key = os.environ.get(api_key[5:], "").strip()
+                if api_key:
+                    base_url = (minimax_cfg.get("base_url") or "https://api.minimaxi.com/v1").rstrip("/")
+                    url = f"{base_url}/t2a_v2"
+                    voice_setting = {
+                        "voice_id": minimax_cfg.get("voice_id", "female-shaonv"),
+                        "speed": float(minimax_cfg.get("speed", 1.0)),
+                        "vol": float(minimax_cfg.get("vol", 1.0)),
+                        "pitch": int(minimax_cfg.get("pitch", 0)),
+                    }
+                    if minimax_cfg.get("emotion"):
+                        voice_setting["emotion"] = minimax_cfg.get("emotion")
+                    payload = {
+                        "model": minimax_cfg.get("model", "speech-2.6-turbo"),
+                        "text": clean,
+                        "stream": False,
+                        "output_format": "hex",
+                        "language_boost": minimax_cfg.get("language_boost", "auto"),
+                        "voice_setting": voice_setting,
+                        "audio_setting": {"sample_rate": 24000, "format": "wav", "channel": 1},
+                    }
+                    req = urllib.request.Request(
+                        url,
+                        data=json.dumps(payload).encode("utf-8"),
+                        headers={
+                            "Authorization": f"Bearer {api_key}",
+                            "Content-Type": "application/json",
+                        },
+                        method="POST",
+                    )
+                    with urllib.request.urlopen(req, timeout=30) as resp:
+                        res_data = json.loads(resp.read().decode("utf-8"))
+                        status_code = res_data.get("base_resp", {}).get("status_code", -1)
+                        if status_code == 0 and res_data.get("data", {}).get("audio"):
+                            raw_hex = res_data["data"]["audio"].strip()
+                            wav_bytes = bytes.fromhex(raw_hex)
+                            temp_wav = os.path.join(temp_dir, f"voice-{ts}.wav")
+                            with open(temp_wav, "wb") as wf:
+                                wf.write(wav_bytes)
+                            # 使用 afconvert 将 wav 转为 Apple 原生兼容的 opus/alac caf
+                            conv = subprocess.run(
+                                ["/usr/bin/afconvert", "-f", "caff", "-d", "opus", temp_wav, dest_path],
+                                capture_output=True,
+                                timeout=15,
+                            )
+                            try:
+                                os.unlink(temp_wav)
+                            except OSError:
+                                pass
+                            if conv.returncode == 0 and os.path.exists(dest_path) and os.path.getsize(dest_path) > 0:
+                                log.info("MiniMax TTS audio synthesized successfully: %s", dest_path)
+                                return dest_path
+                            # 若 afconvert 失败，直接把 wav 改名存过去
+                            dest_wav = os.path.join(dest_dir, f"voice-{ts}.wav")
+                            with open(dest_wav, "wb") as wf:
+                                wf.write(wav_bytes)
+                            return dest_wav
+                        log.warning("MiniMax TTS returned error: %s", res_data)
+    except Exception as e:
+        log.warning("MiniMax TTS request failed: %s, falling back to local say", e)
+
+    # 2. 本地 say 兜底
+    temp_caf = os.path.join(temp_dir, f"voice-{ts}.caf")
+    try:
+        res = subprocess.run(
+            ["/usr/bin/say", "-v", "Tingting", clean, "-o", temp_caf],
+            capture_output=True,
+            text=True,
+            timeout=30,
+        )
+        if res.returncode == 0 and os.path.exists(temp_caf) and os.path.getsize(temp_caf) > 0:
+            if temp_caf != dest_path:
+                shutil.copyfile(temp_caf, dest_path)
+                try:
+                    os.unlink(temp_caf)
+                except OSError:
+                    pass
+            return dest_path
+        log.warning("say synthesis failed: code=%d stderr=%s", res.returncode, res.stderr.strip() if res.stderr else "")
+    except Exception as e:
+        log.warning("local voice synthesis failed: %s", e)
+    return None
+
+
+def markdown_to_plain(text: str) -> tuple:
+    """与 src/platforms/reply.rs 同一口径，返回 (纯文本, 提取出的要念的语音文本)。"""
+    voice_snippets = []
+    def _extract_voice(match):
+        val = match.group(1) or match.group(2) or ""
+        if val.strip():
+            voice_snippets.append(val.strip())
+        return ""
+        
+    raw_text = SPEAK_RE.sub(_extract_voice, text)
     out = []
     in_fence = False
-    for line in text.splitlines():
+    for line in raw_text.splitlines():
         stripped = line.lstrip()
         if stripped.startswith("```") or stripped.startswith("~~~"):
             in_fence = not in_fence
@@ -607,7 +727,7 @@ def markdown_to_plain(text: str) -> str:
         for token in ("**", "__", "~~", "`"):
             line = line.replace(token, "")
         out.append(line)
-    return "\n".join(out).strip()
+    return "\n".join(out).strip(), "\n".join(voice_snippets).strip()
 
 
 def split_bubbles(text: str, max_bubbles: int) -> list:
@@ -682,6 +802,25 @@ def prepare_image(path: str, mime: str, workdir: str):
         timeout=60,
     )
     return out if result.returncode == 0 else None
+
+
+def prepare_media(path: str, mime: str, workdir: str) -> tuple:
+    """分类提取附件：(图片路径, 音频或媒体描述文本)。"""
+    lower = path.lower()
+    # 1. 尝试作为图像处理
+    img = prepare_image(path, mime, workdir)
+    if img:
+        return img, None
+    # 2. 尝试作为音频/语音备忘录处理
+    if mime.startswith("audio/") or lower.endswith((".m4a", ".caf", ".mp3", ".wav", ".aac", ".ogg")):
+        out = os.path.join(workdir, os.path.basename(path))
+        try:
+            import shutil
+            shutil.copyfile(path, out)
+            return None, f"[voice/audio message attached at: {out}]"
+        except OSError:
+            return None, f"[audio attachment: {os.path.basename(path)}]"
+    return None, None
 
 
 def wait_for_file(path: str, seconds: float = 20) -> bool:
@@ -1021,11 +1160,13 @@ class ContactWorker(threading.Thread):
                     if not wait_for_file(path):
                         lines.append(f"[attachment unavailable: {name}]")
                         continue
-                    image = prepare_image(path, mime, workdir)
-                    if image:
-                        images.append(image)
+                    img, audio_desc = prepare_media(path, mime, workdir)
+                    if img:
+                        images.append(img)
                         if not message.text:
                             lines.append("[image]")
+                    elif audio_desc:
+                        lines.append(audio_desc)
                     else:
                         lines.append(f"[attachment: {name}]")
             content = "\n".join(lines).strip() or "[image]"
@@ -1044,9 +1185,14 @@ class ContactWorker(threading.Thread):
                 content,
                 images,
             )
+            plain, voice_text = markdown_to_plain(reply)
+            voice_file = None
+            # 仅在模型显式输出 <voice> 标签时发送语音条，防止提到“语音”或“别发语音”时被关键词误触发
 
-        plain = markdown_to_plain(reply)
-        if not plain and not memes:
+            if voice_text:
+                voice_file = synthesize_voice(voice_text)
+                log.info("voice synthesized: %s (text=%s)", voice_file, voice_text[:30])
+        if not plain and not memes and not voice_file:
             log.info("turn done with empty reply (%.1fs)", time.time() - started)
             return
         bubbles = []
@@ -1063,19 +1209,25 @@ class ContactWorker(threading.Thread):
             if index:
                 time.sleep(bubble_pause(bubble, config.bubble_pause_seconds))
             send_text(reply_handle, bubble)
+        # 发送语音条附件
+        if voice_file:
+            if bubbles:
+                time.sleep(bubble_pause("", config.bubble_pause_seconds))
+            send_file(reply_handle, voice_file)
         for index, meme in enumerate(memes[: config.max_memes]):
-            if bubbles or index:
+            if bubbles or voice_file or index:
                 time.sleep(bubble_pause("", config.bubble_pause_seconds))
             send_file(reply_handle, meme)
+        sent_files = (1 if voice_file else 0) + min(len(memes), config.max_memes)
         log.info(
-            "turn done: contact=%s bubbles=%d memes=%d chars=%d (%.1fs)",
+            "turn done: contact=%s bubbles=%d files=%d chars=%d (%.1fs)",
             self.contact,
             len(bubbles),
-            min(len(memes), config.max_memes),
+            sent_files,
             len(plain),
             time.time() - started,
         )
-        check_delivery(reply_handle, before, len(bubbles) + min(len(memes), config.max_memes))
+        check_delivery(reply_handle, before, len(bubbles) + sent_files)
 
 
 # ---------------------------------------------------------------------------
@@ -1299,7 +1451,15 @@ def main() -> int:
         if watermark.idle() and reloader.changed():
             conn.close()
             reloader.exec()
-        time.sleep(config.poll_seconds)
+            
+        # 敏捷事件等待：按 0.25s 切片检测 db_signature 变化，一旦检测到变动立即打断等待开始处理，兼顾低 CPU 与极速响应
+        poll_step = 0.25
+        elapsed = 0.0
+        while elapsed < config.poll_seconds:
+            time.sleep(poll_step)
+            elapsed += poll_step
+            if db_signature() != last_sig:
+                break
 
 
 if __name__ == "__main__":
