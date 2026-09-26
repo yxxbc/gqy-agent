@@ -31,7 +31,6 @@ import { closeSessionMenu, startBrailleTicker } from "./features/sessions/list.j
 import { loadSessionView, openSessionView, switchSessionMode } from "./features/sessions/view.js";
 import { bindSessionSwitcher, closeSessionSwitcher, openSessionSwitcher } from "./features/sessions/switcher.js";
 import { bindStatusBar } from "./features/sessions/statusbar.js";
-import { startHerRoomClock } from "./features/her-room.js";
 import { initRoom } from "./features/room/room.js";
 import { applyAdvancedConfig, clearProviderSecretChanges, configValue, loadConfigDraft, markConfigDirty, refreshProviderSecretStates, saveConfigDraft, setConfigValue, setSettingsView, updateAdvancedConfigEditor, updateSettingsControls } from "./features/settings/config.js";
 import { closeSidebar, openSidebar, setSidebarCollapsed } from "./features/sidebar.js";
@@ -341,7 +340,6 @@ function bindEvents() {
   bindOobeEvents();
   elements.newChatButton.addEventListener("click", requestNewConversation);
   bindSessionSwitcher();
-  startHerRoomClock();
   elements.sessionSwitcherNew?.addEventListener("click", () => {
     closeSessionSwitcher({ restoreFocus: false });
     requestNewConversation();

@@ -466,7 +466,6 @@
       "to": "sessions",
       "reason": "建房后刷新会话列表并打开新房间"
     },
-
     {
       "from": "session-mode",
       "to": "boot",
@@ -516,11 +515,6 @@
       "from": "sessions",
       "to": "goal",
       "reason": "P2 拆分前 app.js 闭包内已有"
-    },
-    {
-      "from": "sessions",
-      "to": "her-room",
-      "reason": "相识天数按会话列表算,列表重画时刷新她的房间"
     },
     {
       "from": "sessions",
@@ -601,11 +595,6 @@
       "from": "sidebar",
       "to": "artifacts",
       "reason": "P2 拆分前 app.js 闭包内已有"
-    },
-    {
-      "from": "today",
-      "to": "her-room",
-      "reason": "信里与纪念日卡的相识天数和侧栏同一个算法"
     },
     {
       "from": "today",

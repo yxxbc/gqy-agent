@@ -332,6 +332,7 @@ body[data-theme="graphite"] .session-unread-dot {
 
 
 .sidebar-footer {
+  align-self: end;
   padding: 11px 12px max(12px, env(safe-area-inset-bottom));
   background: var(--sidebar-bg);
 }

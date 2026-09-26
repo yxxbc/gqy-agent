@@ -12,7 +12,6 @@ import { deleteSession, openSessionView, refreshSessions } from "./view.js";
 import { sessionsInMode } from "./mode.js";
 import { closeSessionSwitcher, restoreSwitcherCursor } from "./switcher.js";
 import { renderStatusBar } from "./statusbar.js";
-import { syncHerRoom } from "../her-room.js";
 import { closeSidebar } from "../sidebar.js";
 import { elements } from "../../state/elements.js";
 import { state } from "../../state/store.js";
@@ -372,8 +371,6 @@ function syncSessionEntry(sessions) {
   const unread = sessions.some((session) => state.unreadSessions.has(String(session.session_id)));
   elements.sessionEntryUnread.hidden = !unread;
   elements.sessionEntryLabel.textContent = state.sessionMode === "dev" ? "会话" : "信匣";
-  // 相识天数从会话列表里算,列表一变就跟着更新。
-  syncHerRoom();
 }
 
 function buildNoMatchHint() {

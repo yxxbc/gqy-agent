@@ -149,21 +149,8 @@ export function applyPersona(value) {
   elements.brandName.textContent = state.persona.name;
   elements.brandAvatar.alt = state.persona.name;
   setPersonaAvatar(elements.brandAvatar);
-  // 侧栏「她的房间」与模式徽章上的也是她。
+  // 模式徽章上的也是她。
   if (elements.modeBadgeAvatar) setPersonaAvatar(elements.modeBadgeAvatar);
-  // 月洞窗里放看板立绘;没配看板就退回头像。
-  if (elements.herRoomBoard) {
-    const board = boardImageSrc();
-    if (board) {
-      elements.herRoomBoard.hidden = false;
-      elements.herRoomBoard.src = board;
-      elements.herRoomBoard.classList.add("is-board");
-    } else {
-      elements.herRoomBoard.classList.remove("is-board");
-      setPersonaAvatar(elements.herRoomBoard);
-    }
-  }
-  if (elements.herRoomName) elements.herRoomName.textContent = state.persona.name;
   elements.emptyKickerName.textContent = state.persona.name;
   elements.emptyTitle.textContent = state.persona.board_title;
   elements.emptySubtitle.textContent = state.persona.board_subtitle;

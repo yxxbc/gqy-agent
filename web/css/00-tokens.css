@@ -160,10 +160,7 @@ body[data-theme="linen"] {
   --term-warn: #f6c177;
   --term-err: #ff8787;
 
-  /* 普通模式的「月下花笺」:月白的晕、白梅的枝与花、飘落的花瓣。 */
-  --moonlight: #dfe6fb;
-  --plum-branch: #8a787d;
-  --plum-flower: #f4ebef;
+  /* 普通模式飘落的花瓣。 */
   --petal: rgba(255, 196, 214, 0.62);
 
   /* 三档软阴影(阴影 rgba 常量按主题,允许保留) */
@@ -281,9 +278,6 @@ body[data-theme="linen"] {
   --term-ok: #1d6b2f;
   --term-warn: #9a5b00;
   --term-err: #a31d2b;
-  --moonlight: #ffe9bf;
-  --plum-branch: #6a5750;
-  --plum-flower: #f6dce2;
   --petal: rgba(208, 120, 142, 0.42);
   --bubble-shadow: 0 0 0 1px rgba(40, 32, 18, 0.06);
   --card-shadow: 0 0 0 1px rgba(40, 32, 18, 0.07), 0 1px 2px rgba(40, 32, 18, 0.04);

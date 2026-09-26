@@ -1,6 +1,5 @@
 import { apiRequest } from "../core/api.js";
 import { firstLine, formatRelativeTime } from "../core/format.js";
-import { daysTogether } from "./her-room.js";
 import { sessionsInMode } from "./sessions/mode.js";
 import { openSessionView } from "./sessions/view.js";
 import { elements } from "../state/elements.js";
@@ -14,6 +13,23 @@ import { state } from "../state/store.js";
 /// 留一枚小邮戳,点它换城市。下面两张小卡:「上次你说」接着上回的话头,
 /// 「相识第 N 天」是纪念日。天气由 daemon 代取(/api/account/today)。
 const REFRESH_MS = 30 * 60 * 1000;
+const DAY_MS = 24 * 60 * 60 * 1000;
+
+/// 相识天数(按自然日,第一天算 1)与起点;没有会话时为 null。从最早的那个会话算起
+/// (两种模式都算,终端车道也算——那也是在一起的日子)。昨晚认识、今早打开,就是第 2 天。
+export function daysTogether() {
+  let since = Infinity;
+  for (const session of state.sessions) {
+    const time = Date.parse(session?.created_at || "");
+    if (Number.isFinite(time) && time < since) since = time;
+  }
+  if (!Number.isFinite(since)) return null;
+  const start = new Date(since);
+  start.setHours(0, 0, 0, 0);
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+  return { days: Math.max(1, Math.round((today - start) / DAY_MS) + 1), since: start };
+}
 const CN_DIGITS = "〇一二三四五六七八九";
 
 const todayState = {

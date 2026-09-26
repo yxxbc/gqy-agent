@@ -69,7 +69,7 @@ function playModeVeil(mode) {
 export function syncModeChrome() {
   const mode = normalizeMode(state.sessionMode);
   document.body.dataset.mode = mode;
-  // 落梅只属于她的房间;开发模式、单会话部署都不飘。
+  // 落梅只属于普通模式;开发模式、单会话部署都不飘。
   setPetals(elements.mainStage, mode === "normal" && multiSessionEnabled());
   syncComposerPlaceholder();
   syncSwitcherCopy();

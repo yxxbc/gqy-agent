@@ -222,7 +222,7 @@ body.has-statusbar .app-shell {
     transform: translateX(0);
   }
 
-  /* 抽屉里没有她的房间:品牌行、徽章、会话入口排在上面,页脚沉底。 */
+  /* 抽屉:品牌行、徽章、会话入口排在上面,页脚沉底。 */
   body[data-mode="dev"] .sidebar {
     display: flex;
     flex-direction: column;

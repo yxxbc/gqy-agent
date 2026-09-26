@@ -92,24 +92,6 @@
         </button>
       </div>
 
-      <!-- 普通模式的侧栏是「她的房间」:一扇月洞窗,窗里是她,窗外斜出一枝白梅;
-           下面是名字、按时辰变的问候与相识天数(features/her-room.js)。 -->
-      <section class="her-room" id="herRoom" aria-label="她">
-        <div class="moon-gate">
-          <span class="moon-gate-window"><img src="/assets/gqywallpaper.png" alt="" id="herRoomBoard"></span>
-          <svg class="moon-gate-plum" viewBox="0 0 140 110" aria-hidden="true">
-            <path class="plum-branch" d="M138 4 C118 10 104 22 92 38 C84 49 78 58 66 66 M92 38 C98 46 100 56 98 68 M66 66 C56 72 44 74 30 72 M104 22 C112 26 118 32 120 42"></path>
-            <g class="plum-flower" transform="translate(66 66)"><circle r="5.2" cx="0" cy="-5.6"></circle><circle r="5.2" cx="5.3" cy="-1.7"></circle><circle r="5.2" cx="3.3" cy="4.5"></circle><circle r="5.2" cx="-3.3" cy="4.5"></circle><circle r="5.2" cx="-5.3" cy="-1.7"></circle><circle class="plum-heart" r="2.2"></circle></g>
-            <g class="plum-flower" transform="translate(98 68) scale(0.8)"><circle r="5.2" cx="0" cy="-5.6"></circle><circle r="5.2" cx="5.3" cy="-1.7"></circle><circle r="5.2" cx="3.3" cy="4.5"></circle><circle r="5.2" cx="-3.3" cy="4.5"></circle><circle r="5.2" cx="-5.3" cy="-1.7"></circle><circle class="plum-heart" r="2.2"></circle></g>
-            <g class="plum-flower" transform="translate(120 42) scale(0.65)"><circle r="5.2" cx="0" cy="-5.6"></circle><circle r="5.2" cx="5.3" cy="-1.7"></circle><circle r="5.2" cx="3.3" cy="4.5"></circle><circle r="5.2" cx="-3.3" cy="4.5"></circle><circle r="5.2" cx="-5.3" cy="-1.7"></circle><circle class="plum-heart" r="2.2"></circle></g>
-            <g class="plum-flower is-bud" transform="translate(30 72) scale(0.5)"><circle r="5.2" cx="0" cy="-5.6"></circle><circle r="5.2" cx="5.3" cy="-1.7"></circle><circle r="5.2" cx="3.3" cy="4.5"></circle><circle r="5.2" cx="-3.3" cy="4.5"></circle><circle r="5.2" cx="-5.3" cy="-1.7"></circle></g>
-          </svg>
-        </div>
-        <strong class="her-room-name" id="herRoomName">顾清影</strong>
-        <span class="her-room-status" id="herRoomStatus">晚上好,今天辛苦了</span>
-        <span class="her-room-days" id="herRoomDays" hidden></span>
-      </section>
-
       <!-- 会话入口:普通模式叫「信匣」,开发模式是指令面板(Ctrl+K)。 -->
       <button class="session-entry" id="sessionSwitcherButton" type="button" aria-haspopup="dialog">
         <span class="icon-slot" data-icon="messages-square" aria-hidden="true"><span class="icon-fallback">≡</span></span>
