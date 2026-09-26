@@ -13,6 +13,7 @@ use crate::llm::openai_compatible::cli_relay::{
 };
 use crate::llm::openai_compatible::cline::ClineRuntime;
 use crate::llm::openai_compatible::*;
+use serde_json::Value;
 
 /// `--id` 目标在 cline 侧续不上的签名。CLI 没有公开的报错文案,按"找不到
 /// 会话"这一类收口;误判的代价只是白跑一轮(调用方回退全量重放)。
@@ -141,14 +142,13 @@ where
                 }
             }
             Some("hook_event") => {
-                tracing::debug!(
-                    request_id,
-                    hook = value
-                        .get("hookEventName")
-                        .and_then(Value::as_str)
-                        .unwrap_or("?"),
-                    "cline hook event"
-                );
+                // 宏参数里别走裸 `Value` 路径:tracing 的展开作用域里也有个
+                // `Value`(field trait),会把这儿的 serde 类型挡掉(E0782)。
+                let hook = value
+                    .get("hookEventName")
+                    .and_then(Value::as_str)
+                    .unwrap_or("?");
+                tracing::debug!(request_id, hook, "cline hook event");
             }
             Some("team_event") => {
                 tracing::debug!(request_id, "cline team event (ignored by the relay)");
@@ -374,14 +374,13 @@ where
             state.failed = Some(message.to_string());
         }
         Some("notice") => {
-            tracing::debug!(
-                notice = event
-                    .get("noticeType")
-                    .and_then(Value::as_str)
-                    .unwrap_or("?"),
-                reason = event.get("reason").and_then(Value::as_str).unwrap_or(""),
-                "cline notice"
-            );
+            // 同上:hook_event 那条注释说的原因,别在宏参数里写 `Value::…`。
+            let notice = event
+                .get("noticeType")
+                .and_then(Value::as_str)
+                .unwrap_or("?");
+            let reason = event.get("reason").and_then(Value::as_str).unwrap_or("");
+            tracing::debug!(notice, reason, "cline notice");
         }
         _ => {}
     }

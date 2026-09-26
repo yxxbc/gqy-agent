@@ -622,6 +622,7 @@ impl Default for PluginsConfig {
             claude_code: ClaudeCodePluginConfig::default(),
             antigravity: AntigravityPluginConfig::default(),
             codex: CodexPluginConfig::default(),
+            cline: ClinePluginConfig::default(),
         }
     }
 }
