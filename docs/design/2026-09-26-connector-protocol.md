@@ -1,6 +1,6 @@
 # 通用连接器协议：平台接入不再写进 daemon（方案稿）
 
-> 状态：**已确认（09-26）；P2a 已完成（协议、接入端、投递与跟进提到 common/），P2b 施工中**｜日期：2026-09-26｜前身：`docs/design/2026-09-26-imessage-platform.md`（P2 原计划 iMessage 专用模块）
+> 状态：**已确认（09-26）；P2a / P2b / P2c 全部落地，09-26 14:04 fast-forward 合入 gqy（`4b909420`，远端 `gqy/gqy` 同步），CHANGELOG 已补；手机侧真机验收未记录，P3 未开工**｜日期：2026-09-26｜前身：`docs/design/2026-09-26-imessage-platform.md`（P2 原计划 iMessage 专用模块）
 
 ## 一、为什么改
 
@@ -79,7 +79,7 @@ src/platforms/
 | P2b | iMessage 连接器改写 + 指令 + 会话迁移 + 语音 | 手机上把现有功能各试一遍；旧会话历史还在 |
 | P2c | WebUI 平台页（连接器列表、状态、联系人、设置）+ TUI 平台菜单一项 | 页面上能看到连接状态、改设置 |
 
-每步单独提交；P2 整体验收通过再合进 gqy、写 CHANGELOG。
+每步单独提交；原计划「P2 整体验收通过再合进 gqy、写 CHANGELOG」。**实际经过（09-26 收尾核对）**：P2c（`4b909420`）提交后当天 14:04 以 fast-forward 直接合进 `gqy` 并推送，两个 TUI / render 修复叠在其上（`a9e277d2`、`4c2095ca`），CHANGELOG 条目补进 `[Unreleased]`；真机验收（手机上把现有功能各试一遍、旧会话历史还在）没有记录，仍待补。
 
 ## 六、用户拍板（09-26，均按推荐）
 
@@ -87,3 +87,13 @@ src/platforms/
 2. **配置放 `platforms.connectors.<platform>`**，取代原方案稿的 `platforms.imessage`。
 3. **语音 WIP 先原样提交**（`bce1e5de`）再改写，合成搬进 daemon。
 4. **直接切换**：连接器原地替换旧脚本，出问题用 git 退回，不留新旧双模式。
+
+## 七、P2 落地记录（09-26 收尾核对）
+
+- **提交**：`7d49d09b`（P2a：协议、通用接入端、`common/delivery`、配置）、`3923805b`（P2b：连接器改写、平台指令、会话迁移、语音）、`4b909420`（P2c：WebUI 平台页、TUI 菜单）。
+- **代码位置**：daemon 侧 `src/platforms/connector/`（`protocol.rs`、`server.rs`、`registry.rs`、`inbound.rs`、`adapter.rs`、`policy.rs`、`commands.rs`、`legacy.rs`、`tests.rs`）；连接器 `scripts/imessage/imessage_bridge.py` 约 1000 行，含手写的 WebSocket 客户端（只用系统 Python 标准库，不引入 pip 依赖）。
+- **自动测试**：`src/platforms/connector/tests.rs` 用假连接器走真 WebSocket，覆盖握手、鉴权、ack、回合、`send` / `send_result`、断线。
+- **CI**：P2c 那一次的 Source checks 被后一个提交抢占取消；`a9e277d2` 的 CI 因测试编译错在 Linux / macOS 单测、doc 测试、MSRV、测试计数上全红；`4c2095ca` 修掉后其余全绿，只剩 macOS 单测（09-26 14:39 核对时仍在跑，见 [run 36223642805](https://github.com/yxxbc/gqy-agent/actions/runs/36223642805)）。
+- **文档**：wiki 13 §11、wiki 02、wiki 10、wiki 15、README 与 `scripts/imessage/README.md` 随 P2b 更新；P2c 的 WebUI / TUI 入口补进 wiki 13 §11；CHANGELOG 条目 09-26 补进 `[Unreleased]`。
+- **收尾（09-26）**：本地分支 `feat/imessage-platform`、worktree `/Users/mac/Projects/gqy-agent-imessage`、远端分支 `gqy/feat/imessage-platform` 全部删除（提交都在 `gqy` 里，没有别的分支持有 P2）；CHANGELOG 与本文的状态更新留在工作区未提交，等真机验收通过后再一起提。
+- **还没做**：真机验收；P3（主动消息、定时消息、主动私聊、睡眠时段、送达回执、消息记录）；平台插件仍不开；群聊不支持。

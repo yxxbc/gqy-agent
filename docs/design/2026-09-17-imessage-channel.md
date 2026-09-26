@@ -1,6 +1,6 @@
 # iMessage 双向通道：实现方案
 
-> 状态：**已施工，待验收**｜日期：2026-09-17｜实现：`scripts/imessage/`
+> 状态：**已施工并迭代两轮；本文所述的桥接内回合逻辑已被 09-26 的平台化取代**。09-26 复核：iMessage 现在是 gqy 的原生平台（`platforms.connectors.imessage`），`scripts/imessage/` 只剩收发 I/O，会话、指令、拆气泡、模型、记忆都由 daemon 处理——见 `docs/design/2026-09-26-imessage-platform.md`（平台层整理）与 `docs/design/2026-09-26-connector-protocol.md`（通用连接器协议，P2a/P2b/P2c 已合入 gqy）。本文保留为当时的设计与取舍记录｜日期：2026-09-17｜实现：`scripts/imessage/`
 >
 > 文中 `文件:行号` 均指 `9a82439f` 时的代码。
 

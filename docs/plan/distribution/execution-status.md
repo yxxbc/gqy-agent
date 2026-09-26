@@ -1,5 +1,7 @@
 # Distribution implementation status
 
+> **这是一份历史记录（09-26 复核后加注）**：本目录记的是 0.6.0 那轮 Linux 打包分发的施工与取证，**任务已完成、只作存档**。文中引用的路径与分支现在多已不存在：`packaging/`（含 `packaging/common/third-party.lock.json`）已随 Arch/DEB/RPM 打包体系一起删除（AGENTS.md §7.7，只有 Nix 和 `install.sh` 两条安装路线），分支 `worktree-distribution-2026-09-14` 从未合并，仓库也已从上游独立为 `yxxbc/gqy-agent`。要动打包或发布，看 `docs/wiki/18-Nix安装开发与发布.md` 与 AGENTS.md §7，不要照这里的步骤做。
+
 总体进度：100%。用户修改后的 Linux 0.6.0 容器安装、真实模型验收、正式 Release 和环境清理已完成。
 
 - 正式发布：https://github.com/SHORiN-KiWATA/miyu-agent/releases/tag/v0.6.0
