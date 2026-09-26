@@ -125,9 +125,6 @@ pub struct AntigravityPluginConfig {
     /// 这里给 24 小时,真正的活性判定交给看门狗。
     #[serde(default = "default_antigravity_print_timeout_seconds")]
     pub print_timeout_seconds: u64,
-    /// (已废弃，预热逻辑已彻底移除；保留反序列化兼容)
-    #[serde(default = "default_antigravity_warm_idle_seconds")]
-    pub warm_idle_seconds: u64,
 }
 
 impl Default for AntigravityPluginConfig {
@@ -140,7 +137,6 @@ impl Default for AntigravityPluginConfig {
             gqy_tools_eager_extra: Vec::new(),
             idle_timeout_seconds: default_antigravity_idle_timeout_seconds(),
             print_timeout_seconds: default_antigravity_print_timeout_seconds(),
-            warm_idle_seconds: default_antigravity_warm_idle_seconds(),
         }
     }
 }

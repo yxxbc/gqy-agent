@@ -138,8 +138,18 @@ pub(in crate::agent) fn with_host_environment(
     system_prompt
 }
 
+/// 主机环境块后面那段自我认知:每个字段指的是什么。
+///
+/// 09-26 实测:daemon 从源码目录拉起时,她把 gqy-agent 仓库当成了自己的家,
+/// 问「清理你自己的家目录」就去翻源码;WebUI 里问 `letter --help` 就去解释
+/// 代码库。属性值给的是事实,这段给的是读法——家是 gqy_home,源码只是她跑在
+/// 上面的软件,cwd 是这一轮的工作目录,client 是用户从哪条路来的。常量,
+/// 任何会话逐字节相同。
+pub(crate) const SELF_MODEL: &str = "<self-model>gqy_home is your own home. Your config, memories, personas and logs live there. The GQY source code, wherever it sits on disk, is software you run on. It is not your home, and it is not the user's workspace unless cwd points into it. The runtime stamp after the user's message carries cwd and client. cwd is this turn's working directory, and relative paths resolve against it. client names the channel the user reached you through: webui, cli, subagent, or platform/kind such as qq/group. Trust these fields over guesses and over older messages.</self-model>";
+
 /// 主机环境块:模型池与思考档位(state 里存的偏好)——池里不止一个就全列(逗号
-/// 分隔),档位各模型不一致就写 mixed;沙盒回合再带上根与放行摘要。
+/// 分隔),档位各模型不一致就写 mixed;沙盒回合再带上根与放行摘要。后面紧跟
+/// [`SELF_MODEL`],字段和读法放在一起。
 pub(crate) fn host_environment_for(config: &AppConfig, paths: &GqyPaths) -> String {
     let choices = config.active_provider_model_choices();
     let model_label = (!choices.is_empty()).then(|| {
@@ -155,12 +165,15 @@ pub(crate) fn host_environment_for(config: &AppConfig, paths: &GqyPaths) -> Stri
     // (Agent 在 run_turn_task 里建,处在 with_sandbox 作用域内),属性按真实策略
     // 生成——根、可写、可读——字节随会话恒定;绑定/解绑各是一次计划内冷启动。
     let sandbox = crate::tools::sandbox::current_sandbox();
-    crate::host_info::host_environment_block_full(
+    let mut block = crate::host_info::host_environment_block_full(
         &paths.root_dir,
         model_label.as_deref(),
         None,
         sandbox.as_deref(),
-    )
+    );
+    block.push('\n');
+    block.push_str(SELF_MODEL);
+    block
 }
 
 /// 每轮瞬态尾巴里唯一的运行时事实：时间 + 工作目录。
@@ -188,7 +201,10 @@ pub(in crate::agent) fn runtime_context_with(
     if platform {
         let now = Local::now().format("%Y-%m-%d %a %H:%M UTC%:z");
         if let Some(client) = client.filter(|s| !s.trim().is_empty()) {
-            return format!("<runtime now=\"{now}\" client=\"{}\"/>", xml_attr_escape(client));
+            return format!(
+                "<runtime now=\"{now}\" client=\"{}\"/>",
+                xml_attr_escape(client)
+            );
         }
         return format!("<runtime now=\"{now}\"/>");
     }
@@ -204,10 +220,7 @@ pub(in crate::agent) fn runtime_context_with(
             xml_attr_escape(client),
         )
     } else {
-        format!(
-            "<runtime now=\"{now}\" cwd=\"{}\"/>",
-            xml_attr_escape(&cwd),
-        )
+        format!("<runtime now=\"{now}\" cwd=\"{}\"/>", xml_attr_escape(&cwd),)
     }
 }
 

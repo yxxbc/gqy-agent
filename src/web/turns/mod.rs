@@ -535,11 +535,7 @@ pub(in crate::web) async fn list_jobs_http(
         .into_iter()
         .filter(|job| job_visible_to(&state, &identity, job.session_id.as_deref()))
         .collect::<Vec<_>>();
-    Ok(Json(json!({
-        "jobs": jobs,
-        "warm": serde_json::Value::Null,
-    }))
-    .into_response())
+    Ok(Json(json!({ "jobs": jobs })).into_response())
 }
 
 /// 后台子代理到目前为止的原始进度标记流,网页端刷新后据它回放子过程时间线(#9)。

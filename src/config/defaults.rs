@@ -489,11 +489,6 @@ pub(crate) fn default_antigravity_print_timeout_seconds() -> u64 {
     24 * 60 * 60
 }
 
-/// (已废弃，预热逻辑已彻底移除) 默认 0
-pub(crate) fn default_antigravity_warm_idle_seconds() -> u64 {
-    0
-}
-
 pub(crate) fn default_codex_native_tools() -> String {
     "all".to_string()
 }

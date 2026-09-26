@@ -293,7 +293,7 @@ async fn call_tool(
     };
     let registry = build_tool_registry(&config, paths, mode, false)?;
     if !registry.contains(name) {
-        bail!("{:#}", registry.unknown_tool_error(name));
+        bail!("{:#}", registry.unknown_bridge_tool_error(name));
     }
     let turn_origin: crate::tools::workspace::TurnOrigin = origin
         .as_deref()

@@ -118,6 +118,64 @@ fn host_environment_rides_the_system_prompt_for_owners_only() {
     assert!(host_at < lock_at);
 }
 
+/// 自我认知(09-26):主机环境块后面紧跟 SELF_MODEL,说清 gqy_home 是她的家、源码
+/// 不是、cwd/client 怎么读。跟着主机块走——属主与 WebUI 有,平台回合没有;常量,
+/// 两次组装逐字节相同。
+#[test]
+fn the_self_model_follows_the_host_environment_block() {
+    let temp = tempfile::tempdir().unwrap();
+    let paths = test_paths(temp.path());
+    let build = |audience, platform| {
+        with_host_environment(
+            "base".to_string(),
+            audience,
+            &paths,
+            &AppConfig::default(),
+            AgentMode::Normal,
+            platform,
+        )
+    };
+    let owner = build(PromptAudience::Owner, false);
+    let webui = build(PromptAudience::External, false);
+    let platform = build(PromptAudience::External, true);
+    for prompt in [&owner, &webui] {
+        let host_at = prompt.find("<host-environment").unwrap();
+        let self_at = prompt
+            .find(SELF_MODEL)
+            .expect("self-model after the host block");
+        assert!(host_at < self_at, "{prompt}");
+    }
+    assert!(!platform.contains("<self-model>"));
+    assert_eq!(owner, build(PromptAudience::Owner, false));
+    // 模型可见的机械文本:英文短句,不用分号串联(AGENTS.md §1.5)。
+    assert!(SELF_MODEL.is_ascii() && !SELF_MODEL.contains(';'));
+    // 只说「运行时戳」,不写标签:系统提示词里出现 `<runtime` 会被当成逐轮那一枚。
+    assert!(!SELF_MODEL.contains("<runtime"));
+    for field in ["gqy_home", "cwd", "client", "source code"] {
+        assert!(SELF_MODEL.contains(field), "{field}");
+    }
+}
+
+/// 运行时尾巴带上客户端来源;不给就和原来一样(子代理、旧调用点)。
+#[test]
+fn the_runtime_stamp_names_the_client_channel() {
+    let webui = runtime_context_with(AgentMode::Normal, false, Some("webui"));
+    assert!(
+        webui.contains("cwd=\"") && webui.contains("client=\"webui\""),
+        "{webui}"
+    );
+    let group = runtime_context_with(AgentMode::Normal, true, Some("qq/group"));
+    assert!(
+        group.contains("client=\"qq/group\"") && !group.contains("cwd="),
+        "{group}"
+    );
+    let bare = runtime_context_with(AgentMode::Normal, false, None);
+    assert!(!bare.contains("client="), "{bare}");
+    // 引号之类进属性前转义,伪造不出第二个属性。
+    let odd = runtime_context_with(AgentMode::Normal, true, Some("x\" y=\"z"));
+    assert!(odd.contains("client=\"x&quot; y=&quot;z\""), "{odd}");
+}
+
 /// `/sandbox`(或成员)回合:环境块按 task-local 的策略带上根与放行摘要;作用域外
 /// 一个字不多——同一会话内策略不变,字节就不变。
 #[tokio::test]

@@ -250,7 +250,7 @@ pub(in crate::web) async fn handle_session_command(
                 // 一轮,这里把近似建议和"查目录"的路标一并给出。
                 return Err(format!(
                     "tool error: {:#}. {}",
-                    registry.unknown_tool_error(&name),
+                    registry.unknown_bridge_tool_error(&name),
                     t(
                         "run `gqy tool-call --list` to see tools callable in this session",
                         "用 `gqy tool-call --list` 查看本会话可调用的工具"
@@ -340,7 +340,7 @@ pub(in crate::web) async fn handle_session_command(
             match name {
                 Some(name) => {
                     let Some(spec) = registry.get(&name) else {
-                        return Err(format!("{:#}", registry.unknown_tool_error(&name)));
+                        return Err(format!("{:#}", registry.unknown_bridge_tool_error(&name)));
                     };
                     Ok(json!({
                         "mode": mode_label,

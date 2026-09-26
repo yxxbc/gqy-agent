@@ -17,8 +17,6 @@ use crate::llm::openai_compatible::cli_relay::{
 };
 use crate::llm::openai_compatible::*;
 
-
-
 /// 把登录态/额度类失败翻译成端点调度认识的分类。只看 result 级的错误文本:
 /// stderr 每次启动都打一行 "not logged into Antigravity" 再静默鉴权成功,
 /// 拿它判 401 会误杀。

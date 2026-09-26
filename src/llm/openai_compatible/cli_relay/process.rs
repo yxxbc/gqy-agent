@@ -24,7 +24,7 @@ pub(in crate::llm::openai_compatible) struct RelayProcess {
     /// 永远等不到人读,或者拿到一个没有 stderr 尾巴的 EPIPE——两种都盖住了
     /// 真正的报错措辞(评审 09-03)。
     stdin_task: Option<tokio::task::JoinHandle<()>>,
-    /// 预热进程先拉起、后喂载荷,写端在这里存着等 [`RelayProcess::send_payload`]。
+    /// 进程先拉起、后喂载荷,写端在这里存着等 [`RelayProcess::send_payload`]。
     stdin: Option<tokio::process::ChildStdin>,
     idle_timeout: Duration,
     /// 看门狗报错里的阶段名(`claude-code.stream` 这种)。
@@ -79,8 +79,8 @@ impl RelayProcess {
         Ok(process)
     }
 
-    /// 只拉起进程,不喂 stdin。预热用:CLI 在收到输入之前就会把登录、MCP 握手
-    /// 这些固定开销跑完(agy 实测 4.5 秒),载荷晚点再给也不影响。
+    /// 只拉起进程,不喂 stdin;[`Self::spawn`] 拉起后紧接着喂载荷。拆成两步是
+    /// 为了让拉起失败(找不到二进制等)与写 stdin 失败各报各的错。
     #[allow(clippy::too_many_arguments)]
     pub(in crate::llm::openai_compatible) async fn spawn_idle(
         binary: &std::path::Path,

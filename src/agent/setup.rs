@@ -263,16 +263,21 @@ impl Agent {
             .is_some_and(|context| !context.owner_bound())
     }
 
-    /// 回合客户端来源(终端 CLI、WebUI、平台或内部子代理)。
-    pub(in crate::agent) fn runtime_client_label(&self) -> &'static str {
-        if self.platform_context.is_some() {
-            "platform"
+    /// 回合客户端来源:用户从哪条路来的(`<runtime client=…>`)。
+    ///
+    /// 平台回合写到平台与会话类型(`qq/group`、`imessage/private`),而不是笼统
+    /// 的 platform——群聊和私聊该怎么说话不一样,iMessage 与 QQ 能发的东西也不
+    /// 一样。同一会话里恒定,不会让运行时尾巴逐轮变字节。
+    pub(in crate::agent) fn runtime_client_label(&self) -> String {
+        if let Some(context) = &self.platform_context {
+            let conversation = &context.conversation;
+            format!("{}/{}", conversation.platform, conversation.kind.as_str())
         } else if self.prompt_audience == PromptAudience::External {
-            "webui"
+            "webui".to_string()
         } else if self.prompt_audience == PromptAudience::Internal {
-            "subagent"
+            "subagent".to_string()
         } else {
-            "cli"
+            "cli".to_string()
         }
     }
 

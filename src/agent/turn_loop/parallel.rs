@@ -228,7 +228,7 @@ impl Agent {
         let runtime = runtime_context_with(
             mode,
             self.platform_context.is_some(),
-            Some(self.runtime_client_label()),
+            Some(self.runtime_client_label().as_str()),
         );
         let runtime_block = (last_fossil_with_prefix(messages, "<runtime ")
             != Some(runtime.as_str()))

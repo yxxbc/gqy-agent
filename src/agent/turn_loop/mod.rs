@@ -408,7 +408,7 @@ impl Agent {
                             ChatMessage::turn_context(runtime_context_with(
                                 self.mode,
                                 self.platform_context.is_some(),
-                                Some(self.runtime_client_label()),
+                                Some(self.runtime_client_label().as_str()),
                             )),
                         ],
                     ));
@@ -1216,7 +1216,7 @@ impl Agent {
                                 ChatMessage::turn_context(runtime_context_with(
                                     self.mode,
                                     self.platform_context.is_some(),
-                                    Some(self.runtime_client_label()),
+                                    Some(self.runtime_client_label().as_str()),
                                 )),
                             ],
                         ));

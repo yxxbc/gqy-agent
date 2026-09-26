@@ -521,13 +521,12 @@ impl ToolRegistry {
             .collect()
     }
 
+    /// 回合内(任何供应商)调到不存在的工具:只说真话——没有这件,近似的有哪些。
+    ///
+    /// 不在这里说「这是宿主原生工具」:直连 API 的供应商(DeepSeek、OpenAI 兼容
+    /// 等)根本没有原生工具,告诉它「read 已经直接可用」只会让它越绕越远。那句
+    /// 提示只属于 CLI 中转后端的桥路径,见 [`Self::unknown_bridge_tool_error`]。
     pub fn unknown_tool_error(&self, name: &str) -> anyhow::Error {
-        let canonical = normalize_tool_target(name);
-        if is_native_host_tool(canonical) {
-            return anyhow::anyhow!(
-                "tool `{name}` is a native host tool, already available in your environment directly without calling through agent internal tools"
-            );
-        }
         let suggestions = self.suggest_similar(name);
         if suggestions.is_empty() {
             anyhow::anyhow!("unknown tool: {name}")
@@ -537,6 +536,21 @@ impl ToolRegistry {
                 suggestions.join(", ")
             )
         }
+    }
+
+    /// 工具桥(`gqy mcp-serve` / `gqy tool-call`)上的「没有这件」。
+    ///
+    /// 桥的调用方是 CLI 中转后端(agy、claude-code、codex、cline),它们自带一套
+    /// 原生工具。模型常把原生工具名当成 顾清影 的工具经桥去调(`view_file`、
+    /// `bash`…),这时要告诉它回自己的原生工具去,而不是只报拼写错误。
+    pub fn unknown_bridge_tool_error(&self, name: &str) -> anyhow::Error {
+        let canonical = normalize_tool_target(name);
+        if is_native_host_tool(canonical) && !self.contains(canonical) {
+            return anyhow::anyhow!(
+                "`{name}` is one of your host CLI's own native tools, not a GQY bridge tool. Call it directly as a native tool."
+            );
+        }
+        self.unknown_tool_error(name)
     }
 
     pub(crate) fn loadable_tools(&self, loaded: &BTreeSet<String>) -> Vec<&ToolSpec> {
@@ -588,13 +602,7 @@ impl ToolRegistry {
             let canonical = normalize_tool_target(target);
             let tool = self.tools.get(target).or_else(|| self.tools.get(canonical));
             let Some(tool) = tool else {
-                if is_native_host_tool(canonical) {
-                    skipped.push(format!(
-                        "{target}: native host tool, already directly available without load_tools"
-                    ));
-                } else {
-                    skipped.push(format!("{target}: unknown tool or script"));
-                }
+                skipped.push(format!("{target}: unknown tool or script"));
                 continue;
             };
             if tool.name == "load_tools" || tool.always_loaded {
@@ -1286,15 +1294,55 @@ mod manifest_tests {
         assert_eq!(targets, vec!["alarm".to_string()]);
         assert_eq!(tools, vec!["alarm".to_string()]);
 
-        assert!(skipped.iter().any(|s| s.contains("custom_always_loaded: already available (always loaded)")));
-        assert!(skipped.iter().any(|s| s.contains("run_command: native host tool, already directly available")));
-        assert!(skipped.iter().any(|s| s.contains("mcp_gqy_view_file: native host tool, already directly available")));
-        assert!(skipped.iter().any(|s| s.contains("completely_unknown_tool: unknown tool or script")));
+        assert!(skipped
+            .iter()
+            .any(|s| s.contains("custom_always_loaded: already available (always loaded)")));
+        // load_tools 对任何供应商都可见:不在这里说「原生可用」,如实报没有。
+        assert!(skipped
+            .iter()
+            .any(|s| s.contains("run_command: unknown tool or script")));
+        assert!(skipped
+            .iter()
+            .any(|s| s.contains("mcp_gqy_view_file: unknown tool or script")));
+        assert!(skipped
+            .iter()
+            .any(|s| s.contains("completely_unknown_tool: unknown tool or script")));
 
         // registry.contains and registry.get also work with prefixed names
         assert!(registry.contains("mcp_gqy_alarm"));
         assert!(registry.contains("alarm"));
         assert!(registry.get("mcp_gqy_alarm").is_some());
     }
-}
 
+    /// 回合内的报错对所有供应商都一样:不说「宿主原生工具」(直连 API 的模型没有);
+    /// 只有桥路径(CLI 中转后端)才这样提示,而且 顾清影 自己有同名工具时不提示。
+    #[test]
+    fn native_tool_hint_only_on_the_bridge() {
+        let mut registry = ToolRegistry::new();
+        registry.register(ToolSpec::new(
+            "read_files",
+            "read files",
+            json!({"type":"object","properties":{}}),
+            |_| async { Ok("ok".to_string()) },
+        ));
+        registry.register(ToolSpec::new(
+            "run_command",
+            "run a command",
+            json!({"type":"object","properties":{}}),
+            |_| async { Ok("ok".to_string()) },
+        ));
+
+        let turn = registry.unknown_tool_error("view_file").to_string();
+        assert!(turn.starts_with("unknown tool: view_file"), "{turn}");
+        assert!(!turn.contains("native"), "{turn}");
+
+        let bridge = registry
+            .unknown_bridge_tool_error("mcp_gqy_view_file")
+            .to_string();
+        assert!(bridge.contains("native tools"), "{bridge}");
+
+        // 拼错的 顾清影 工具仍给近似建议,桥上也一样。
+        let typo = registry.unknown_bridge_tool_error("read_file").to_string();
+        assert!(typo.contains("did you mean: read_files"), "{typo}");
+    }
+}

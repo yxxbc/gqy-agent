@@ -124,7 +124,7 @@ pub(in crate::cli) async fn run_tool_call(paths: &GqyPaths, args: ToolCallArgs) 
         }
         let name = args.name.as_deref().expect("checked above");
         let Some(spec) = registry.get(name) else {
-            return Err(registry.unknown_tool_error(name));
+            return Err(registry.unknown_bridge_tool_error(name));
         };
         println!(
             "{}",
@@ -192,7 +192,7 @@ pub(in crate::cli) async fn run_tool_call(paths: &GqyPaths, args: ToolCallArgs) 
     if !registry.contains(&name) {
         bail!(
             "{:#}. {}",
-            registry.unknown_tool_error(&name),
+            registry.unknown_bridge_tool_error(&name),
             t(
                 "run `gqy tool-call --list` to see tools callable in this session",
                 "用 `gqy tool-call --list` 查看本会话可调用的工具"

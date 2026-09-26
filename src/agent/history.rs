@@ -156,7 +156,7 @@ impl Agent {
         let runtime = runtime_context_with(
             self.mode,
             self.platform_context.is_some(),
-            Some(self.runtime_client_label()),
+            Some(self.runtime_client_label().as_str()),
         );
         if last_fossil_with_prefix(&messages, "<runtime ") != Some(runtime.as_str()) {
             messages.push(ChatMessage::turn_context(runtime));
