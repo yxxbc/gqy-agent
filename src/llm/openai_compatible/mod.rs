@@ -18,6 +18,7 @@ mod wire;
 mod zen_headers;
 use antigravity::AntigravityRuntime;
 pub(crate) use antigravity::{
+    discard_warm_process as discard_antigravity_warm,
     remove_relay_files_now as remove_antigravity_relay_files,
     warm_snapshot as antigravity_warm_snapshot,
 };

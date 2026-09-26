@@ -223,6 +223,9 @@ pub async fn run(paths: GqyPaths, args: WebArgs) -> Result<()> {
     };
     let _ = actor_tx.send(ActorCommand::Shutdown);
     tools::jobs::shutdown_all();
+    // 晾着的 agy 预热进程同在「收进程」这一档:它躺在 static 池里,进程退出不走
+    // 析构,不显式杀就只能等 agy 自己退——重启后的孤儿 agy 就是这么来的。
+    crate::llm::discard_antigravity_warm();
     voice_bridge::shutdown();
     state.platforms.shutdown_all(&state).await;
     ipc_task.abort();

@@ -46,6 +46,14 @@ pub(crate) fn warm_snapshot() -> Option<WarmSnapshot> {
     warm::snapshot()
 }
 
+/// daemon 关停时把晾着的预热进程显式收掉。
+///
+/// 它躺在 static 池里,而进程退出不会对 static 跑析构——不主动杀就只能靠
+/// 管道断开让 agy 自己退(不保证)。重启后留下的孤儿 agy 就是这么来的。
+pub(crate) fn discard_warm_process() {
+    warm::discard();
+}
+
 /// 桥上按 eager 常驻的内置工具：以 `mcp_gqy_<名>` 原生名直接可调，完整说明
 /// 进 agy 的系统提示词。其余工具仍挂在桥上，走 agy 的懒加载（先读 schema 再
 /// `call_mcp_tool`），不再每次模型调用都背着完整说明。
