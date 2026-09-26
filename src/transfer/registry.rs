@@ -67,6 +67,23 @@ pub const UNITS: &[DataUnit] = &[
         why: "user-authored theme",
     },
     DataUnit {
+        id: "config.webui_themes",
+        rel: "config/webui-themes",
+        kind: UnitKind::Dir,
+        tier: Tier::Core,
+        secret: false,
+        why: "WebUI theme library (Settings → Interface → Color scheme), written by \
+              the user or the webui-theme skill",
+    },
+    DataUnit {
+        id: "config.imessage",
+        rel: "config/imessage.json",
+        kind: UnitKind::File,
+        tier: Tier::Platform,
+        secret: false,
+        why: "iMessage bridge settings; the contact list holds phone numbers and emails",
+    },
+    DataUnit {
         id: "config.shell_hooks",
         rel: "config/shell",
         kind: UnitKind::Dir,
@@ -268,6 +285,23 @@ pub const UNITS: &[DataUnit] = &[
         tier: Tier::Core,
         secret: false,
         why: "per-model thinking level choices",
+    },
+    DataUnit {
+        id: "state.imessage_contacts",
+        rel: "state/imessage-contacts.json",
+        kind: UnitKind::File,
+        tier: Tier::Platform,
+        secret: false,
+        why: "per-contact iMessage topic, model and pause choices",
+    },
+    DataUnit {
+        id: "state.imessage_watermark",
+        rel: "state/imessage-bridge.json",
+        kind: UnitKind::File,
+        tier: Tier::Never,
+        secret: false,
+        why: "ROWID watermark into this Mac's Messages chat.db; on another Mac the \
+              numbers point at unrelated messages, so the bridge must start fresh",
     },
     DataUnit {
         id: "state.repl_history",
