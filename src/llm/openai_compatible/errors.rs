@@ -380,18 +380,21 @@ pub(in crate::llm::openai_compatible) fn provider_error_text(value: &Value) -> S
 
 /// 错误链里的失败归类（稳定字符串，给 WebUI 事件与用户提示用）。
 ///
-/// 只认链里第一个打得开的类型：HTTP 状态失败直接用 [`HttpFailureKind`] 的
-/// 命名（`content_policy`、`rate_limit`……），传输失败加 `transport_` 前缀
+/// 链里能认出哪种失败类型就报哪种：HTTP 状态失败直接用 [`HttpFailureKind`]
+/// 的命名（`content_policy`、`rate_limit`……），传输失败加 `transport_` 前缀
 /// （`transport_timeout`……）。识别不了返回 `None`，调用方保留错误原文——
 /// 不猜、不把未知失败硬塞进某个分类。
+///
+/// 必须用 [`anyhow::Error::downcast_ref`]，不能逐个看 `chain()`：这类失败都是
+/// `.context(..)` 挂上去的，链上每一层是 anyhow 自己的包装类型，`&dyn Error`
+/// 的 downcast 打不开里面挂的类型；`downcast_ref` 会沿 context 链找，挂在
+/// 哪一层都认得出来。
 pub(crate) fn classify_failure(error: &anyhow::Error) -> Option<String> {
-    for cause in error.chain() {
-        if let Some(failure) = cause.downcast_ref::<HttpStatusFailure>() {
-            return Some(failure.kind.to_string());
-        }
-        if let Some(failure) = cause.downcast_ref::<TransportFailure>() {
-            return Some(format!("transport_{}", failure.kind));
-        }
+    if let Some(failure) = error.downcast_ref::<HttpStatusFailure>() {
+        return Some(failure.kind.to_string());
+    }
+    if let Some(failure) = error.downcast_ref::<TransportFailure>() {
+        return Some(format!("transport_{}", failure.kind));
     }
     None
 }
