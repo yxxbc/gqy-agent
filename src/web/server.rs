@@ -419,6 +419,10 @@ pub(in crate::web) fn router(state: DaemonState) -> Router {
         .route("/api/config", get(get_config).put(update_config))
         .route("/api/ui-prefs", get(get_ui_prefs).put(update_ui_prefs))
         .route("/api/providers/models", post(provider_models))
+        .route(
+            "/api/providers/cline-candidates",
+            get(cline_provider_candidates),
+        )
         .route("/api/voice/status", get(voice_status))
         .route("/api/voice/devices", get(voice_devices))
         .route("/api/voice/stream", get(voice_stream))

@@ -36,6 +36,11 @@ struct LiveModel {
 static CLI_WINDOWS: LazyLock<Mutex<HashMap<(String, String), usize>>> =
     LazyLock::new(|| Mutex::new(HashMap::new()));
 
+/// cline 供应商候选的缓存(键 = 解析后的二进制路径):226 家逐个数一次模型要起
+/// 一次 node,输入框聚焦一次就拉一次,缓存住别反复起。
+static CLINE_PROVIDERS: LazyLock<Mutex<Option<(String, Vec<(String, u32)>)>>> =
+    LazyLock::new(|| Mutex::new(None));
+
 fn remember_windows(provider_id: &str, models: &[LiveModel]) {
     let Ok(mut cache) = CLI_WINDOWS.lock() else {
         return;
@@ -175,6 +180,59 @@ fn cline_catalog(config: &AppConfig, binary: &str) -> Result<Vec<LiveModel>> {
     parse_cline_models(&stdout)
 }
 
+/// cline 的供应商候选(id + 模型数):设置里「cline 供应商 id」输入框的候选,
+/// 与模型目录、`-P` 同一个数据源(`getProviderIds()` 逐家数模型)。
+///
+/// cline 的订阅/额度区分就是不同的供应商 id(`cline` 账号额度、`cline-pass`
+/// 订阅……),这里把它们一次列全,免得用户只能手填猜名字。
+pub(crate) fn cline_provider_candidates(config: &AppConfig) -> Result<Vec<(String, u32)>> {
+    let binary = {
+        let configured = config.plugins.cline.binary.trim();
+        if configured.is_empty() {
+            "cline"
+        } else {
+            configured
+        }
+    };
+    let resolved = resolve_binary_path(binary)?;
+    let cache_key = resolved.display().to_string();
+    if let Ok(cache) = CLINE_PROVIDERS.lock() {
+        if let Some((key, cached)) = cache.as_ref() {
+            if key == &cache_key {
+                return Ok(cached.clone());
+            }
+        }
+    }
+    let entry = locate_cline_llms(&resolved).with_context(|| {
+        format!(
+            "cline's bundled @cline/llms was not found above {}; the install may be incomplete",
+            resolved.display()
+        )
+    })?;
+    let script = format!(
+        "const m = await import({});\n\
+         const out = [];\n\
+         for (const id of m.getProviderIds()) {{\n\
+           let count = 0;\n\
+           try {{ const models = await m.getModelsForProvider(id); count = Object.keys(models ?? {{}}).length; }} catch {{}}\n\
+           out.push({{ id, count }});\n\
+         }}\n\
+         process.stdout.write(JSON.stringify(out));",
+        serde_json::to_string(&entry.display().to_string())?,
+    );
+    let stdout = run_with_timeout(
+        "node",
+        &["--input-type=module", "-e", &script],
+        CLI_LIST_TIMEOUT,
+    )
+    .context("running node for the cline provider list")?;
+    let candidates = parse_cline_provider_candidates(&stdout)?;
+    if let Ok(mut cache) = CLINE_PROVIDERS.lock() {
+        *cache = Some((cache_key, candidates.clone()));
+    }
+    Ok(candidates)
+}
+
 /// 把裸名字/相对路径解析成实际文件路径(PATH 查找),供向上找包用。
 fn resolve_binary_path(binary: &str) -> Result<PathBuf> {
     let path = PathBuf::from(binary);
@@ -240,6 +298,33 @@ fn parse_cline_models(stdout: &str) -> Result<Vec<LiveModel>> {
             Some(LiveModel { id, context_window })
         })
         .collect())
+}
+
+/// `[{id,count}]`:供应商 id 与它的模型数。空 id 丢掉;不是数组就报错让调用方看见。
+fn parse_cline_provider_candidates(stdout: &str) -> Result<Vec<(String, u32)>> {
+    let trimmed = stdout.trim();
+    let start = trimmed
+        .find('[')
+        .context("the cline provider list printed no JSON")?;
+    let entries: Vec<serde_json::Value> =
+        serde_json::from_str(&trimmed[start..]).context("the cline provider list JSON")?;
+    let mut candidates = Vec::with_capacity(entries.len());
+    for entry in entries {
+        let Some(id) = entry.get("id").and_then(serde_json::Value::as_str) else {
+            continue;
+        };
+        let id = id.trim();
+        if id.is_empty() {
+            continue;
+        }
+        let count = entry
+            .get("count")
+            .and_then(serde_json::Value::as_u64)
+            .unwrap_or(0)
+            .min(u32::MAX as u64) as u32;
+        candidates.push((id.to_string(), count));
+    }
+    Ok(candidates)
 }
 
 /// `agy models`:每行 `slug<TAB>显示名`;首行 "Fetching available models..."
@@ -367,6 +452,20 @@ mod tests {
             builtin_cli_binary(&config, &provider).as_deref(),
             Some("cline")
         );
+    }
+
+    #[test]
+    fn cline_provider_candidates_read_the_printed_json() {
+        // 空 id(纯空白)混在里面:丢掉,别拿它当候选。
+        let out = "[{\"id\":\"cline\",\"count\":317},{\"id\":\"cline-pass\",\"count\":18},{\"id\":\" \",\"count\":3}]";
+        assert_eq!(
+            parse_cline_provider_candidates(out).unwrap(),
+            vec![
+                ("cline".to_string(), 317u32),
+                ("cline-pass".to_string(), 18)
+            ]
+        );
+        assert!(parse_cline_provider_candidates("no json here").is_err());
     }
 
     /// cline 的清单:node 的杂音在前、JSON 数组在后;空数组合法(调用方据此

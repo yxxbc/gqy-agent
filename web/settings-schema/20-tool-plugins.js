@@ -785,8 +785,11 @@ const toolPlugins = {
       {
         key: "provider",
         label: "cline 供应商 id",
-        hint: "对应 cline 的 -P;空 = 用 CLI 默认的那家",
-        kind: "text",
+        hint: "对应 cline 的 -P:选哪家(如 cline=账号额度、cline-pass=Pass 订阅),模型目录与实际运行都用它。留空 = 用 CLI 默认的那家(目录仍按 cline 列)。输入即搜索,也可手填",
+        kind: "combo",
+        suggestFrom: { url: "/api/providers/cline-candidates", key: "providers" },
+        placeholder: "cline-pass",
+        mono: true,
         default: "",
       },
       {

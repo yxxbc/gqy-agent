@@ -92,6 +92,8 @@
 .st-input.is-invalid, .st-textarea.is-invalid, .st-chips-input.is-invalid { box-shadow: 0 0 0 2px color-mix(in srgb, var(--danger) 60%, transparent); }
 .st-input::placeholder, .st-textarea::placeholder, .st-chips-input::placeholder { color: var(--text-faint); }
 .st-unit-wrap { display: inline-flex; align-items: center; gap: 6px; }
+/* 输入框 + 候选(datalist):候选不占布局,只给输入框当建议 */
+.st-combo-wrap { display: inline-flex; align-items: center; min-width: 0; }
 .st-unit { color: var(--text-faint); font-size: var(--fs-micro); white-space: nowrap; }
 .st-select-wrap { position: relative; display: inline-flex; min-width: 0; }
 .st-select { appearance: none; min-height: 34px; padding: 6px 30px 6px 10px; border: 0; border-radius: var(--radius); outline: 0; background: var(--surface-2); color: var(--text); font-size: var(--fs-ui); cursor: pointer; max-width: 260px; transition: box-shadow var(--motion) ease; }

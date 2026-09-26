@@ -11,6 +11,7 @@ mod plugins;
 mod providers;
 mod quota;
 pub(crate) use cli_catalog::builtin_cli_binary;
+pub(crate) use cli_catalog::cline_provider_candidates;
 pub(crate) use cli_catalog::remembered_window;
 pub(crate) use providers::{auto_configure_model_tags, fetch_models};
 mod real_context;

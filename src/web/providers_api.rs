@@ -24,6 +24,36 @@ pub(in crate::web) struct ProviderModelsResponse {
     pub(in crate::web) models: Vec<crate::models_cache::ModelCatalogEntry>,
 }
 
+/// cline 供应商候选(id + 各家模型数):设置里「cline 供应商 id」输入框的候选。
+///
+/// cline 的订阅/额度区分就是不同的供应商 id(`cline`、`cline-pass`……),这份
+/// 列表直接来自 cline 本体自带的 `@cline/llms`,与模型目录、`-P` 同源。拉不到
+/// 就报错让用户看见(与模型目录同一口径,不悄悄给一份空列表)。
+pub(in crate::web) async fn cline_provider_candidates(
+    State(state): State<DaemonState>,
+    headers: HeaderMap,
+) -> std::result::Result<Response, ApiError> {
+    require_admin(&headers, &state)?;
+    let config = state.manager.lock().unwrap().config.clone();
+    let candidates =
+        tokio::task::spawn_blocking(move || crate::config_tui::cline_provider_candidates(&config))
+            .await
+            .map_err(ApiError::internal)?
+            .map_err(ApiError::internal)?;
+    let providers = candidates
+        .into_iter()
+        .map(|(id, count)| {
+            let label = if count > 0 {
+                format!("{id} · {count} 个模型")
+            } else {
+                id.clone()
+            };
+            serde_json::json!({ "value": id, "label": label })
+        })
+        .collect::<Vec<_>>();
+    Ok(Json(serde_json::json!({ "providers": providers })).into_response())
+}
+
 pub(in crate::web) async fn provider_models(
     State(state): State<DaemonState>,
     headers: HeaderMap,

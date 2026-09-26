@@ -980,6 +980,41 @@ window.GqySettings = (() => {
       }
       case "text":
         return textInput(current ?? "", (next) => binding.set(next), { placeholder: field.placeholder || "", mono: Boolean(field.mono), ariaLabel: field.label });
+      case "combo": {
+        // 输入框 + 候选(datalist):可搜可筛,也允许手填候选之外的值——
+        // 候选只是本机那份清单,拉不到时输入框照常能用(聚焦时再试一次)。
+        const input = textInput(current ?? "", (next) => binding.set(next), {
+          placeholder: field.placeholder || "",
+          mono: Boolean(field.mono),
+          ariaLabel: field.label
+        });
+        const source = field.suggestFrom;
+        if (!source?.url) return input;
+        const listId = `st-combo-${Math.random().toString(36).slice(2, 9)}`;
+        input.setAttribute("list", listId);
+        const datalist = el("datalist", { id: listId });
+        let loading = false;
+        let loaded = false;
+        input.addEventListener("focus", () => {
+          if (loaded || loading) return;
+          loading = true;
+          fetch(source.url, { credentials: "same-origin", cache: "no-store" })
+            .then((response) => (response.ok ? response.json() : Promise.reject(new Error(response.statusText))))
+            .then((payload) => {
+              const items = Array.isArray(payload?.[source.key]) ? payload[source.key] : [];
+              for (const item of items) {
+                const value = String(typeof item === "string" ? item : item?.value ?? "");
+                if (!value) continue;
+                const label = String(typeof item === "string" ? item : item?.label ?? value);
+                datalist.append(el("option", { value, label }));
+              }
+              loaded = true;
+            })
+            .catch(() => { /* 拉不到就下次聚焦再试;输入框不受影响 */ })
+            .finally(() => { loading = false; });
+        });
+        return el("span.st-combo-wrap", null, input, datalist);
+      }
       case "textarea":
         return textarea(current ?? "", (next) => binding.set(next), { rows: field.rows || 4, placeholder: field.placeholder || "", mono: Boolean(field.mono), ariaLabel: field.label });
       case "secret":
