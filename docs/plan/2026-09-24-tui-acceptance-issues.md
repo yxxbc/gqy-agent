@@ -81,3 +81,9 @@
 - 问题 7 选「空会话直接隐藏」，不标注「基础占用」。WebUI 输入框的上下文圆环这次**没动**——要不要一起隐藏，等验收时定。
 - `wake.rs` 里流中途的 `/goal` 仍然静默执行（那是原本的设计：流的中断与重启本身就是反馈），只有空闲时的 `/goal` 改成留痕。
 
+### 验收状态（2026-09-26）
+
+10 项问题已全部完成施工：
+- 1~8、10：已在 `8a5e5611` 及 `ba5fec64` 落实。
+- 9：已在 `tool_summary.rs`（渲染期组装主体与输出、预填信封 diff）、`screen/mod.rs`（无详情点击反馈轻量 toast）与 `tool_display.rs` 落实，带单元测试 `file_tools_register_expandable_blocks_with_subject_and_output_in_timeline`。
+

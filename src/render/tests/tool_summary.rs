@@ -1014,3 +1014,119 @@ fn tool_peek_spells_out_arguments_instead_of_raw_json() {
     assert_eq!(args_peek("{}"), None);
     assert_eq!(args_peek("not json"), None);
 }
+
+fn with_blocks<T>(body: impl FnOnce() -> T) -> T {
+    static LOCK: std::sync::Mutex<()> = std::sync::Mutex::new(());
+    let _guard = LOCK
+        .lock()
+        .unwrap_or_else(std::sync::PoisonError::into_inner);
+    blocks::set_enabled(true);
+    let out = body();
+    blocks::set_enabled(false);
+    out
+}
+
+fn block_id_in(line: &str) -> Option<u64> {
+    let rest = line.split_once("\x1b]1337;gqy-block=")?.1;
+    rest.split_once('\u{7}')?.0.parse().ok()
+}
+
+/// 文件类工具（read、grep、edit 等）在时间线上必须挂可展开块，即使输出为空也能展开看路径/参数。
+#[test]
+fn file_tools_register_expandable_blocks_with_subject_and_output_in_timeline() {
+    with_blocks(|| {
+        let mut renderer = StreamRenderer::new(
+            ReasoningDisplayMode::Summary,
+            ToolCallDisplayMode::Summary,
+            false,
+            true,
+            10,
+        );
+        renderer.live_summary = false;
+        renderer.use_buffered_output();
+
+        // 1. read 有输出：详情包含路径和内容
+        renderer
+            .write_tool_call("read", r#"{"path":"src/main.rs"}"#)
+            .unwrap();
+        renderer
+            .write_tool_result("read", true, "fn main() {}")
+            .unwrap();
+
+        // 2. read 空文件（输出为空）：详情仍然包含路径，不能变成空块
+        renderer
+            .write_tool_call("read", r#"{"path":"empty.txt"}"#)
+            .unwrap();
+        renderer.write_tool_result("read", true, "").unwrap();
+
+        // 3. edit 没有 __patch_preview__（如重放或非 preview 路径）：详情是信封 diff 而不是 JSON
+        renderer
+            .write_tool_call(
+                "edit",
+                r#"{"patchText":"*** Begin Patch\n*** Update File: src/lib.rs\n@@\n-old line\n+new line\n*** End Patch\n"}"#,
+            )
+            .unwrap();
+        renderer
+            .write_tool_result("edit", true, r#"{"ok":true}"#)
+            .unwrap();
+
+        // 4. grep 0 个匹配（输出为空）：详情仍然包含模式与路径
+        renderer
+            .write_tool_call("grep", r#"{"pattern":"my_func","path":"src"}"#)
+            .unwrap();
+        renderer.write_tool_result("grep", true, "").unwrap();
+
+        renderer.cut_timeline().unwrap();
+        let frame = String::from_utf8_lossy(&renderer.take_output_frame()).into_owned();
+        let head = block_id_in(&frame).expect("时间线收缩行没挂块");
+        let inner = crate::render::blocks::get(head).unwrap_or_default();
+        let step_blocks: Vec<u64> = inner.iter().filter_map(|line| block_id_in(line)).collect();
+
+        assert_eq!(
+            step_blocks.len(),
+            4,
+            "4 个工具步骤都应该挂可展开块，实际挂了: {step_blocks:?}"
+        );
+
+        // 验证各步的展开详情
+        let read_detail = crate::render::blocks::get(step_blocks[0])
+            .unwrap_or_default()
+            .join("\n");
+        assert!(
+            read_detail.contains("src/main.rs"),
+            "read 详情缺少路径: {read_detail}"
+        );
+        assert!(
+            read_detail.contains("fn main()"),
+            "read 详情缺少内容: {read_detail}"
+        );
+
+        let empty_read_detail = crate::render::blocks::get(step_blocks[1])
+            .unwrap_or_default()
+            .join("\n");
+        assert!(
+            empty_read_detail.contains("empty.txt"),
+            "空文件 read 详情缺少路径: {empty_read_detail}"
+        );
+
+        let edit_detail = crate::render::blocks::get(step_blocks[2])
+            .unwrap_or_default()
+            .join("\n");
+        assert!(
+            edit_detail.contains("new line"),
+            "edit 详情应该包含 diff 行: {edit_detail}"
+        );
+        assert!(
+            !edit_detail.contains(r#"{"ok":true}"#),
+            "edit 详情不应被原始 ok JSON 覆盖: {edit_detail}"
+        );
+
+        let grep_detail = crate::render::blocks::get(step_blocks[3])
+            .unwrap_or_default()
+            .join("\n");
+        assert!(
+            grep_detail.contains("my_func") && grep_detail.contains("src"),
+            "grep 0 匹配时详情缺少模式/路径: {grep_detail}"
+        );
+    });
+}

@@ -268,9 +268,10 @@ pub(crate) fn tool_subject(name: &str, arguments: &str) -> Option<String> {
         "Task" | "Agent" => string_arg(&args, &["description"]),
         "SlashCommand" => string_arg(&args, &["command"]),
         // —— agy 原生工具(antigravity 中转;入参键已在流层归一成 顾清影 的) ——
-        "view_file" | "write_to_file" | "replace_file_content" | "list_dir" => {
-            string_arg(&args, &["path"])
-        }
+        "view_file" | "write_to_file" | "replace_file_content" | "list_dir" => string_arg(
+            &args,
+            &["path", "AbsolutePath", "TargetFile", "DirectoryPath"],
+        ),
         "find_by_name" | "grep_search" => {
             let needle = string_arg(&args, &["pattern", "query"])?;
             Some(match string_arg(&args, &["path"]) {

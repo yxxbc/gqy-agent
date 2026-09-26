@@ -1181,8 +1181,29 @@ impl super::LiveReplTail {
                                 // 子代理点开的是覆盖层，不是就地展开。
                                 if crate::render::blocks::is_overlay(id) {
                                     screen.open_overlay(id);
-                                } else {
-                                    screen.toggle_block(id);
+                                } else if !screen.toggle_block(id) {
+                                    screen.toast(crate::i18n::text(
+                                        "no details available",
+                                        "无详细输出",
+                                    ));
+                                }
+                            } else {
+                                let line_text = screen
+                                    .view_row(row)
+                                    .into_iter()
+                                    .map(|span| span.text)
+                                    .collect::<String>();
+                                let trimmed = line_text.trim_start();
+                                if trimmed.starts_with('│')
+                                    || trimmed.starts_with('├')
+                                    || trimmed.starts_with('└')
+                                    || trimmed.starts_with("⎿")
+                                    || trimmed.starts_with("⎇")
+                                {
+                                    screen.toast(crate::i18n::text(
+                                        "no details available",
+                                        "无详细输出",
+                                    ));
                                 }
                             }
                         }

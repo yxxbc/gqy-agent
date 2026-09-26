@@ -4,7 +4,7 @@
 //! （`finish_subagent_timer`）。并行子代理各占一块，settled 的要冻在原地，不能
 //! 因为别人还在跑就跟着重排。
 
-use super::timeline::{command_peek, tool_output_lines};
+use super::timeline::{command_peek, tool_output_lines, wrap_detail};
 use crate::render::*;
 
 impl StreamRenderer {
@@ -66,6 +66,15 @@ impl StreamRenderer {
             let stats = self.tool_stats_entry(name);
             stats.calls += 1;
             stats.subject = tool_subject(name, arguments);
+            if self.timeline_enabled() && stats.detail.is_empty() {
+                if let Some(diff) = crate::render::patch_envelope_lines_from_args(
+                    name,
+                    arguments,
+                    super::timeline::detail_width(),
+                ) {
+                    stats.detail = diff;
+                }
+            }
             // 每个工具都掐表，不只命令和子代理。时间线上那一步要报秒数，收缩行的
             // `Worked for` 要把它算进去——原来普通工具不掐，一段里只有普通工具时
             // 收缩行就成了光秃秃的 `1 tool · 1 err`（用户实测）。
@@ -241,11 +250,6 @@ impl StreamRenderer {
             // 静态版没处点开：普通工具只留那一行，成败都不印输出——输出是给模型
             // 看的，不是给人扫的；报错更多时候是一团裸 JSON，印出来只会丑
             //（用户拍板：除了命令，其他工具报错不需要报错信息）。
-            let detail = if self.timeline_static() {
-                None
-            } else {
-                self.timeline_enabled().then(|| tool_output_lines(output))
-            };
             let stats = self.tool_stats_entry(name);
             if ok {
                 stats.ok += 1;
@@ -256,10 +260,24 @@ impl StreamRenderer {
             if stats.elapsed.is_none() {
                 stats.elapsed = stats.measure();
             }
-            // 已经有更好的详情（补丁 diff）就别用原始输出盖掉它。
-            if let Some(detail) = detail {
-                if stats.detail.is_empty() {
-                    stats.detail = detail;
+            // 已经有更好的详情（补丁 diff）就别用原始输出盖掉它；没有的话，
+            // 像子代理时间线一样组装：主体（路径/参数摘要）一段、空一行、输出一段。
+            if !self.timeline_static() && self.timeline_enabled() && stats.detail.is_empty() {
+                let mut lines = Vec::new();
+                if let Some(subject) = stats.subject.as_deref().filter(|s| !s.trim().is_empty()) {
+                    lines.extend(
+                        wrap_detail(subject)
+                            .into_iter()
+                            .map(|piece| format!("\x1b[2m{piece}\x1b[0m")),
+                    );
+                }
+                let output_lines = tool_output_lines(output);
+                if !lines.is_empty() && !output_lines.is_empty() {
+                    lines.push(String::new());
+                }
+                lines.extend(output_lines);
+                if !lines.is_empty() {
+                    stats.detail = lines;
                 }
             }
             stats.progress = None;
