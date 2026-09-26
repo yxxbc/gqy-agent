@@ -42,10 +42,7 @@ fn remember_windows(provider_id: &str, models: &[LiveModel]) {
     };
     for model in models {
         if let Some(window) = model.context_window.filter(|window| *window > 0) {
-            cache.insert(
-                (provider_id.to_string(), model.id.clone()),
-                window as usize,
-            );
+            cache.insert((provider_id.to_string(), model.id.clone()), window as usize);
         }
     }
 }
@@ -240,10 +237,7 @@ fn parse_cline_models(stdout: &str) -> Result<Vec<LiveModel>> {
                 .get("contextWindow")
                 .and_then(serde_json::Value::as_u64)
                 .filter(|window| *window > 0);
-            Some(LiveModel {
-                id,
-                context_window,
-            })
+            Some(LiveModel { id, context_window })
         })
         .collect())
 }
