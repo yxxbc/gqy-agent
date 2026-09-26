@@ -1,6 +1,6 @@
 # 通用连接器协议：平台接入不再写进 daemon（方案稿）
 
-> 状态：**已确认（09-26），P2a 施工中**｜日期：2026-09-26｜前身：`docs/design/2026-09-26-imessage-platform.md`（P2 原计划 iMessage 专用模块）
+> 状态：**已确认（09-26）；P2a 已完成（协议、接入端、投递与跟进提到 common/），P2b 施工中**｜日期：2026-09-26｜前身：`docs/design/2026-09-26-imessage-platform.md`（P2 原计划 iMessage 专用模块）
 
 ## 一、为什么改
 
@@ -14,46 +14,52 @@
 - 解耦：连接器自己保管读取水位，daemon 回 ack 才推进。daemon 升级重启或忙，连接器只是等着重连，消息不丢；连接器挂了不影响 daemon。
 - macOS 权限只给连接器的启动器，一次授权（原方案稿 §二 的约束不变）。
 
-## 二、协议 `gqy-connector/1`
+## 二、协议 `gqy-connector/1`（P2a 已落地，以代码为准：`src/platforms/connector/protocol.rs`）
 
-传输：本机 WebSocket，挂在 web 端口的 `/api/connector/ws`。鉴权：`Authorization: Bearer <token>`，token 在该连接器的配置里；没配 token 时只接受回环地址。帧是 JSON 文本，每帧带 `type`。
+传输：本机 WebSocket，挂在 web 端口的 `/api/connector/ws?platform=<平台名>`。鉴权在升级之前：该平台必须在 `platforms.connectors` 里启用，并带 `Authorization: Bearer <token>`。**口令必填，不认「来自本机」**：沙盒里的成员会话也能连回环端口（Landlock 不管 socket），放行等于让它冒充主人。帧是 JSON 文本，每帧带 `type`，未知字段忽略。
 
 | 方向 | type | 内容 | 说明 |
 |---|---|---|---|
-| C→D | `hello` | `protocol`、`platform`（如 `imessage`）、`account`、`connector`（名称/版本）、`capabilities` | 第一帧。platform 必须在配置里启用 |
-| D→C | `welcome` | `protocol`、`session`（连接 id）、`limits`（单帧/附件上限） | 版本不兼容就回 `error` 并断开 |
-| C→D | `event` | `id`（连接器侧唯一，如 ROWID）、`kind`（`message`/`reaction`）、`conversation`、`sender`、`text`、`reply_to`、`reaction`、`attachments[]`、`timestamp` | 平台中立字段，对应 `PlatformInboundEvent` |
-| D→C | `ack` | `id` | daemon 已接收并排进队列。连接器收到才推进水位 |
-| D→C | `send` | `req`、`conversation`、`parts[]`（`text`/`image`/`audio`/`file`/`reaction`）、`pace_ms` | 一个气泡或一个附件一帧；daemon 负责拆气泡和节奏 |
-| C→D | `send_result` | `req`、`ok`、`message_id`、`error` | 送达回执（iMessage 回查 chat.db 后可补一帧 `delivery`） |
-| 双向 | `ping`/`pong` | — | 30 秒心跳 |
+| C→D | `hello` | `protocol`、`platform`、`account`、`display_name`、`connector`（name/version）、`capabilities` | 升级后 10 秒内必须到。platform 要与 URL 一致 |
+| D→C | `welcome` | `protocol`、`connection`、`max_frame_bytes`、`max_attachment_bytes` | 版本或平台不对就回 `error`（`bad_hello`）并断开 |
+| C→D | `event` | `id`、`kind`（`message`/`reaction`）、`conversation`（kind/id）、`sender`（id/name）、`text`、`reply_to`、`reaction`、`target`、`attachments[]`、`timestamp` | 平台中立字段 |
+| D→C | `ack` | `id` | **处理完**才回（回合跑完或判定不回）。连接器收到才推进水位；重复的 id 直接回 ack |
+| D→C | `send` | `req`、`to`、`part`（`text`/`image`/`audio`/`file`，附件带 mime/name/data） | 一帧一个气泡或一个附件；拆气泡、打字停顿都在 daemon |
+| C→D | `send_result` | `req`、`ok`、`message_id`、`error` | 纯文字 30 秒、附件 180 秒内不回算失败 |
+| 双向 | `ping`/`pong` | — | daemon 30 秒一次；90 秒收不到任何帧就断 |
 | 双向 | `error` | `code`、`message` | |
 
-附件走协议内 base64（带大小上限），不传路径：daemon 没有完全磁盘访问权限，读不了 `~/Library/Messages`；以后远端连接器也一样能用。
+附件走协议内 base64（单个上限 16 MiB，单帧 32 MB），不传路径：daemon 没有完全磁盘访问权限，读不了 `~/Library/Messages`；以后远端连接器也一样能用。
 
-`capabilities` 例：`{"reaction_in": true, "reaction_out": false, "audio_out": true, "group": false, "typing": false}`。daemon 按能力决定能用什么（例如没有 `audio_out` 就不合成语音）。
+`capabilities`：`reaction_in`、`reaction_out`、`image_out`、`audio_out`、`file_out`、`group`，缺省全否。没声明的能力 daemon 不用（没有 `audio_out` 时 `send_voice_message` 报「cannot send voice messages」）。
+
+同一（平台, 账号）只留一条连接：重连顶掉旧连接，旧连接上等待中的发送立刻失败。
 
 ## 三、daemon 侧结构
 
 ```
 src/platforms/
-  connector/          通用接入端（新）
-    mod.rs            ConnectorDriver（PlatformDriver 实现）、连接表
-    protocol.rs       帧类型 serde，版本协商
-    server.rs         WS 握手、鉴权、读写循环、ack
-    inbound.rs        event → PlatformInboundEvent → 回合（照 onebot/dispatch 的 14 步）
-    adapter.rs        ConnectorAdapter：PlatformAdapter 实现，send → send 帧 + 等 send_result
-    commands.rs       连接器平台通用指令：/new /topics /topic /model /pause /resume /help
+  connector/          通用接入端
+    mod.rs            ConnectorDriver（配置变了断开不再合法的连接）
+    protocol.rs       帧类型
+    server.rs         WS 入口、鉴权、握手、读写循环、心跳、ack
+    registry.rs       连接表、事件去重、攒着的点按回应
+    inbound.rs        event → 回合（照 QQ 私聊的规矩）
+    adapter.rs        PlatformAdapter：拆气泡、打字停顿、附件、按能力拒绝
     policy.rs         impl PlatformPolicy for ConnectorPlatformConfig
-  common/delivery.rs  deliver_dispatch 从 onebot/outbound.rs 提出来，两边共用
+    commands.rs       （P2b）/new /topics /topic /model /pause /resume /help
+    tests.rs          假连接器走真 WebSocket
+  common/delivery.rs  deliver_dispatch（从 onebot/outbound.rs 提出来，两边共用）
+  common/followup.rs  回合中途来消息：platform_update_target、active_turn_update_mode
 ```
 
-- **配置**：`platforms.connectors.<platform>`（缺省不写出），每个平台一段：`enabled`、`token`、`owner`、`contacts`（名字 + 多个 handle 合成一个人）、`batch_wait_seconds`、`max_bubbles`、`tools`、`voice`。token 在 WebUI 里打码（照 `platforms.qq.access_token`）。
+- **配置**：`platforms.connectors.<platform>`（缺省不写出），每个平台一段：`enabled`、`token`、`contacts`（名字 + 多个账号合成一个人，`owner` 标主人）、`owner_host_tools`、`max_bubbles`、`bubble_pause_seconds`、`memory_write_enabled`。token 在 WebUI 里打码（照 `platforms.qq.access_token`）。旧桥接的「攒几秒再回」不要了：私聊里回合还在写时来新消息会取代它，和 QQ 私聊一样。
 - **会话**：绑定键 `platform=imessage, conversation_id=<联系人名>`。话题 = 同一联系人名下多个会话，`/new` 建新会话并改绑，`/topic N` 改绑到 `imessage-<联系人>-N`。旧会话 `imessage-<联系人>`、`imessage-<联系人>-N` 原名沿用，历史不丢；当前话题从 `~/.gqy/state/imessage-contacts.json` 迁过来一次。
 - **模型**：`/model` 用会话级模型覆盖（`set_session_model_override`，`TurnProfile.text_models = None` 时自动生效），不写配置文件。
-- **插件**：第一版只开平台中立的 reply_processor；其余插件写死了 onebot，按需再放开。
-- **语音**：`<voice>` 标签在 daemon 解析，复用 `ui.tts` 配置与语音模块合成，作为 `audio` part 发给连接器。缓存按天清理。
-- **唤醒**：`job_wake.rs` 里写死 onebot 的地方改成按 `binding.key.platform` 分派——这是 P3 主动消息的前提，P2 顺手把分派口留好。
+- **权限**：联系人名就是身份（`sender_id`），同一个人的多个账号合成一个。`owner: true` 的联系人按主人算（记忆共享、写入算主人的），但**宿主工具默认关**（`owner_host_tools`）：手机丢了或账号被盗时，别人不能借聊天窗口在电脑上跑命令。关着时用受限工具底座，再把记忆工具换成主人作用域。
+- **插件**：第一版不开平台插件（插件缺省只服务 QQ，不少还写死了 onebot），按需再逐个放开。
+- **语音**：不另做 `<voice>` 标签。平台回合本来就有 `send_voice_message` 工具（TTS 可用时注册，合成后以 `AudioPath` 发出、用完即删），连接器声明 `audio_out` 就能收到 `audio` part。旧桥接 WIP 里的标签方案作废。
+- **唤醒**：`job_wake.rs` 先按 `binding.key.platform` 分派，连接器平台的会话暂不唤醒（不再被当成 QQ 去唤醒）；真正的主动消息在 P3。
 
 ## 四、iMessage 连接器（瘦身）
 

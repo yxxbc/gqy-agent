@@ -717,6 +717,8 @@ pub(in crate::web) fn router(state: DaemonState) -> Router {
             "/onebot/v11/ws",
             get(platforms::onebot::onebot_ws_on_web_port),
         )
+        // 通用连接器协议（iMessage 等）。鉴权在处理函数里：平台启用 + 口令。
+        .route("/api/connector/ws", get(platforms::connector::connector_ws))
         .layer(DefaultBodyLimit::max(JSON_BODY_LIMIT))
         .with_state(state)
 }

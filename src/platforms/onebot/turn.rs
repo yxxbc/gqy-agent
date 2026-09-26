@@ -251,53 +251,6 @@ pub(in crate::platforms::onebot) fn platform_turn_context_with_activity(
     })
 }
 
-/// Turns a parsed inbound message into agent input (downloading media),
-/// resolves the dedicated session and runs the turn. `Ok(None)` means
-/// the message needs no reply (e.g. sticker-only).
-pub(in crate::platforms::onebot) fn platform_update_target(
-    state: &DaemonState,
-    session_id: &str,
-    conversation: &PlatformConversation,
-    sender_id: &str,
-) -> Option<(String, String, Arc<PlatformFollowupRun>)> {
-    let manager = state.manager.lock().unwrap();
-    manager
-        .active_runs
-        .iter()
-        .filter(|(_, run)| &*run.session_id == session_id)
-        .filter_map(|(run_id, run)| {
-            let followup = run.platform_followup.as_ref()?;
-            if followup.conversation != *conversation || followup.sender_id != sender_id {
-                return None;
-            }
-            Some((
-                followup.started(),
-                run_id.clone(),
-                run.turn_id.clone()?,
-                followup.clone(),
-            ))
-        })
-        .max_by_key(|(started, _, _, _)| *started)
-        .map(|(_, run_id, turn_id, followup)| (run_id, turn_id, followup))
-}
-
-pub(in crate::platforms::onebot) fn reserve_tool_followup(
-    state: &DaemonState,
-    session_id: &str,
-    conversation: &PlatformConversation,
-    sender_id: &str,
-) -> Option<(
-    String,
-    String,
-    Arc<PlatformFollowupRun>,
-    crate::agent::QueueIngressReservation,
-)> {
-    let (run_id, turn_id, followup) =
-        platform_update_target(state, session_id, conversation, sender_id)?;
-    let reservation = followup.try_reserve()?;
-    Some((run_id, turn_id, followup, reservation))
-}
-
 #[allow(clippy::too_many_arguments)]
 pub(in crate::platforms::onebot) async fn enqueue_tool_followup(
     state: &DaemonState,

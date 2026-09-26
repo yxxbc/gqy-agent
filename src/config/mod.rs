@@ -1,3 +1,4 @@
+mod connector;
 mod defaults;
 pub mod feature_catalog;
 mod io;
@@ -14,6 +15,7 @@ pub(crate) use provider::append_resolved_api_keys;
 mod provider_ops;
 pub(crate) use provider_ops::detect_provider_renames;
 mod tool_plugins;
+pub(crate) use connector::*;
 pub(crate) use defaults::*;
 pub(crate) use paths::*;
 pub use persona_manifest::{PersonaManifest, PLUGIN_IDS};

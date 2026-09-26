@@ -1,6 +1,7 @@
 //! 投递：分帧、转发标记、直发抑制与部分失败。
 
 use super::shared::*;
+use crate::platforms::final_reply_text;
 use crate::platforms::onebot::*;
 
 #[test]

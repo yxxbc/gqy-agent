@@ -289,11 +289,11 @@ impl StateStore {
         self.conv_db.persona_reset_session_ids(persona, platform)
     }
 
-    /// 所有接入平台（`platform_types::PLATFORM_IDS`）的 [`Self::persona_reset_session_ids`]。
+    /// 所有接入平台（见 [`Self::platform_ids`]）的 [`Self::persona_reset_session_ids`]。
     pub fn persona_reset_session_ids_all_platforms(&self, persona: &str) -> Result<Vec<String>> {
         let mut ids = Vec::new();
-        for platform in crate::platform_types::PLATFORM_IDS {
-            ids.extend(self.persona_reset_session_ids(persona, platform)?);
+        for platform in self.platform_ids()? {
+            ids.extend(self.persona_reset_session_ids(persona, &platform)?);
         }
         Ok(ids)
     }
@@ -304,10 +304,24 @@ impl StateStore {
         persona: &str,
     ) -> Result<Vec<PlatformSessionBinding>> {
         let mut bindings = Vec::new();
-        for platform in crate::platform_types::PLATFORM_IDS {
-            bindings.extend(self.platform_session_bindings(persona, platform)?);
+        for platform in self.platform_ids()? {
+            bindings.extend(self.platform_session_bindings(persona, &platform)?);
         }
         Ok(bindings)
+    }
+
+    /// 内置平台（`platform_types::PLATFORM_IDS`）加上绑定表里出现过的连接器平台。
+    pub fn platform_ids(&self) -> Result<Vec<String>> {
+        let mut ids: Vec<String> = crate::platform_types::PLATFORM_IDS
+            .iter()
+            .map(|id| id.to_string())
+            .collect();
+        for platform in self.conv_db.bound_platforms()? {
+            if !ids.contains(&platform) {
+                ids.push(platform);
+            }
+        }
+        Ok(ids)
     }
 
     pub fn platform_session_bindings(

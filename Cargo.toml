@@ -104,6 +104,8 @@ fst = "0.4"
 [dev-dependencies]
 jieba-rs = "0.7"
 tiktoken-rs = "0.12"
+# 连接器协议测试里的假连接器（axum 的 ws 本来就依赖它，不新增 crate）
+tokio-tungstenite = "0.29"
 
 # cargo-fuzz 编译时带 --cfg fuzzing（见 fuzz/），这里登记免得普通构建报 unexpected_cfgs
 [lints.rust]

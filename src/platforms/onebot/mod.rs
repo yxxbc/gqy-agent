@@ -53,7 +53,8 @@ pub(crate) use turn::{wake_conversation_for_job, wake_private_for_initiative};
 
 use super::access_control::{has_dynamic_access, AccessPermission};
 use super::{
-    commands, download_capped, markdown_to_plain, resolve_platform_session, run_platform_turn,
+    active_turn_update_mode, commands, deliver_dispatch, download_capped, markdown_to_plain,
+    platform_update_target, reserve_tool_followup, resolve_platform_session, run_platform_turn,
     sniff_image_mime, split_reply, BotGroupRole, BotSendAvailability, ConversationKind,
     ForwardNode, OutboundBody, OutboundMessage, OutboundOrigin, OutboundSegment, PartialSendError,
     PlatformAdapter, PlatformContextFileRef, PlatformConversation, PlatformFileDownload,

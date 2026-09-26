@@ -17,6 +17,9 @@ pub(crate) trait PlatformPolicy: Sync {
     /// 配置里写明的私聊白名单（静态部分；动态授权在 access_control 里另查）。
     fn private_whitelisted(&self, sender_id: &str) -> bool;
 
+    /// 管理员能不能用宿主工具。QQ 恒为真；连接器平台由 `owner_host_tools` 决定。
+    fn admin_host_tools(&self) -> bool;
+
     /// 白名单里的非管理员能不能用宿主工具（跑命令、读写文件等）。
     fn allow_non_admin_host_tools(&self) -> bool;
 
@@ -37,6 +40,9 @@ impl PlatformPolicy for NoPolicy {
     fn private_whitelisted(&self, _sender_id: &str) -> bool {
         false
     }
+    fn admin_host_tools(&self) -> bool {
+        false
+    }
     fn allow_non_admin_host_tools(&self) -> bool {
         false
     }
@@ -45,10 +51,13 @@ impl PlatformPolicy for NoPolicy {
     }
 }
 
-/// 会话所属平台的策略。加平台 = 这里多一个分支。
+/// 会话所属平台的策略：QQ 读 `platforms.qq`，其余按连接器平台名读 `platforms.connectors`。
 pub(crate) fn policy_for<'a>(config: &'a AppConfig, platform: &str) -> &'a dyn PlatformPolicy {
     match platform {
         access_control::ONEBOT_PLATFORM => &config.platforms.qq,
-        _ => &NoPolicy,
+        other => match config.platforms.connectors.get(other) {
+            Some(connector) => connector,
+            None => &NoPolicy,
+        },
     }
 }

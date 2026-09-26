@@ -96,6 +96,9 @@ pub struct PlatformsConfig {
     pub terminal_outreach: bool,
     #[serde(default, skip_serializing_if = "OneBotConfig::is_default")]
     pub qq: OneBotConfig,
+    /// 经通用连接器协议接入的平台，键是平台名（`imessage`……），见 connector.rs。
+    #[serde(default, skip_serializing_if = "BTreeMap::is_empty")]
+    pub connectors: BTreeMap<String, ConnectorPlatformConfig>,
 }
 
 fn is_false(value: &bool) -> bool {
@@ -122,6 +125,7 @@ impl Default for PlatformsConfig {
             max_tool_rounds: default_platform_max_tool_rounds(),
             terminal_outreach: default_terminal_outreach(),
             qq: OneBotConfig::default(),
+            connectors: BTreeMap::new(),
         }
     }
 }

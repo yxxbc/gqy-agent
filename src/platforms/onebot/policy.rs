@@ -20,6 +20,10 @@ impl PlatformPolicy for OneBotConfig {
         qq_number(sender_id).is_some_and(|sender| self.private_chats.whitelist.contains(&sender))
     }
 
+    fn admin_host_tools(&self) -> bool {
+        true
+    }
+
     fn allow_non_admin_host_tools(&self) -> bool {
         self.allow_non_admin_host_tools
     }

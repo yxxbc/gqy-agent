@@ -602,6 +602,16 @@ pub(in crate::web) async fn wake_platform_session_for_job(
         tracing::debug!(job_id = %completion.job_id, "job wake skipped: no platform binding");
         return;
     };
+    // 连接器平台的主动消息属于 P3（docs/design/2026-09-26-connector-protocol.md），
+    // 这里先按平台分派，别把 iMessage 会话当成 QQ 去唤醒。
+    if binding.key.platform != "onebot" {
+        tracing::info!(
+            job_id = %completion.job_id,
+            platform = %binding.key.platform,
+            "job wake skipped: proactive messages are not supported on this platform yet"
+        );
+        return;
+    }
     let noun = if completion.is_subagent {
         "后台子代理"
     } else {

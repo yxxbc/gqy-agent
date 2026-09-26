@@ -43,7 +43,12 @@ pub fn init(paths: &GqyPaths, cli_debug: bool) -> Result<LoggingGuard> {
     let targets = Targets::new()
         .with_default(LevelFilter::OFF)
         .with_target("gqy", level)
-        .with_target("gqy::qq", qq_level(level, cli_debug, env_value.is_some()));
+        .with_target("gqy::qq", qq_level(level, cli_debug, env_value.is_some()))
+        // 平台中立的投递与连接器日志，和 QQ 同一档（common/delivery.rs、connector/）。
+        .with_target(
+            "gqy::platform",
+            qq_level(level, cli_debug, env_value.is_some()),
+        );
     let fmt_layer = tracing_subscriber::fmt::layer()
         .with_ansi(false)
         .with_target(true)

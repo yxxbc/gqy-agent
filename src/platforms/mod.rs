@@ -2,9 +2,9 @@
 //!
 //! This module is the platform-neutral core: turn driving against the
 //! agent actor, session resolution, rate limiting and reply shaping.
-//! Each protocol lives in its own submodule (`onebot` = NapCat / QQ);
-//! later platforms (Telegram, QQ official, WeChat) add submodules and
-//! reuse everything here without touching the web core.
+//! QQ speaks OneBot in `onebot/`; every other platform runs as an external
+//! connector process over the generic connector protocol in `connector/`,
+//! so adding a platform means writing a connector, not a submodule here.
 
 // 平台中立的回合机器在 common/；这里按原名再导出，`crate::platforms::scheduling::…`、
 // `platforms::PlatformTurnContext` 这类旧路径一个字都不用改。
@@ -19,6 +19,7 @@ pub(crate) use driver::*;
 pub(crate) use policy::*;
 
 pub(crate) mod avatar;
+pub(crate) mod connector;
 pub(crate) mod onebot;
 pub(crate) mod plugins;
 mod sponsor_fx;
@@ -63,6 +64,8 @@ pub(crate) struct PlatformRuntime {
     http: Arc<OnceLock<std::result::Result<reqwest::Client, String>>>,
     pub(crate) onebot: Arc<Mutex<onebot::ConnectionRegistry>>,
     pub(crate) qq_listener: onebot::QqListenerManager,
+    /// 经通用连接器协议接入的连接（iMessage 等），见 connector/。
+    pub(crate) connectors: connector::ConnectorRegistry,
     /// 接入的平台，起停与配置重载遍历它（见 driver.rs）。加平台 = 在 `new` 里多挂一个。
     drivers: Arc<Vec<Arc<dyn PlatformDriver>>>,
     pub(crate) rate: Arc<Mutex<RateWindow>>,
@@ -79,17 +82,15 @@ pub(crate) struct PlatformRuntime {
 
 impl PlatformRuntime {
     pub(crate) fn new() -> Result<Self> {
-        let drivers: Vec<Arc<dyn PlatformDriver>> = vec![Arc::new(onebot::OneBotDriver)];
-        debug_assert!(
-            drivers
-                .iter()
-                .all(|driver| crate::platform_types::PLATFORM_IDS.contains(&driver.id())),
-            "every platform driver id must be listed in platform_types::PLATFORM_IDS"
-        );
+        let drivers: Vec<Arc<dyn PlatformDriver>> = vec![
+            Arc::new(onebot::OneBotDriver),
+            Arc::new(connector::ConnectorDriver),
+        ];
         Ok(Self {
             http: Arc::new(OnceLock::new()),
             onebot: Arc::new(Mutex::new(onebot::ConnectionRegistry::default())),
             qq_listener: onebot::QqListenerManager::default(),
+            connectors: connector::ConnectorRegistry::default(),
             drivers: Arc::new(drivers),
             rate: Arc::new(Mutex::new(RateWindow::new())),
             plugins: Arc::new(OnceLock::new()),
@@ -224,6 +225,12 @@ pub(crate) fn apply_platform_turn_scope(
             Some(base) => base.clone(),
             None => crate::tools::restricted_platform_registry(config, paths),
         };
+        // 连接器平台的主人默认不给宿主工具（`owner_host_tools`），但记忆照旧按
+        // 主人算：受限底座之上把记忆工具换成主人作用域。QQ 的管理员恒有宿主工具，
+        // 走不到这里。
+        if context.is_admin {
+            crate::tools::rescope_platform_memory_tools(registry, config, paths, context, false);
+        }
     } else {
         crate::tools::rescope_platform_memory_tools(registry, config, paths, context, false);
     }

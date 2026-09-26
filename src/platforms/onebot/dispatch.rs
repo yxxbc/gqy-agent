@@ -86,29 +86,6 @@ pub(in crate::platforms::onebot) async fn handle_message(
     handle_message_with_activity(state, conn, event, ingress_order, activity).await;
 }
 
-/// 回合还在跑时,新消息该排队还是该取代当前生成。
-///
-/// 群聊走的是另一条路(`reserve_tool_followup` 只在工具执行期返回 Some,
-/// 其余落到下面的覆盖分支),所以这里恒为排队。
-///
-/// 私聊的判据与群聊同源:**工具正在跑**说明她在真干活,排队别打断;否则她
-/// 只是在写回复,新消息该取代它。
-///
-/// 08-29 取证:QQ 里一句话拆成几条发是常态。用户先发"这是什么鱼"、三秒后
-/// 补图,回合已经带着"没有图"开跑并写出"你没发图我怎么知道",这句被中间
-/// 消息通道投递了出去,随后消费队列才答对——用户看到的是先装瞎再答题。
-/// 同样两条消息在群里会被覆盖窗口合并。
-pub(in crate::platforms::onebot) fn active_turn_update_mode(
-    is_group: bool,
-    tool_executing: bool,
-) -> TurnUpdateMode {
-    if is_group || tool_executing {
-        TurnUpdateMode::Followup
-    } else {
-        TurnUpdateMode::Supersede
-    }
-}
-
 pub(in crate::platforms::onebot) async fn handle_message_with_activity(
     state: DaemonState,
     conn: ConnectionHandle,

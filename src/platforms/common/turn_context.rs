@@ -345,7 +345,7 @@ impl PlatformTurnContext {
 
     pub(crate) fn host_tools_allowed(&self) -> bool {
         if self.is_admin {
-            return true;
+            return self.policy().admin_host_tools();
         }
         self.conversation.kind == ConversationKind::Private
             && self.policy().allow_non_admin_host_tools()

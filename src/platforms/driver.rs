@@ -11,7 +11,8 @@ use super::*;
 use futures_util::future::BoxFuture;
 
 pub(crate) trait PlatformDriver: Send + Sync {
-    /// 与会话绑定、`PlatformConversation::platform` 一致的平台标识（QQ 是 `onebot`）。
+    /// 驱动标识。QQ 是 `onebot`（也是它会话里的平台名）；连接器驱动是
+    /// `connector`，它的会话平台名是各连接器握手时报的名字。
     fn id(&self) -> &'static str;
 
     /// 给人看的名字，报错里用（「Tencent QQ listener configuration failed: …」）。

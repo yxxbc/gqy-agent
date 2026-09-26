@@ -34,6 +34,9 @@ impl AppConfig {
                 );
             }
         }
+        for (platform, connector) in &self.platforms.connectors {
+            connector.validate(platform)?;
+        }
         let qq = &self.platforms.qq;
         if qq.reverse_ws_port == 0 {
             bail!("platforms.qq.reverse_ws_port must be between 1 and 65535");

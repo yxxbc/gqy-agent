@@ -12,6 +12,16 @@
 use crate::state::conversation_db::*;
 
 impl ConversationDb {
+    /// 绑定表里出现过的平台名。连接器平台是动态的（按配置里的键），没法写成
+    /// 常量表，「所有平台」的查询从这里补齐。
+    pub fn bound_platforms(&self) -> Result<Vec<String>> {
+        let conn = self.conn.lock().unwrap();
+        let mut stmt = conn
+            .prepare("SELECT DISTINCT platform FROM platform_session_bindings ORDER BY platform")?;
+        let rows = stmt.query_map([], |row| row.get(0))?;
+        Ok(rows.collect::<std::result::Result<Vec<_>, _>>()?)
+    }
+
     pub fn platform_session_bindings(
         &self,
         persona: &str,

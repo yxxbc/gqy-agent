@@ -651,6 +651,13 @@ pub(in crate::web) fn config_response(
         !redacted.platforms.qq.access_token.trim().is_empty(),
     );
     redacted.platforms.qq.access_token.clear();
+    for (platform, connector) in redacted.platforms.connectors.iter_mut() {
+        secret_states.insert(
+            format!("platforms.connectors.{platform}.token"),
+            !connector.token.trim().is_empty(),
+        );
+        connector.token.clear();
+    }
     redact_secret_list(
         &mut secret_states,
         "plugins.image_generation.api_keys",
@@ -788,6 +795,22 @@ pub(in crate::web) fn restore_config_secrets(
         Some(SecretMutation::Clear) => String::new(),
         None => current.platforms.qq.access_token.clone(),
     };
+    for (platform, connector) in candidate.platforms.connectors.iter_mut() {
+        let key = format!("platforms.connectors.{platform}.token");
+        connector.token = match mutations.get(&key) {
+            Some(SecretMutation::Set(value)) => {
+                normalize_single_secret(value, &key)?.unwrap_or_default()
+            }
+            Some(SecretMutation::Clear) => String::new(),
+            None => current
+                .platforms
+                .connectors
+                .get(platform)
+                .map(|current| current.token.clone())
+                .unwrap_or_default(),
+        };
+        recognized.insert(key);
+    }
 
     if let Some(key) = mutations.keys().find(|key| !recognized.contains(*key)) {
         return Err(ApiError::new(
