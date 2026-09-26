@@ -1,6 +1,6 @@
 # iMessage 变成原生平台，平台层整理成可扩展结构（方案稿）
 
-> 状态：**已确认（09-26），待施工**｜日期：2026-09-26｜前身：`docs/design/2026-09-17-imessage-channel.md`（当时判「原生平台适配器暂不做」）
+> 状态：**P1 已完成（09-26，`f3f3da60` 合入 gqy），P2 施工中**｜日期：2026-09-26｜前身：`docs/design/2026-09-17-imessage-channel.md`（当时判「原生平台适配器暂不做」）
 
 ## 一、为什么现在做、要解决什么
 
@@ -41,7 +41,7 @@ src/platforms/
                   status / connected / send_direct（主动发送）/ wake（任务唤醒）
   policy.rs       PlatformPolicy：一次回合用到的平台策略（主人/管理员/白名单、宿主工具、
                   记忆写入、中间消息、会话限额、模型路由与模型池、最大回复长度、插件实例）
-  core/           平台中立的部分从现在的顶层搬进来：turn_context、turn_run、scheduling、
+  common/         平台中立的部分从现在的顶层搬进来：turn_context、turn_run、scheduling、
                   reply、delivery（从 onebot/outbound.rs 提出来的 deliver_dispatch）、activity、
                   inflight、live_turns、turn_order、commands、access_control、logging
   plugins/        插件描述符新增 platforms 字段，注册表按平台过滤
@@ -78,7 +78,7 @@ src/platforms/
 
 | 期 | 内容 | 行为变化 | 验收 |
 |---|---|---|---|
-| P1 | 平台层整理：core/ 搬家、PlatformDriver 包住 QQ、PlatformPolicy、插件按平台过滤、去掉写死的 onebot | 无 | 全部测试与门禁绿；QQ 私聊、群聊、定时消息、主动私聊各走一遍 |
+| P1 ✅ | 平台层整理：common/ 搬家、PlatformDriver 包住 QQ、PlatformPolicy、插件按平台过滤、去掉写死的 onebot | 无 | 全部测试与门禁绿；QQ 私聊、群聊、定时消息、主动私聊各走一遍 |
 | P2 | iMessage 平台第一版 + 连接器瘦身 + 会话迁移；WebUI 平台页、TUI 平台菜单各加一项 | 桥接换成平台 | 手机上把现有功能各试一遍；旧会话历史还在 |
 | P3 | 主动消息、定时消息、主动私聊、睡眠时段、送达回执、消息记录 | 新功能 | 让她定一个提醒，到点手机收到 |
 
@@ -86,9 +86,17 @@ src/platforms/
 
 注（09-26）：另有一路改动在 `scripts/imessage/imessage_bridge.py` 里加语音消息（用户明确要语音时，回复里的 `<voice>…</voice>` 用 MiniMax 等 TTS 合成成音频发出），写方案时尚未提交。P2 迁移时一并搬进平台：合成放 daemon（复用 `ui.tts` 配置与语音模块），连接器只负责把音频文件发出去。
 
-## 六、用户拍板（09-26，均按推荐）
+## 六、P1 实际落地（09-26）
+
+- 目录叫 `common/` 不叫 `core/`：`core` 会遮住标准库的 `core`（搬文件五坑之「模块名遮蔽」）。`platforms/mod.rs` 原名再导出，旧路径不用改。
+- `PlatformDriver` 只落了 `id / display_name / prepare→commit / shutdown`；`status / connected / send_direct / wake` 留给 P2、P3 按需加。
+- `PlatformPolicy` 落了 `plugin_enabled / is_owner / private_whitelisted / allow_non_admin_host_tools / intermediate_messages`；模型路由、会话限额等仍直读 `platforms.qq`，P2 接 iMessage 时再按需收进 policy。
+- `deliver_dispatch` 还在 `onebot/outbound.rs`，没提成 `common/delivery`，P2 需要时再提。
+- 写死的 `"onebot"` 改成了遍历 `PLATFORM_IDS` 的 `*_all_platforms` 查询。
+
+## 七、用户拍板（09-26，均按推荐）
 
 1. **连接器 + 原生平台**：不让 daemon 直接读 `chat.db`，否则每次升级都要重新授权。
 2. **新增 `platforms.imessage`，`platforms.qq` 不动**：不统一成 `platforms.<id>`。
-3. **P1 就做目录整理**（core/ 搬家），不只加接缝。
+3. **P1 就做目录整理**（common/ 搬家），不只加接缝。
 4. **第一版只对齐现有功能**，主动消息放 P3。
