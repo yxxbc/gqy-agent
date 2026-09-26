@@ -1,6 +1,6 @@
 # iMessage 变成原生平台，平台层整理成可扩展结构（方案稿）
 
-> 状态：**P1 已完成（09-26，`f3f3da60` 合入 gqy），P2 施工中**｜日期：2026-09-26｜前身：`docs/design/2026-09-17-imessage-channel.md`（当时判「原生平台适配器暂不做」）
+> 状态：**P1 已完成（09-26，`f3f3da60` 合入 gqy）；P2 起改走通用连接器协议，见 `docs/design/2026-09-26-connector-protocol.md`**（本文 §三 的 `imessage/` 模块与 §三.1 的 `platforms.imessage` 作废）｜日期：2026-09-26｜前身：`docs/design/2026-09-17-imessage-channel.md`（当时判「原生平台适配器暂不做」）
 
 ## 一、为什么现在做、要解决什么
 
