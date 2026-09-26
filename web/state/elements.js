@@ -201,6 +201,7 @@ export const elements = {
   settingsFooter: document.getElementById("settingsFooter"),
   toastRegion: document.getElementById("toastRegion"),
   resetDialog: document.getElementById("resetDialog"),
+  resetDialogTitle: document.getElementById("resetDialogTitle"),
   popDialog: document.getElementById("popDialog"),
   popDialogList: document.getElementById("popDialogList"),
   popDialogAll: document.getElementById("popDialogAll"),

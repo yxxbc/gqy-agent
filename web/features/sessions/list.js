@@ -39,17 +39,20 @@ export function toggleSessionMenu(sessionId) {
 
 /// 会话菜单钉在视口上,贴着「…」按钮弹出。
 ///
-/// 菜单原本是会话行里的 absolute 元素,会话收进面板(信匣/指令面板)之后,
-/// 面板的滚动容器 overflow:auto 会把它裁掉——信笺卡片比列表行高,最下面
-/// 那几张一点「编辑」就只露半截。改成 fixed 定位 + 压在所有浮层之上,放不下
-/// 就往上翻。列表每次重画都会重建菜单,所以重画后也要再摆一次。
+/// 菜单不放进会话卡片,挂在会话面板根节点上。放在卡片里时,信笺悬停上浮的
+/// transform 会让卡片自成层叠上下文、并成为 fixed 的参照系:菜单的 z-index
+/// 只在这张卡片里算数,被后面的卡片盖住,鼠标一离开卡片还会整块跳位;面板
+/// 的滚动容器也会把它裁掉。挂到面板根上就只和面板比高低,放不下就往上翻。
+/// 列表每次重画都会重建菜单,所以重画后也要再摆一次。
 export function placeSessionMenu() {
+  removeSessionMenu();
   if (!state.sessionMenuFor) return null;
   const item = elements.sessionItems.querySelector(`.session-item[data-session-id="${CSS.escape(state.sessionMenuFor)}"]`);
-  const menu = item?.querySelector(".session-menu");
   const anchor = item?.querySelector(".session-menu-button");
-  if (!menu || !anchor) return null;
-  menu.classList.add("is-floating");
+  const session = findSession(state.sessionMenuFor);
+  if (!anchor || !session) return null;
+  const menu = buildSessionMenu(session, state.sessionMenuFor === "default");
+  (elements.sessionSwitcher || document.body).appendChild(menu);
   // 外壳有 zoom(--ui-scale):矩形是视觉像素,fixed 的坐标要换回布局像素。
   const rect = anchor.getBoundingClientRect();
   const button = {
@@ -66,8 +69,8 @@ export function placeSessionMenu() {
   const top = below + height > viewportHeight - 8 ? Math.max(8, button.top - height - 4) : below;
   menu.style.left = `${left}px`;
   menu.style.top = `${top}px`;
-  // 祖先带 transform(开发模式的指令面板靠 translateX 居中)时,fixed 的参照
-  // 系是那个祖先而不是视口。量一下实际落点,差多少补多少。
+  // 万一祖先带了 transform,fixed 的参照系就是那个祖先而不是视口。
+  // 量一下实际落点,差多少补多少。
   const placed = menu.getBoundingClientRect();
   const driftX = visualPixelsToLayout(placed.left) - left;
   const driftY = visualPixelsToLayout(placed.top) - top;
@@ -76,6 +79,10 @@ export function placeSessionMenu() {
     menu.style.top = `${top - driftY}px`;
   }
   return menu;
+}
+
+function removeSessionMenu() {
+  for (const menu of document.querySelectorAll(".session-menu")) menu.remove();
 }
 
 export function beginSessionRename(sessionId) {
@@ -123,7 +130,7 @@ export function buildSessionMenu(session, isDefault) {
   if (!isDefault) actions.push({ label: "重命名", handler: () => beginSessionRename(id) });
   // 清空对本来只给默认会话（它不能改名/删除，拿这个顶位），可普通会话一样
   // 需要「留着会话、只丢历史」——删掉重建会连模型/工作目录覆盖一起丢。
-  actions.push({ label: "清空对话", handler: requestClearConversation });
+  actions.push({ label: "清空对话", handler: () => requestClearConversation(id) });
   if (!isDefault) actions.push({ label: "删除", danger: true, handler: () => deleteSession(id) });
   for (const action of actions) {
     const button = document.createElement("button");
@@ -281,8 +288,6 @@ export function buildSessionItem(session) {
   });
   trailing.appendChild(menuButton);
   item.appendChild(trailing);
-
-  if (state.sessionMenuFor === id) item.appendChild(buildSessionMenu(session, isDefault));
   return item;
 }
 
@@ -329,6 +334,7 @@ export function renderSessionList() {
   elements.sessionItems.replaceChildren();
   if (!multiSessionEnabled() || state.sessions.length === 0) {
     elements.sessionItems.appendChild(buildFallbackSessionItem());
+    removeSessionMenu();
     return;
   }
   // 侧栏只列当前模式的会话（左上角开关切换，模式创建时定死）。终端集成会话

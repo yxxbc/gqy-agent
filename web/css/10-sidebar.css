@@ -294,11 +294,10 @@ body[data-theme="graphite"] .session-unread-dot {
   color: var(--text);
 }
 
+/* 钉在视口上、挂在会话面板根节点上(list.js 的 placeSessionMenu):压过所有卡片,不被滚动容器裁掉。 */
 .session-menu {
-  position: absolute;
-  top: calc(100% - 12px);
-  right: 6px;
-  z-index: calc(var(--z-popover) - 10);
+  position: fixed;
+  z-index: var(--z-overlay-top);
   display: grid;
   min-width: 132px;
   padding: 4px;
@@ -307,19 +306,6 @@ body[data-theme="graphite"] .session-unread-dot {
   background: var(--surface-1);
   box-shadow: var(--float-shadow);
   gap: 1px;
-}
-
-/* 钉在视口上的菜单(list.js 的 placeSessionMenu):压过会话面板,不被滚动容器裁掉。 */
-.session-menu.is-floating {
-  position: fixed;
-  z-index: var(--z-overlay-top);
-  right: auto;
-  bottom: auto;
-}
-
-.session-menu.open-up {
-  top: auto;
-  bottom: calc(100% - 12px);
 }
 
 .session-menu button {
