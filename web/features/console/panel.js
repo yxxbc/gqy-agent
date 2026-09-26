@@ -98,6 +98,11 @@ export const PLATFORMS = {
       history: { dash: "qq" },
       groups: { dash: "groups" }
     }
+  },
+  imessage: {
+    tabs: {
+      settings: { settingsPage: "imessage" }
+    }
   }
 };
 

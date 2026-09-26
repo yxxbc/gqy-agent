@@ -45,6 +45,7 @@
   <script defer src="/dash-sponsor.js"></script>
   <script defer src="/settings-schema.js"></script>
   <script defer src="/settings-extensions.js"></script>
+  <script defer src="/settings-connectors.js"></script>
   <script defer src="/settings.js"></script>
   <script type="module" src="/app.js"></script>
 </head>
@@ -560,13 +561,14 @@
         </div>
         <!--
           通讯平台：每个平台一个 platform-body，平台列表一行一个按钮。
-          加新平台 = 这里加一个按钮和一个 platform-body，再在 features/platforms.js 的
-          PLATFORMS 表里登记它的分页。分页内容沿用已有的渲染器（设置页、看板）。
+          加新平台 = 这里加一个按钮和一个 platform-body，再在 features/console/panel.js 的
+          PLATFORMS 表里登记它的分页。只有一个分页的平台不放分页条。分页内容沿用已有的渲染器（设置页、看板）。
         -->
         <div class="con-panel" data-console-panel="platforms" hidden>
           <div class="settings-layout platform-layout">
             <nav class="settings-nav platform-nav" aria-label="通讯平台">
               <button class="active" type="button" data-platform="qq">QQ</button>
+              <button type="button" data-platform="imessage">iMessage</button>
             </nav>
             <div class="settings-content platform-body" data-platform-body="qq">
               <nav class="platform-tabs" aria-label="QQ 分页">
@@ -581,6 +583,9 @@
               <section class="platform-pane st-page" data-platform-pane="group" hidden><div class="st-root" id="settings-qq-group"></div></section>
               <section class="platform-pane" data-platform-pane="history" hidden><div class="con-inner is-wide" id="dashQqRoot"></div></section>
               <section class="platform-pane" data-platform-pane="groups" hidden><div class="con-inner is-wide" id="dashGroupsRoot"></div></section>
+            </div>
+            <div class="settings-content platform-body" data-platform-body="imessage" hidden>
+              <section class="platform-pane st-page" data-platform-pane="settings"><div class="st-root" id="settings-imessage"></div></section>
             </div>
           </div>
         </div>

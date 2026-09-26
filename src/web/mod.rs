@@ -29,6 +29,7 @@ mod bridge_progress;
 mod bridge_question;
 mod commands_api;
 mod config_api;
+mod connectors_api;
 mod context_panel;
 mod dashboards;
 #[cfg(debug_assertions)]
@@ -77,6 +78,7 @@ use bridge_progress::*;
 use bridge_question::*;
 use commands_api::*;
 use config_api::*;
+use connectors_api::*;
 use context_panel::*;
 use dashboards::affection::*;
 use dashboards::album::*;

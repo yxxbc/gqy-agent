@@ -504,6 +504,7 @@ pub(in crate::web) fn router(state: DaemonState) -> Router {
             axum::routing::delete(dash_scripts_delete),
         )
         .route("/api/dash/scripts/register", post(dash_scripts_register))
+        .route("/api/connectors", get(connectors_status))
         .route("/api/extensions", get(extensions_overview))
         .route(
             "/api/extensions/skills",

@@ -1,4 +1,4 @@
-//! 平台（QQ 等）的接入配置。
+//! 平台（QQ、iMessage 等）的接入配置。iMessage 这类连接器平台在 connectors.rs。
 //!
 //! 这里的 ID 列表编辑（`parse_id_lines`、`prompt_single_id`）都做严格校验：这
 //! 些值最终会决定谁能指挥 顾清影，填错一个数字就是把权限给了别人。
@@ -6,9 +6,11 @@
 //! 模型路由（`select_platform_model_routes`）让不同会话走不同的模型池，摘要函
 //! 数（`*_summary`、`*_label`）只是把配置压成菜单里一行看得懂的字。
 
+mod connectors;
 mod id_lists;
 mod model_assignment;
 mod routes;
+pub(in crate::config_tui) use connectors::*;
 pub(in crate::config_tui) use id_lists::*;
 pub(in crate::config_tui) use model_assignment::*;
 pub(in crate::config_tui) use routes::*;
@@ -16,10 +18,16 @@ pub(in crate::config_tui) use routes::*;
 use crate::config_tui::*;
 
 pub(in crate::config_tui) fn platforms_label(config: &AppConfig) -> String {
-    if config.platforms.qq.enabled {
-        t("Tencent QQ enabled", "腾讯 QQ 已启用").to_string()
-    } else {
-        t("disabled", "未启用").to_string()
+    let imessage = config
+        .platforms
+        .connectors
+        .get("imessage")
+        .is_some_and(|connector| connector.enabled);
+    match (config.platforms.qq.enabled, imessage) {
+        (true, true) => t("Tencent QQ, iMessage enabled", "腾讯 QQ、iMessage 已启用").to_string(),
+        (true, false) => t("Tencent QQ enabled", "腾讯 QQ 已启用").to_string(),
+        (false, true) => t("iMessage enabled", "iMessage 已启用").to_string(),
+        (false, false) => t("disabled", "未启用").to_string(),
     }
 }
 
@@ -42,6 +50,7 @@ pub(in crate::config_tui) fn select_platforms(
         };
         let options = vec![
             format!("{}: {state}", t("Tencent QQ", "腾讯 QQ")),
+            format!("iMessage: {}", connector_label(config, "imessage")),
             format!(
                 "{}: {}",
                 t("Command trigger prefix", "命令触发前缀"),
@@ -81,10 +90,11 @@ pub(in crate::config_tui) fn select_platforms(
             KeyCode::Down | KeyCode::Char('j') => selected = (selected + 1).min(options.len() - 1),
             KeyCode::Enter => match selected {
                 0 => edit_qq(stdout, paths, config)?,
-                1 => edit_platform_command_prefix(stdout, config)?,
-                2 => select_platform_commands(stdout, config)?,
-                3 => edit_platform_max_tool_rounds(stdout, config)?,
-                4 => config.platforms.terminal_outreach = !config.platforms.terminal_outreach,
+                1 => edit_imessage(stdout, config)?,
+                2 => edit_platform_command_prefix(stdout, config)?,
+                3 => select_platform_commands(stdout, config)?,
+                4 => edit_platform_max_tool_rounds(stdout, config)?,
+                5 => config.platforms.terminal_outreach = !config.platforms.terminal_outreach,
                 _ => {}
             },
             _ => {}

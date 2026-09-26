@@ -2645,8 +2645,15 @@ window.GqySettings = (() => {
     plugins: renderPluginsPage,
     qq: renderQqPage,
     "qq-private": renderQqPrivatePage,
-    "qq-group": renderQqGroupPage
+    "qq-group": renderQqGroupPage,
+    // 连接器平台（iMessage 等）在 settings-connectors.js，零件从这里借。
+    imessage: (root) => window.GqySettingsConnectors?.render(root, "imessage", connectorKit("imessage"))
   };
+
+  function connectorKit(page) {
+    const setSecret = (key, value) => { S().secretChanges[key] = { action: "set", value }; ctx.markConfigDirty(); };
+    return { el, card, row, chip, chipList, empty, button, toggle, textInput, fieldRows, pathBinding, secretControl, setSecret, confirmAction, cfg, setCfg, toast, rerender: () => rerender(page) };
+  }
 
   function init(context) {
     ctx = context;
