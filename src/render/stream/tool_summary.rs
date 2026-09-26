@@ -63,10 +63,12 @@ impl StreamRenderer {
             write_tool_payload(stdout, t("args", "参数"), arguments)?;
             stdout.flush()?;
         } else if self.tool_call_mode == ToolCallDisplayMode::Summary {
+            // 先把开关读出来：拿到 stats 之后 self 已被可变借用，不能再调方法。
+            let timeline = self.timeline_enabled();
             let stats = self.tool_stats_entry(name);
             stats.calls += 1;
             stats.subject = tool_subject(name, arguments);
-            if self.timeline_enabled() && stats.detail.is_empty() {
+            if timeline && stats.detail.is_empty() {
                 if let Some(diff) = crate::render::patch_envelope_lines_from_args(
                     name,
                     arguments,
@@ -250,6 +252,7 @@ impl StreamRenderer {
             // 静态版没处点开：普通工具只留那一行，成败都不印输出——输出是给模型
             // 看的，不是给人扫的；报错更多时候是一团裸 JSON，印出来只会丑
             //（用户拍板：除了命令，其他工具报错不需要报错信息）。
+            let assemble_detail = !self.timeline_static() && self.timeline_enabled();
             let stats = self.tool_stats_entry(name);
             if ok {
                 stats.ok += 1;
@@ -262,7 +265,7 @@ impl StreamRenderer {
             }
             // 已经有更好的详情（补丁 diff）就别用原始输出盖掉它；没有的话，
             // 像子代理时间线一样组装：主体（路径/参数摘要）一段、空一行、输出一段。
-            if !self.timeline_static() && self.timeline_enabled() && stats.detail.is_empty() {
+            if assemble_detail && stats.detail.is_empty() {
                 let mut lines = Vec::new();
                 if let Some(subject) = stats.subject.as_deref().filter(|s| !s.trim().is_empty()) {
                     lines.extend(
