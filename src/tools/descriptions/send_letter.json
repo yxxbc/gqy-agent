@@ -1,0 +1,29 @@
+{
+  "name": "send_letter",
+  "display_name": "寄信",
+  "description": "Send the user a letter as a sealed envelope they tap open. Reach for it when something deserves to be kept rather than scrolled past, such as a thank-you, an apology, or a small ceremony. Write it short and in your own voice. salutation is the opening line, body is the letter itself, signature closes it. The envelope appears beside your reply, so keep replying normally around it.",
+  "parameters": {
+    "type": "object",
+    "properties": {
+      "salutation": {
+        "type": "string",
+        "description": "How you address them. Optional, for example their name."
+      },
+      "body": {
+        "type": "string",
+        "description": "The letter itself. Use \\n to start a new line. Keep it short."
+      },
+      "signature": {
+        "type": "string",
+        "description": "The closing line, for example your name. Optional."
+      }
+    },
+    "required": ["body"],
+    "additionalProperties": false
+  },
+  "permission": "reads",
+  "always_loaded": false,
+  "load_policy": "summary",
+  "groups": ["utility"],
+  "stub_example": "{\"body\":\"The moon is bright tonight. I folded it into this letter.\"}"
+}

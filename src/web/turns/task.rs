@@ -278,6 +278,8 @@ async fn run_turn_task_inner(
             tools::register_webui_artifact_tools(&mut normal_tools, &config, &paths, &session_id);
             // 分享是全局清单,用根库而不是会话钉定克隆。
             tools::register_webui_share_tools(&mut normal_tools, &config, base_store.clone());
+            // 寄信只进普通模式:信封是给她说话用的,开发模式那边是干活的地方。
+            tools::register_webui_letter_tools(&mut normal_tools);
         }
         if profile
             .as_ref()

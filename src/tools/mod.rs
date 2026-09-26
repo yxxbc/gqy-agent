@@ -8,6 +8,7 @@ mod share_file;
 pub use share_file::set_share_url_bases;
 mod ask_question;
 mod compose;
+mod letter;
 pub(crate) use compose::{build_tool_registry, restricted_platform_registry};
 #[cfg(test)]
 pub(crate) use compose::{builtin_registry, dev_registry};
@@ -257,6 +258,7 @@ fn builtin_readable_tool_name(name: &str) -> Option<&'static str> {
         "read_artifact" => t("Read preview file", "读取预览文件"),
         "present_artifact" => t("Preview file", "预览文件"),
         "ask_question" => t("Ask user", "询问用户"),
+        "send_letter" => t("Send a letter", "寄信"),
         // "task" 是 09-11 改名前的旧名:历史记录里存着的调用照样要显示成
         // 「子代理」,不然翻旧会话看到的是裸工具名。
         "subagent" | "task" => t("Subagent", "子代理"),
@@ -443,6 +445,12 @@ pub fn register_webui_share_tools(
     store: crate::state::StateStore,
 ) {
     share_file::register_webui(registry, config, store);
+}
+
+/// 寄信(WebUI 专属):信封卡片由前端画,别的场所没有信封可点,所以只在这里
+/// 按会话追加(见 `web/turns/task.rs` 的 local_webui 分支)。
+pub fn register_webui_letter_tools(registry: &mut ToolRegistry) {
+    letter::register_webui(registry);
 }
 
 pub fn webui_artifact_manifest(
