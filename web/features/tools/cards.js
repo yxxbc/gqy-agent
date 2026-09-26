@@ -59,6 +59,8 @@ export function boundedAppend(current, addition) {
 export const TOOL_RICH_CARDS = [
   { selector: ".map-card", mount: "fold", module: () => window.GqyMap, matches: (m, name) => m.isMapTool(name), render: (m, output) => m.renderCard(output) },
   { selector: ".express-card", mount: "outside", module: () => window.GqyExpress, matches: (m, name) => m.isExpressTool(name), render: (m, output) => m.renderCard(output) },
+  // 信封是给人看的交付物:挂在工具签外面(mount outside),收起时也看得见。
+  { selector: ".letter-card", mount: "outside", module: () => window.GqyLetter, matches: (m, name) => m.isLetterTool(name), render: (m, output) => m.renderCard(output) },
 ];
 
 export function toolRichCards(name, output) {

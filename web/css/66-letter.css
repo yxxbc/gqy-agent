@@ -1,0 +1,229 @@
+/*
+ * 寄信卡片：工具卡里的那只信封，和点开后浮层里的花笺。
+ *
+ * 画法与动效先在桌面 demo 里调好，这里只换名字、尺寸与 token——奶油纸、白梅、
+ * 四片折页在中心交汇的几何、拆印→翻盖→铺纸那一串，都照旧。
+ *
+ * 字号一律走 --fs-* 或 cqw（信封内的字随信封大小缩放，飞进浮层放大时不变形），
+ * 不写 px 字面量：CSS token 门禁盯着这一条。
+ */
+
+.letter-card{display:flex;flex-direction:column;gap:10px;padding:6px 0 2px}
+.letter-hint{
+  margin:0;font-family:var(--serif);font-size:var(--fs-meta);
+  letter-spacing:.14em;color:var(--text-faint);
+}
+
+.letter-envelope{
+  position:relative;width:min(260px,62vw);aspect-ratio:300/190;
+  display:block;border:0;padding:0;background:none;cursor:pointer;
+  container-type:size;
+  filter:drop-shadow(0 16px 26px rgba(0,0,0,.46));
+  transition:transform var(--motion) ease, opacity .4s ease;
+}
+.letter-envelope:hover{transform:translateY(-3px)}
+.letter-envelope:focus-visible{outline:2px solid var(--accent);outline-offset:6px;border-radius:14px}
+/* 飞进浮层：同一个元素改成 fixed 再动画到中央，不是另画一只 */
+.letter-envelope.is-flying{
+  position:fixed;right:auto;bottom:auto;z-index:var(--z-top);animation:none;
+  transition:left .66s cubic-bezier(.32,.02,.18,1), top .66s cubic-bezier(.32,.02,.18,1),
+             width .66s cubic-bezier(.32,.02,.18,1), height .66s cubic-bezier(.32,.02,.18,1),
+             opacity .45s ease;
+  will-change:left,top,width,height;
+}
+.letter-envelope.is-gone{opacity:0;transform:translateY(8px) scale(.97)}
+
+.letter-env-paper{
+  position:absolute;inset:0;border-radius:12px;
+  background:
+    repeating-linear-gradient(90deg, rgba(120,96,60,.035) 0 1px, transparent 1px 4px),
+    linear-gradient(160deg,#efe5cf,#e6d9bd 60%,#ded0b1);
+  box-shadow:inset 0 0 0 1px rgba(120,96,60,.20), inset 0 0 46px rgba(120,96,60,.12);
+}
+.letter-env-paper::before,.letter-env-paper::after{content:"";position:absolute;inset:0}
+.letter-env-paper::before{
+  clip-path:polygon(0 0,50% 50%,0 100%);
+  background:linear-gradient(90deg,#f7f0e1,#f0e6cf);
+  filter:drop-shadow(1px 0 0 rgba(120,96,60,.20));
+}
+.letter-env-paper::after{
+  clip-path:polygon(100% 0,50% 50%,100% 100%);
+  background:linear-gradient(270deg,#eee3ca,#e9dcc0);
+  filter:drop-shadow(-1px 0 0 rgba(120,96,60,.16));
+}
+.letter-env-pocket{
+  position:absolute;inset:0;border-radius:12px;z-index:2;
+  clip-path:polygon(0 100%,50% 42%,100% 100%);
+  background:linear-gradient(0deg,#f3e9d4,#e8dcc0 62%);
+  filter:drop-shadow(0 -1px 0 rgba(120,96,60,.22));
+}
+.letter-env-frame{
+  position:absolute;inset:3.6%;border-radius:8px;border:1px solid rgba(228,191,121,.42);
+  z-index:4;pointer-events:none;
+}
+.letter-env-branch{
+  position:absolute;left:6%;bottom:8%;width:28cqw;z-index:3;opacity:.6;pointer-events:none;
+}
+.letter-env-branch path{fill:none;stroke:#8a787d;stroke-width:1.4;stroke-linecap:round}
+.letter-env-branch circle{fill:#f4ebef;stroke:#b9a7ad;stroke-width:.3}
+.letter-env-address{
+  position:absolute;left:0;right:0;bottom:12%;z-index:3;text-align:center;
+  color:#6b5a41;font-family:var(--serif);font-size:3.6cqw;
+  letter-spacing:.42em;text-indent:.42em;opacity:.9;pointer-events:none;
+}
+.letter-env-seal{
+  position:absolute;left:50%;top:46%;z-index:6;
+  width:19cqw;height:19cqw;min-width:30px;min-height:30px;
+  margin:calc(19cqw / -2) 0 0 calc(19cqw / -2);
+  display:grid;place-items:center;
+  border-radius:47% 53% 50% 50% / 52% 48% 52% 48%;
+  background:
+    radial-gradient(circle at 34% 28%, rgba(255,214,222,.55), transparent 42%),
+    radial-gradient(circle at 62% 74%, rgba(76,20,32,.55), transparent 46%),
+    radial-gradient(circle at 42% 36%, #cf6a7e, #a13b50 58%, #7c2739);
+  box-shadow:0 0 0 2px rgba(228,191,121,.42), 0 6px 14px rgba(0,0,0,.45),
+             inset 0 2px 5px rgba(255,255,255,.25), inset 0 -3px 7px rgba(0,0,0,.4);
+  color:#f6dfae;font-family:var(--serif);font-size:7.5cqw;line-height:1;
+  text-shadow:0 1px 0 rgba(255,255,255,.25), 0 -1px 1px rgba(0,0,0,.4);
+  transition:transform .3s ease, opacity .3s ease, box-shadow .3s ease;
+}
+.letter-env-seal::after{
+  content:"";position:absolute;inset:12%;border-radius:50%;
+  border:1px dashed rgba(246,223,174,.32);
+}
+.letter-envelope:hover .letter-env-seal{
+  transform:scale(1.06) rotate(-3deg);
+  box-shadow:0 0 0 2px rgba(228,191,121,.6), 0 8px 20px rgba(0,0,0,.5),
+             0 0 26px rgba(228,191,121,.35),
+             inset 0 2px 5px rgba(255,255,255,.25), inset 0 -3px 7px rgba(0,0,0,.4);
+}
+.letter-env-seal.is-broken{transform:scale(.35) rotate(-26deg);opacity:0}
+.letter-env-flap{
+  position:absolute;left:0;top:0;width:100%;height:52%;z-index:5;
+  clip-path:polygon(0 0,100% 0,50% 100%);
+  background:linear-gradient(180deg,#fdf8ec,#f1e7ce);
+  filter:drop-shadow(0 1px 0 rgba(120,96,60,.26));
+  transform-origin:top center;transform:rotateX(0deg);
+  transition:transform .72s cubic-bezier(.45,.05,.2,1), background .34s ease .3s;
+}
+/* 翻过去露出信封内里：比外面暗一档 */
+.letter-envelope.is-open .letter-env-flap{
+  transform:rotateX(-178deg);z-index:1;
+  background:linear-gradient(180deg,#e6d9bd,#f5eddd);
+}
+
+/* ── 浮层：月光晕、金屑、花笺信纸 ───────────────────────────── */
+.letter-veil{
+  position:fixed;inset:0;z-index:var(--z-overlay-top);
+  display:grid;place-items:center;
+  background:radial-gradient(1100px 780px at 50% 42%, rgba(20,21,25,.5), rgba(7,8,11,.88) 72%);
+  backdrop-filter:blur(12px) saturate(.92);
+  -webkit-backdrop-filter:blur(12px) saturate(.92);
+  opacity:0;transition:opacity .4s ease;
+}
+.letter-veil.is-shown{opacity:1}
+.letter-veil-glow{
+  position:absolute;left:50%;top:44%;width:min(760px,130vw);aspect-ratio:1;
+  transform:translate(-50%,-50%);pointer-events:none;
+  background:radial-gradient(circle, rgba(223,230,251,.12), rgba(174,189,232,.05) 44%, transparent 70%);
+  animation:letter-glow 5.5s ease-in-out infinite alternate;
+}
+@keyframes letter-glow{
+  from{opacity:.75;transform:translate(-50%,-50%) scale(1)}
+  to{opacity:1;transform:translate(-50%,-50%) scale(1.06)}
+}
+.letter-veil-motes{position:absolute;inset:0;overflow:hidden;pointer-events:none}
+.letter-mote{
+  position:absolute;bottom:-4vh;width:3px;height:3px;border-radius:50%;
+  background:rgba(228,191,121,.55);filter:blur(.4px);animation:letter-rise linear infinite;
+}
+@keyframes letter-rise{
+  0%{transform:translate3d(0,0,0);opacity:0}
+  12%{opacity:.9}
+  60%{opacity:.5}
+  100%{transform:translate3d(26px,-86vh,0);opacity:0}
+}
+
+/* 花笺：奶油纸 + 纸纹 + 金线双框 + 白梅水印 */
+.letter-paper{
+  position:absolute;left:50%;top:50%;
+  width:min(600px,92vw);max-height:82vh;overflow:auto;
+  padding:48px 56px 44px;border-radius:14px;
+  transform:translate(-50%,-46%) rotateX(-92deg);transform-origin:top center;opacity:0;
+  background:
+    repeating-linear-gradient(90deg, rgba(120,96,60,.035) 0 1px, transparent 1px 4px),
+    repeating-linear-gradient(0deg, rgba(120,96,60,.045) 0 1px, transparent 1px 5px),
+    linear-gradient(168deg,#fdfaf1,#f6efe0 58%,#f0e7d4);
+  color:#3b3226;font-family:var(--serif);
+  box-shadow:0 0 0 1px rgba(120,96,60,.22), 0 40px 90px rgba(0,0,0,.62),
+             inset 0 0 90px rgba(150,120,80,.08);
+  transition:transform .9s cubic-bezier(.28,.02,.16,1), opacity .36s ease;
+}
+.letter-paper.is-open{transform:translate(-50%,-52%) rotateX(0deg);opacity:1}
+.letter-paper::before{
+  content:"";position:absolute;inset:14px;border-radius:9px;
+  border:1px solid rgba(228,191,121,.55);pointer-events:none;
+}
+.letter-paper::after{
+  content:"";position:absolute;inset:19px;border-radius:7px;
+  border:1px solid rgba(228,191,121,.22);pointer-events:none;
+}
+.letter-paper-mark{position:absolute;right:6%;top:14%;width:34%;opacity:.07;pointer-events:none}
+.letter-paper-mark circle{fill:#8a5f66}
+.letter-paper p{margin:0 0 15px;font-size:var(--fs-chat);line-height:2.1;letter-spacing:.05em}
+.letter-kicker{
+  display:flex;align-items:center;gap:12px;margin:0 0 26px;
+  color:#8a7360;font-size:var(--fs-ui);letter-spacing:.52em;text-indent:.52em;
+}
+.letter-sprig{width:52px;height:14px;flex:none;opacity:.75}
+.letter-sprig path{fill:none;stroke:#a8817f;stroke-width:1.1;stroke-linecap:round}
+.letter-sprig circle{fill:#d9a8ad;stroke:none}
+.letter-sprig.is-flip{transform:scaleX(-1)}
+.letter-salutation{margin-bottom:20px;font-size:var(--fs-ui);color:#6b5a41}
+.letter-sign{margin:26px 0 0;text-align:right;font-size:var(--fs-ui);color:#6b5a41;letter-spacing:.12em}
+.letter-stamp{
+  position:absolute;right:40px;bottom:30px;display:grid;place-items:center;
+  width:46px;height:46px;border:2.5px solid #b8465a;border-radius:8px;
+  color:#b8465a;font-size:var(--fs-ui);letter-spacing:.18em;text-indent:.18em;
+  writing-mode:vertical-rl;
+  opacity:0;transform:scale(1.7) rotate(-8deg);filter:blur(1.2px);
+  transition:opacity .16s ease, transform .16s ease, filter .16s ease;
+}
+.letter-stamp.is-pressed{opacity:.9;transform:scale(1) rotate(-4deg);filter:blur(0)}
+.letter-stamp::after{
+  content:"";position:absolute;inset:3px;
+  border:1px solid rgba(184,70,90,.5);border-radius:5px;
+}
+/* 正文一行行浮上来：墨迹由虚到实 */
+.letter-veil .is-line{
+  opacity:0;filter:blur(3px);transform:translateY(10px);
+  transition:opacity .62s ease, filter .62s ease, transform .62s ease;
+}
+.letter-veil .is-line.is-in{opacity:1;filter:blur(0);transform:none}
+
+.letter-actions{
+  position:absolute;bottom:30px;left:50%;transform:translateX(-50%);
+  display:flex;gap:10px;z-index:var(--z-popover);
+}
+.letter-actions button{
+  padding:9px 20px;border:1px solid rgba(255,255,255,.14);border-radius:var(--radius);
+  background:color-mix(in srgb, var(--surface-2) 88%, transparent);color:var(--text-soft);
+  font-family:var(--font-ui);font-size:var(--fs-meta);cursor:pointer;
+  transition:color .16s ease, border-color .16s ease, transform .16s ease;
+}
+.letter-actions button:hover{color:var(--text);border-color:rgba(228,191,121,.5);transform:translateY(-1px)}
+.letter-x{
+  position:absolute;top:22px;right:24px;z-index:var(--z-popover);
+  width:40px;height:40px;border-radius:50%;
+  border:1px solid rgba(255,255,255,.14);
+  background:color-mix(in srgb, var(--surface-2) 80%, transparent);color:var(--text-soft);
+  font-size:var(--fs-chat);line-height:1;cursor:pointer;
+  transition:color .16s ease, border-color .16s ease;
+}
+.letter-x:hover{color:var(--text);border-color:rgba(255,255,255,.3)}
+
+@media (prefers-reduced-motion: reduce){
+  .letter-veil-glow{animation:none}
+  .letter-mote{display:none}
+  .letter-envelope.is-flying,.letter-paper,.letter-veil .is-line,.letter-stamp{transition:none}
+}
