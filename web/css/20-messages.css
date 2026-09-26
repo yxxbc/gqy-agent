@@ -288,12 +288,50 @@
   height: 13px;
 }
 
-/* 助手消息:92% 列宽的气泡行,30px 金圈头像固定在消息顶部 */
+/*
+ * 头像取景框(features/persona.js 的 makeAvatarFrame):外层裁圆、描边,里面
+ * 的图按焦点取景——object-position 决定露哪一块,同一点作 transform 原点放大。
+ * 焦点与缩放是 body 上的 --her-* / --me-*,尺寸是 --chat-avatar-size,
+ * 都由账号的头像设置写入。
+ */
+.avatar-frame {
+  display: block;
+  overflow: hidden;
+  flex: none;
+  border-radius: 50%;
+  background: var(--surface-2);
+}
+
+.avatar-frame img {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+/* 作者样式的 display 会盖过 hidden 属性:没有图时别露出破图。 */
+.avatar-frame img[hidden] {
+  display: none;
+}
+
+.avatar-frame.is-her img {
+  object-position: var(--her-fx, 50%) var(--her-fy, 50%);
+  transform: scale(var(--her-zoom, 1));
+  transform-origin: var(--her-fx, 50%) var(--her-fy, 50%);
+}
+
+.avatar-frame.is-me img {
+  object-position: var(--me-fx, 50%) var(--me-fy, 50%);
+  transform: scale(var(--me-zoom, 1));
+  transform-origin: var(--me-fx, 50%) var(--me-fy, 50%);
+}
+
+/* 助手消息:92% 列宽的气泡行,金圈头像固定在消息顶部,尺寸跟设置走 */
 .assistant-message {
   position: relative;
   max-width: 92%;
   margin-bottom: 30px;
-  padding-left: 40px;
+  padding-left: calc(var(--chat-avatar-size, 30px) + 10px);
 }
 
 .assistant-message.is-muted {
@@ -308,16 +346,36 @@
   gap: 8px;
 }
 
-.assistant-label img {
+.assistant-label .avatar-frame {
   position: absolute;
   top: 0;
-  bottom: auto;
   left: 0;
-  width: 30px;
-  height: 30px;
+  width: var(--chat-avatar-size, 30px);
+  height: var(--chat-avatar-size, 30px);
   border: 1.5px solid var(--gold);
-  border-radius: 50%;
-  object-fit: cover;
+}
+
+/* 自己的头像:气泡右上角,描边用雾蓝和她的金色分开。没设置时整个不出现。 */
+.user-message {
+  position: relative;
+}
+
+.user-message > .avatar-frame {
+  display: none;
+  position: absolute;
+  top: 0;
+  right: 0;
+  width: var(--chat-avatar-size, 30px);
+  height: var(--chat-avatar-size, 30px);
+  border: 1.5px solid var(--accent);
+}
+
+body.has-user-avatar .user-message {
+  padding-right: calc(var(--chat-avatar-size, 30px) + 10px);
+}
+
+body.has-user-avatar .user-message > .avatar-frame {
+  display: block;
 }
 
 .assistant-label > div {
@@ -327,10 +385,13 @@
   gap: 7px;
 }
 
+/* 她的名字用宋体、发金色:整页只有「她」用衬线,一眼分得出谁在说话。 */
 .assistant-label strong {
-  color: var(--text-soft);
-  font-size: var(--fs-micro);
+  color: var(--gold);
+  font-family: var(--serif);
+  font-size: var(--fs-meta);
   font-weight: 600;
+  letter-spacing: 0.08em;
 }
 
 .assistant-label span {
@@ -413,7 +474,7 @@
   min-height: 31px;
   align-items: center;
   margin: -18px 0 28px;
-  padding-left: 40px;
+  padding-left: calc(var(--chat-avatar-size, 30px) + 10px);
   color: var(--text-faint);
   font-size: var(--fs-meta);
   gap: 7px;

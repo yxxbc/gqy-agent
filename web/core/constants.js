@@ -27,9 +27,11 @@ export const DEFAULT_BOARD_SUBTITLE = "从一个问题、计划或此刻的想�
 
 // 输入框提示跟着人格名走,所以是函数不是常量;与后端
 // `web::dto::default_composer_placeholder` 保持同一句话。
+// 开发模式输入框的占位语：不借人格口吻，那边是干活的地方。
+export const DEV_COMPOSER_PLACEHOLDER = "描述要做的改动，/ 调出命令";
 export const defaultComposerPlaceholder = (name) => `给 ${name} 发消息`;
 
-export const DEFAULT_STARTER_PROMPTS = ["查询今天的天气", "分析一个问题", "发表情包打个招呼吧", "搜索一张图片"];
+export const DEFAULT_STARTER_PROMPTS = ["陪我说说话", "给我讲个睡前故事", "发表情包打个招呼吧", "写首小诗给我"];
 
 // 档位一律用供应商原值(max/high/minimal…),不翻译:译名和文档、和模型
 // 实际认的参数值对不上,查起来反而费劲。"没设"这一档没有原值,只好写字。

@@ -1,0 +1,247 @@
+/*
+ * 账号页的头像卡(features/avatar-settings.js)。
+ * 上排:左边一个大圆取景器,拖动/滚轮直接作用在图上;右边是对象切换与滑块。
+ * 下排:一段迷你对话,和对话流读同一组头像变量,改动即时可见。
+ */
+.avatar-editor-row {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  align-items: center;
+  gap: 24px;
+  padding: 4px 0 16px;
+}
+
+.avatar-editor {
+  position: relative;
+  display: grid;
+  width: 148px;
+  height: 148px;
+  place-items: center;
+  border-radius: 50%;
+  cursor: grab;
+  touch-action: none;
+  user-select: none;
+}
+
+/* 取景器外面一圈虚线:框出的就是对话里露出来的那一圈。 */
+.avatar-editor::after {
+  position: absolute;
+  inset: -6px;
+  border: 1px dashed color-mix(in srgb, var(--accent) 55%, transparent);
+  border-radius: 50%;
+  content: "";
+  pointer-events: none;
+}
+
+.avatar-editor.is-dragging {
+  cursor: grabbing;
+}
+
+.avatar-editor.is-empty {
+  cursor: default;
+}
+
+.avatar-editor:focus-visible {
+  outline: 2px solid color-mix(in srgb, var(--accent) 70%, transparent);
+  outline-offset: 10px;
+}
+
+.avatar-editor > .avatar-frame {
+  width: 100%;
+  height: 100%;
+  box-shadow: var(--card-shadow);
+}
+
+.avatar-editor > .avatar-frame.is-her {
+  border: 2px solid var(--gold);
+}
+
+.avatar-editor > .avatar-frame.is-me {
+  border: 2px solid var(--accent);
+}
+
+.avatar-editor > .avatar-frame[hidden] {
+  display: none;
+}
+
+.avatar-editor-empty {
+  position: absolute;
+  color: var(--text-faint);
+  font-size: var(--fs-meta);
+}
+
+.avatar-controls {
+  display: grid;
+  min-width: 0;
+  gap: 12px;
+}
+
+.avatar-tabs {
+  display: inline-flex;
+  justify-self: start;
+  padding: 3px;
+  border-radius: var(--radius-pill);
+  background: var(--surface-2);
+  gap: 2px;
+}
+
+.avatar-tab {
+  min-height: 28px;
+  padding: 0 14px;
+  border: 0;
+  border-radius: var(--radius-pill);
+  background: transparent;
+  color: var(--text-soft);
+  cursor: pointer;
+  font: inherit;
+  font-size: var(--fs-ui);
+  transition: background var(--motion) ease, color var(--motion) ease;
+}
+
+.avatar-tab.is-active {
+  background: var(--surface-1);
+  box-shadow: var(--card-shadow);
+  color: var(--text);
+}
+
+.avatar-tab[data-who="her"].is-active {
+  color: var(--gold);
+  font-family: var(--serif);
+}
+
+.avatar-control {
+  display: grid;
+  grid-template-columns: 92px minmax(0, 1fr) 48px;
+  align-items: center;
+  color: var(--text-soft);
+  font-size: var(--fs-meta);
+  gap: 10px;
+}
+
+.avatar-range {
+  width: 100%;
+  accent-color: var(--accent);
+}
+
+.avatar-range-value {
+  color: var(--text-soft);
+  font-family: var(--font-mono);
+  font-size: var(--fs-micro);
+  font-variant-numeric: tabular-nums;
+  text-align: right;
+}
+
+.avatar-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.avatar-actions .secondary-button[hidden] {
+  display: none;
+}
+
+.avatar-actions .is-danger {
+  color: var(--danger);
+}
+
+.avatar-hint {
+  margin: 0;
+  color: var(--text-faint);
+  font-size: var(--fs-micro);
+  line-height: 1.6;
+}
+
+/* 预览:铺一块页面底色,像从对话流里截下来的一段。 */
+.avatar-preview {
+  position: relative;
+  display: grid;
+  padding: 28px 18px 16px;
+  border-radius: var(--radius);
+  background:
+    radial-gradient(ellipse 70% 60% at 8% -10%, var(--window-light), transparent 72%),
+    var(--app-bg);
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--line) 70%, transparent);
+  gap: 16px;
+}
+
+.avatar-preview-label {
+  position: absolute;
+  top: 8px;
+  left: 12px;
+  color: var(--text-faint);
+  font-size: var(--fs-micro);
+}
+
+.avatar-preview-row {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+}
+
+.avatar-preview-row.is-me {
+  justify-content: flex-end;
+}
+
+.avatar-preview-row > .avatar-frame {
+  width: var(--chat-avatar-size, 30px);
+  height: var(--chat-avatar-size, 30px);
+  transition: width var(--motion) ease, height var(--motion) ease;
+}
+
+.avatar-preview-row.is-her > .avatar-frame {
+  border: 1.5px solid var(--gold);
+}
+
+.avatar-preview-row.is-me > .avatar-frame {
+  border: 1.5px solid var(--accent);
+}
+
+/* 没设头像时对话里不出现,预览也照实不出现。 */
+body:not(.has-user-avatar) .avatar-preview-row.is-me > .avatar-frame {
+  display: none;
+}
+
+.avatar-preview-copy {
+  display: grid;
+  min-width: 0;
+  gap: 4px;
+}
+
+.avatar-preview-copy p,
+.avatar-preview-bubble {
+  margin: 0;
+  color: var(--text);
+  font-size: var(--fs-chat);
+  line-height: 1.7;
+}
+
+.avatar-preview-name {
+  color: var(--gold);
+  font-family: var(--serif);
+  font-size: var(--fs-meta);
+  letter-spacing: 0.08em;
+}
+
+.avatar-preview-bubble {
+  max-width: 70%;
+  padding: 8px 14px;
+  border-radius: var(--radius-bubble) var(--radius-bubble) var(--radius-sm) var(--radius-bubble);
+  background: var(--user-bg);
+  color: var(--user-text);
+}
+
+@media (max-width: 640px) {
+  .avatar-editor-row {
+    grid-template-columns: 1fr;
+    justify-items: center;
+  }
+
+  .avatar-controls {
+    width: 100%;
+  }
+
+  .avatar-control {
+    grid-template-columns: 80px minmax(0, 1fr) 44px;
+  }
+}

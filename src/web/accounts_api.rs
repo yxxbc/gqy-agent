@@ -68,6 +68,9 @@ pub(in crate::web) fn member_dashboards(
 /// bootstrap 里的账号块:身份 + 当前人格 + 引导是否待做。
 pub(in crate::web) fn account_bootstrap_json(state: &DaemonState, identity: &WebIdentity) -> Value {
     let mut value = identity_json(identity);
+    let (avatar_url, avatar_display) = account_avatar_bootstrap(state, identity);
+    value["avatar_url"] = json!(avatar_url);
+    value["avatar_display"] = avatar_display;
     if !identity.admin && !identity.username.is_empty() {
         let settings = member_persona::load_settings(&state.paths, &identity.username);
         let active = member_persona::active_persona(&state.paths, &identity.username);

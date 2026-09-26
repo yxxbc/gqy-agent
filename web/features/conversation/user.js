@@ -4,6 +4,7 @@ import { safeAttachmentUrl } from "../composer/attachments.js";
 import { makeCopyButton, makeMessageAction, openRevisionEditor } from "./actions.js";
 import { validAssetDimension } from "./media.js";
 import { removeQueuedPrompt } from "../live/state.js";
+import { makeAvatarFrame } from "../persona.js";
 import { codeBlock } from "../markdown/blocks.js";
 import { appendAutoLink, appendTitleUrlLine, bareUrlAt, titleUrlLineAt, validLinkUrl } from "../markdown/links.js";
 
@@ -211,7 +212,7 @@ export function createUserMessage(content, timestamp, attributes = {}) {
     remove.addEventListener("click", () => removeQueuedPrompt(attributes.queueId));
     badge.append(label, remove);
     if (attachments) article.appendChild(attachments);
-    article.append(badge, bubble);
+    article.append(badge, bubble, makeAvatarFrame("me"));
     return article;
   }
   const actions = document.createElement("div");
@@ -225,7 +226,8 @@ export function createUserMessage(content, timestamp, attributes = {}) {
   }
   if (textContent.trim()) actions.appendChild(makeCopyButton(textContent, "复制消息"));
   if (attachments) article.appendChild(attachments);
-  article.append(bubble, actions);
+  // 自己的头像:没设置时由 CSS 整个藏起来(body.has-user-avatar),设置页换图不用重画对话。
+  article.append(bubble, actions, makeAvatarFrame("me"));
   return article;
 }
 

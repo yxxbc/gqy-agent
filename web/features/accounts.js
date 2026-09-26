@@ -2,6 +2,7 @@ import { apiRequest } from "../core/api.js";
 import { asFiniteNumber, formatDateTime, formatRelativeTime } from "../core/format.js";
 import { showToast } from "../core/toast.js";
 import { isAdmin } from "./auth.js";
+import { syncAvatarCard } from "./avatar-settings.js";
 import { usageFmt, usageFmtCost } from "./console/usage.js";
 import { loadPersonaCard } from "./persona-list.js";
 import { elements } from "../state/elements.js";
@@ -32,6 +33,7 @@ export function showAccountError(message) {
 }
 
 export async function loadAccountPanel() {
+  syncAvatarCard();
   const seq = ++accountState.loadSeq;
   showAccountError("");
   const account = state.account || {};

@@ -1,0 +1,347 @@
+/*
+ * 普通模式空白页:她写给你的一张花笺(features/today.js)。
+ *
+ * 花体英文问候在上;中间是信——暖色信纸、朱丝栏竖线、楷体、右上角一枚
+ * 天气邮戳、右下角一枚朱印,纸微微歪一点,像刚放在桌上;下面「上次你说」
+ * 与「我们认识 N 天」两张小卡;最底一排起手语。信是这一页唯一的主角,
+ * 每次空白页露出来轻轻展开一次。原来的竖排问候与立绘收起(她的立绘在
+ * 侧栏月洞窗里)。开发模式整块不出现。
+ */
+.today[hidden] {
+  display: none;
+}
+
+body[data-mode="dev"] .today {
+  display: none;
+}
+
+body:not([data-mode="dev"]) .empty-state:has(.today:not([hidden])) {
+  grid-template-areas:
+    "today"
+    "prompts";
+  grid-template-columns: minmax(0, 640px);
+  /* safe:内容比视口高时别从上面裁掉问候,退回顶端对齐。 */
+  align-content: safe center;
+  padding-top: 28px;
+}
+
+body:not([data-mode="dev"]) .empty-state:has(.today:not([hidden])) .empty-visual,
+body:not([data-mode="dev"]) .empty-state:has(.today:not([hidden])) .empty-copy {
+  display: none;
+}
+
+.today {
+  --letter-font: "Kaiti SC", "STKaiti", "KaiTi", "BiauKai", "AR PL UKai CN", var(--serif);
+  --latin-display: "Didot", "Bodoni 72", "Playfair Display", "Baskerville", "Cormorant Garamond", Georgia, var(--serif);
+  --paper: color-mix(in srgb, var(--surface-1) 90%, var(--gold));
+  display: grid;
+  grid-area: today;
+  width: 100%;
+  gap: 20px;
+  text-align: left;
+}
+
+/* ───────── 问候 ───────── */
+.today-greeting {
+  display: grid;
+  gap: 4px;
+}
+
+.today-en {
+  display: grid;
+  margin: 0;
+  color: var(--accent);
+  font-family: var(--latin-display);
+  font-size: calc(var(--fs-title) * 1.55);
+  font-style: italic;
+  font-weight: 500;
+  line-height: 1.12;
+}
+
+.today-en-name {
+  padding-left: 1.4em;
+}
+
+.today-zh {
+  margin: 6px 0 0;
+  color: var(--text-soft);
+  font-family: var(--serif);
+  font-size: var(--fs-ui);
+  letter-spacing: 0.14em;
+}
+
+/* ───────── 信 ───────── */
+.today-letter {
+  position: relative;
+  padding: 26px 34px 30px;
+  border: 1px solid color-mix(in srgb, var(--gold) 22%, var(--line));
+  border-radius: var(--radius-sm);
+  background:
+    repeating-linear-gradient(90deg, transparent 0 33px, color-mix(in srgb, var(--ribbon) 11%, transparent) 33px 34px),
+    var(--paper);
+  box-shadow:
+    0 1px 0 color-mix(in srgb, #fff 30%, transparent) inset,
+    0 18px 40px -18px color-mix(in srgb, #000 45%, transparent),
+    var(--card-shadow);
+  transform: rotate(-0.6deg);
+  animation: letter-unfold 700ms cubic-bezier(0.2, 0.8, 0.2, 1) backwards;
+}
+
+.letter-body {
+  display: grid;
+  gap: 2px;
+  color: var(--text);
+  font-family: var(--letter-font);
+  font-size: calc(var(--fs-chat) * 1.12);
+  letter-spacing: 0.04em;
+  line-height: 2;
+}
+
+.letter-body p {
+  margin: 0;
+}
+
+.letter-salutation {
+  font-weight: 600;
+}
+
+.letter-line {
+  text-indent: 2em;
+}
+
+.letter-sign {
+  margin: 14px 64px 0 0;
+  color: var(--text-soft);
+  font-family: var(--letter-font);
+  font-size: var(--fs-chat);
+  text-align: right;
+}
+
+/* 朱印:她名字的最后一个字,盖得有点歪,颜色不太匀。 */
+.letter-seal {
+  position: absolute;
+  right: 26px;
+  bottom: 22px;
+  display: grid;
+  width: 38px;
+  height: 38px;
+  place-items: center;
+  border: 2px solid var(--ribbon);
+  border-radius: var(--radius-sm);
+  background: color-mix(in srgb, var(--ribbon) 8%, transparent);
+  color: var(--ribbon);
+  font-family: var(--serif);
+  font-size: var(--fs-chat);
+  font-weight: 700;
+  opacity: 0.82;
+  transform: rotate(-9deg);
+}
+
+/* 邮戳:天气符号 + 城市 + 温度,虚线齿边,点它换城市。 */
+.letter-stamp {
+  position: absolute;
+  top: 16px;
+  right: 18px;
+  display: inline-flex;
+  align-items: center;
+  padding: 4px 9px;
+  border: 1.5px dashed color-mix(in srgb, var(--accent) 55%, transparent);
+  border-radius: var(--radius-sm);
+  background: color-mix(in srgb, var(--paper) 80%, transparent);
+  color: var(--accent);
+  cursor: pointer;
+  font-family: var(--serif);
+  font-size: var(--fs-micro);
+  gap: 5px;
+  letter-spacing: 0.08em;
+  transform: rotate(4deg);
+  transition: transform var(--motion) ease;
+}
+
+.letter-stamp:hover {
+  transform: rotate(0deg) scale(1.04);
+}
+
+.letter-stamp:focus-visible {
+  outline: 2px solid color-mix(in srgb, var(--accent) 60%, transparent);
+  outline-offset: 2px;
+}
+
+.letter-stamp-glyph {
+  font-size: var(--fs-ui);
+}
+
+.letter-stamp-temp {
+  font-family: var(--latin-display);
+  font-size: var(--fs-ui);
+}
+
+.letter-city-form {
+  display: flex;
+  max-width: 320px;
+  margin: 12px 0 0 2em;
+  gap: 8px;
+}
+
+.letter-city-input {
+  flex: 1;
+  min-width: 0;
+  height: 34px;
+  padding: 0 12px;
+  border: 0;
+  border-bottom: 1px solid color-mix(in srgb, var(--ribbon) 50%, transparent);
+  border-radius: 0;
+  outline: 0;
+  background: transparent;
+  color: var(--text);
+  font-family: var(--letter-font);
+  font-size: var(--fs-chat);
+}
+
+.letter-city-input:focus {
+  border-bottom-color: var(--ribbon);
+}
+
+.letter-city-save {
+  padding: 0 14px;
+  border: 1px solid color-mix(in srgb, var(--ribbon) 60%, transparent);
+  border-radius: var(--radius-pill);
+  background: transparent;
+  color: var(--ribbon);
+  cursor: pointer;
+  font-family: var(--serif);
+  font-size: var(--fs-meta);
+}
+
+.letter-city-save:hover {
+  background: color-mix(in srgb, var(--ribbon) 12%, transparent);
+}
+
+@keyframes letter-unfold {
+  from {
+    opacity: 0;
+    transform: rotate(-2deg) translateY(10px) scale(0.97);
+  }
+}
+
+/* ───────── 两张小卡 ───────── */
+.today-cards {
+  display: grid;
+  grid-template-columns: minmax(0, 1.6fr) minmax(0, 1fr);
+  gap: 12px;
+}
+
+.today-card-label {
+  color: var(--text-faint);
+  font-family: var(--serif);
+  font-size: var(--fs-micro);
+  letter-spacing: 0.2em;
+}
+
+.today-memory,
+.today-days {
+  display: grid;
+  align-content: start;
+  padding: 14px 16px;
+  border: 1px solid color-mix(in srgb, var(--line) 70%, transparent);
+  border-radius: var(--radius-lg);
+  background: color-mix(in srgb, var(--surface-1) 92%, var(--ribbon));
+  gap: 6px;
+  text-align: left;
+}
+
+.today-memory {
+  color: var(--text);
+  cursor: pointer;
+  font: inherit;
+  transition: border-color var(--motion) ease, transform var(--motion) ease;
+}
+
+.today-memory:hover {
+  border-color: color-mix(in srgb, var(--ribbon) 45%, transparent);
+  transform: translateY(-1px);
+}
+
+.today-memory:focus-visible {
+  outline: 2px solid color-mix(in srgb, var(--ribbon) 60%, transparent);
+  outline-offset: 2px;
+}
+
+.today-memory-quote {
+  font-family: var(--letter-font);
+  font-size: var(--fs-chat);
+  line-height: 1.7;
+}
+
+.today-memory-ask {
+  color: var(--ribbon);
+  font-family: var(--serif);
+  font-size: var(--fs-micro);
+  letter-spacing: 0.06em;
+}
+
+.today-days-count {
+  display: flex;
+  align-items: baseline;
+  color: var(--ribbon);
+  gap: 6px;
+}
+
+.today-days-count b {
+  font-family: var(--latin-display);
+  font-size: calc(var(--fs-title) * 1.7);
+  font-style: italic;
+  font-weight: 500;
+  line-height: 1;
+}
+
+.today-days-count span {
+  font-family: var(--serif);
+  font-size: var(--fs-ui);
+}
+
+.today-days-since {
+  color: var(--text-faint);
+  font-size: var(--fs-micro);
+}
+
+/* ───────── 起手语:一排胶囊 ───────── */
+body:not([data-mode="dev"]) .empty-state:has(.today:not([hidden])) .prompt-grid {
+  display: flex;
+  flex-wrap: wrap;
+  width: 100%;
+  margin-top: 4px;
+  gap: 8px;
+}
+
+body:not([data-mode="dev"]) .empty-state:has(.today:not([hidden])) .prompt-grid button:not(.prompt-dev) {
+  display: inline-flex;
+  min-height: 34px;
+  padding: 0 14px;
+  border-radius: var(--radius-pill);
+  gap: 6px;
+}
+
+@media (max-width: 836px) {
+  .today-cards {
+    grid-template-columns: 1fr;
+  }
+
+  .today-en {
+    font-size: calc(var(--fs-title) * 1.25);
+  }
+
+  .today-letter {
+    padding: 22px 20px 26px;
+  }
+
+  body:not([data-mode="dev"]) .empty-state:has(.today:not([hidden])) {
+    padding-top: 12px;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .today-letter {
+    animation: none;
+  }
+}

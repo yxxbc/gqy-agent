@@ -396,6 +396,20 @@ pub(in crate::web) fn router(state: DaemonState) -> Router {
             put(account_persona_image).delete(account_persona_image_delete),
         )
         .route("/api/account/active-persona", put(account_active_persona))
+        .route(
+            "/api/account/avatar",
+            get(account_avatar_get)
+                .put(account_avatar_put)
+                .delete(account_avatar_delete),
+        )
+        .route(
+            "/api/account/avatar-display",
+            put(account_avatar_display_put),
+        )
+        .route(
+            "/api/account/today",
+            get(account_today_get).put(account_today_put),
+        )
         .route("/api/admin/accounts", get(admin_list_accounts))
         .route(
             "/api/admin/accounts/{account_id}",

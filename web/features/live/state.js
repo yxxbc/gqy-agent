@@ -7,7 +7,7 @@ import { activeTurnUpdateTarget, conversationRunning, liveViewed, updateConversa
 import { createTurnStatus } from "../conversation/render.js";
 import { contentAdded } from "../conversation/scroll.js";
 import { createUserMessage, isSyntheticTurnContent } from "../conversation/user.js";
-import { setPersonaAvatar } from "../persona.js";
+import { makeAvatarFrame } from "../persona.js";
 import { updateQuestionDock } from "../questions.js";
 import { loadSessionView } from "../sessions/view.js";
 import { clearPreparingTool } from "../tools/events.js";
@@ -426,10 +426,7 @@ export function ensureLiveArticle(live) {
   if (live.turnId) article.dataset.turnId = String(live.turnId);
   const header = document.createElement("header");
   header.className = "assistant-label";
-  const avatar = document.createElement("img");
-  avatar.alt = "";
-  avatar.setAttribute("aria-hidden", "true");
-  setPersonaAvatar(avatar);
+  const avatar = makeAvatarFrame("her");
   const identity = document.createElement("div");
   const name = document.createElement("strong");
   name.textContent = state.persona.name;

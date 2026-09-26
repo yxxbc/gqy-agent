@@ -57,7 +57,7 @@
     <aside class="sidebar" id="sidebar" aria-label="会话">
       <header class="brand-row">
         <div class="brand-identity">
-          <img src="/assets/gqy-logo.png" alt="顾清影" class="brand-avatar" id="brandAvatar">
+          <span class="avatar-frame is-her brand-avatar"><img src="/assets/gqy-logo.png" alt="顾清影" id="brandAvatar"></span>
           <div>
             <strong id="brandName">顾清影</strong>
             <span><i class="status-dot is-connecting" id="sidebarStatusDot"></i><span id="sidebarConnectionStatus">连接中</span></span>
@@ -214,22 +214,46 @@
               <h1 id="emptyTitle">今天想聊些什么？</h1>
               <p id="emptySubtitle">从一个问题、计划或此刻的想法开始。</p>
             </div>
+            <!-- 开发模式的空白页：换一套文案，不借人格的看板与寒暄（显隐由 body[data-mode] 决定）。 -->
+            <div class="empty-copy empty-copy-dev">
+              <span class="empty-kicker"><span class="icon-slot" data-icon="terminal" aria-hidden="true"><span class="icon-fallback">›</span></span><span>开发模式</span></span>
+              <h1>要改哪里？</h1>
+              <p>极简提示词与编码工具，记忆和普通对话隔开。</p>
+            </div>
+            <!-- 普通模式的「今天」:问候、天气、今日建议(features/today.js 填充)。 -->
+            <div class="today" id="todayHome" hidden></div>
             <div class="prompt-grid" id="promptGrid">
-              <button type="button" data-prompt="查询今天的天气">
-                <span class="icon-slot" data-icon="cloud-sun" aria-hidden="true"><span class="icon-fallback">☀</span></span>
-                <span>查询今天的天气</span>
+              <button type="button" data-prompt="陪我说说话">
+                <span class="icon-slot" data-icon="message-circle" aria-hidden="true"><span class="icon-fallback">○</span></span>
+                <span>陪我说说话</span>
               </button>
-              <button type="button" data-prompt="分析一个问题">
-                <span class="icon-slot" data-icon="lightbulb" aria-hidden="true"><span class="icon-fallback">?</span></span>
-                <span>分析一个问题</span>
+              <button type="button" data-prompt="给我讲个睡前故事">
+                <span class="icon-slot" data-icon="moon" aria-hidden="true"><span class="icon-fallback">☾</span></span>
+                <span>给我讲个睡前故事</span>
               </button>
               <button type="button" data-prompt="发表情包打个招呼吧">
                 <span class="icon-slot" data-icon="smile" aria-hidden="true"><span class="icon-fallback">☺</span></span>
                 <span>发表情包打个招呼吧</span>
               </button>
-              <button type="button" data-prompt="搜索一张图片">
-                <span class="icon-slot" data-icon="image-search" aria-hidden="true"><span class="icon-fallback">⌕</span></span>
-                <span>搜索一张图片</span>
+              <button type="button" data-prompt="写首小诗给我">
+                <span class="icon-slot" data-icon="sparkles" aria-hidden="true"><span class="icon-fallback">✦</span></span>
+                <span>写首小诗给我</span>
+              </button>
+              <button class="prompt-dev" type="button" data-prompt="先看看这个仓库的结构和入口">
+                <span class="icon-slot" data-icon="file-code" aria-hidden="true"><span class="icon-fallback">⌘</span></span>
+                <span>看看仓库结构</span>
+              </button>
+              <button class="prompt-dev" type="button" data-prompt="帮我排查一个报错：">
+                <span class="icon-slot" data-icon="circle-alert" aria-hidden="true"><span class="icon-fallback">!</span></span>
+                <span>排查一个报错</span>
+              </button>
+              <button class="prompt-dev" type="button" data-prompt="给这个改动补上测试">
+                <span class="icon-slot" data-icon="check-square" aria-hidden="true"><span class="icon-fallback">✓</span></span>
+                <span>补一组测试</span>
+              </button>
+              <button class="prompt-dev" type="button" data-prompt="解释一下这段代码在做什么：">
+                <span class="icon-slot" data-icon="code" aria-hidden="true"><span class="icon-fallback">&lt;/&gt;</span></span>
+                <span>解释一段代码</span>
               </button>
             </div>
           </section>
@@ -517,6 +541,8 @@
             </div>
             <p class="login-error" id="accountError" role="alert" hidden></p>
           </div>
+          <!-- 头像:双方取景 + 对话里的尺寸,下方是实时预览(features/avatar-settings.js 填充)。 -->
+          <div class="u-card avatar-card" id="avatarCard"></div>
           <div class="u-card" data-member-only hidden>
             <div class="u-card-head">
               <h3>我的人格</h3><span class="u-hint">新会话用当前选中的那个</span>

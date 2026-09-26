@@ -17,11 +17,13 @@ pub(in crate::web) fn default_composer_placeholder(persona_name: &str) -> String
     format!("给 {persona_name} 发消息")
 }
 
+/// 空白页四个起手语的默认值。普通模式的首页是「她写给你的信」,起手语也
+/// 该是想和她一起做的事,而不是工具入口(09-26 用户:首页不浪漫)。
 pub(in crate::web) const DEFAULT_STARTER_PROMPTS: [&str; 4] = [
-    "查询今天的天气",
-    "分析一个问题",
+    "陪我说说话",
+    "给我讲个睡前故事",
     "发表情包打个招呼吧",
-    "搜索一张图片",
+    "写首小诗给我",
 ];
 
 pub(in crate::web) const MAX_THINKING_VARIANT_UPDATES: usize = 64;

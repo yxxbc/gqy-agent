@@ -18,6 +18,7 @@ use crate::paths::GqyPaths;
 use crate::question::{self, QuestionAnswers};
 // daemon 运行时的共享状态已下沉到 runtime：web 只是它的消费者之一，IPC 与
 // 平台适配是另外两个。放在 web 里会让平台层反过来依赖 HTTP 服务。
+mod account_avatar;
 mod accounts_api;
 mod actor;
 // build.rs 也 include! 这份规则；发布版里只有 build.rs 用得上它，运行时那条路径只在 debug 构建存在。
@@ -57,6 +58,7 @@ mod shared_files;
 #[cfg(test)]
 pub(crate) mod tests;
 mod themes_api;
+mod today;
 mod tty;
 mod turns;
 mod ui_prefs;
@@ -70,6 +72,7 @@ mod ipc_server;
 // 地图瓦片代理:CSP 是 img-src 'self',瓦片只能由 daemon 代取。
 mod map_api;
 
+use account_avatar::*;
 use accounts_api::*;
 use actor::*;
 use assets::*;
@@ -112,6 +115,7 @@ use session_cmds::*;
 use sessions::*;
 use shared_files::*;
 use themes_api::*;
+use today::*;
 use tty::*;
 use turns::*;
 use ui_prefs::*;
