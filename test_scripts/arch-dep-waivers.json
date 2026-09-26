@@ -1,6 +1,6 @@
 {
   "_说明": "现存跨层引用（低层 → 高层）的白名单，层序表见 arch_dep_check.py。只允许变小，变大即失败；新增的边不在表里，直接失败。",
-  "_来源": "--write-waivers 以现状重建",
+  "_来源": "--tighten 收紧",
   "waivers": {
     "agent->platforms": {
       "count": 8,
@@ -69,10 +69,6 @@
     "web->cli": {
       "count": 4,
       "reason": "Existing at main b4d2ac92: src/web/actor/job_wake.rs"
-    },
-    "web->config_tui": {
-      "count": 3,
-      "reason": "层序表启用前的既有依赖：src/web/providers_api.rs（模型目录与 CLI binary 解析）；09-26 新增一处：CLI 目录带回的上下文窗口回填（remembered_window）"
     }
   }
 }

@@ -2,7 +2,7 @@
 //!
 //! 与另三条 CLI 线的表单同构、不共享字段:没有 HTTP 概念,只有启用总开关
 //! 与 CLI 中转设置(落盘在 plugins.cline)。模型名不在表单里:cline 的模型 id
-//! 由用户自己的 cline 供应商决定,在模型菜单里手动添加(见 cli_catalog)。
+//! 由用户自己的 cline 供应商决定,在模型菜单里手动添加(见 models_cache::cli_catalog)。
 
 use crate::config_tui::*;
 

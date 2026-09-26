@@ -624,7 +624,7 @@
       "tests": 0,
       "total": 100
     },
-    "src/config_tui/cli_catalog.rs": {
+    "src/models_cache/cli_catalog.rs": {
       "tests": 130,
       "total": 452
     },
@@ -3698,7 +3698,7 @@
     },
     "web/settings.js": {
       "tests": 0,
-      "total": 2682
+      "total": 2717
     },
     "web/shared.js": {
       "tests": 0,

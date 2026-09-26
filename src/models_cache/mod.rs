@@ -1,7 +1,9 @@
 mod api;
+mod cli_catalog;
 mod lookup;
 mod provider_api;
 pub(crate) use api::*;
+pub(crate) use cli_catalog::{builtin_cli_binary, cline_provider_candidates, remembered_window};
 pub(crate) use lookup::*;
 pub(crate) use provider_api::*;
 

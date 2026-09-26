@@ -276,7 +276,7 @@ pub const ANTIGRAVITY_PRESET_MODELS: &[&str] = &[
 ];
 /// Cline 预置模型:目录不预置——cline 的模型 id 由用户自己配置的供应商决定
 /// (如 `anthropic/claude-sonnet-4.6`),真实清单在列模型时读 cline 本体自带的
-/// `@cline/llms`(见 `config_tui::cli_catalog::cline_catalog`);这里留空,
+/// `@cline/llms`(见 `models_cache::cli_catalog::cline_catalog`);这里留空,
 /// 免得把某个供应商的模型当成通用预置。
 pub const CLINE_PRESET_MODELS: &[&str] = &[];
 
@@ -643,7 +643,7 @@ impl ProviderConfig {
 
     /// 内置的 Cline 特殊供应商:本机 `cline` CLI 的登录态中转,形态与
     /// Claude Code 完全同构(恒存在、默认禁用、无 HTTP 字段)。模型目录不预置:
-    /// 列模型时读 cline 本体自带的 `@cline/llms`(`config_tui::cli_catalog`)。
+    /// 列模型时读 cline 本体自带的 `@cline/llms`(`models_cache::cli_catalog`)。
     pub fn cline_template() -> Self {
         Self {
             enabled: false,

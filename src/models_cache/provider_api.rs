@@ -2,7 +2,11 @@
 //!
 //! models.dev 覆盖不到自建端点，但很多供应商自己会报 context window。这条路是
 //! 补充：拿到了就用，拿不到不影响主流程。
+//!
+//! `fetch_models` 是配置界面（TUI、WebUI、OOBE）共用的「列模型」入口：HTTP
+//! 供应商问 `/models`，内置 CLI 供应商问 CLI（`cli_catalog.rs`）。
 
+use super::cli_catalog::builtin_cli_catalog;
 use crate::models_cache::*;
 
 pub(crate) static PROVIDER_API_CACHE: OnceLock<Mutex<HashMap<(String, String), u64>>> =
@@ -75,6 +79,63 @@ pub(crate) fn fetch_provider_context_windows(
             })
         })
         .collect())
+}
+
+/// `cli_binary`:内置 CLI 供应商列模型要跑的二进制(见 `cli_catalog.rs`);
+/// HTTP 供应商忽略。`config` 供 cline 的目录读 `plugins.cline.provider`。
+pub(crate) fn fetch_models(
+    config: &crate::config::AppConfig,
+    provider: &crate::config::ProviderConfig,
+    cli_binary: Option<&str>,
+) -> Result<Vec<String>> {
+    if provider.is_builtin_cli_provider() {
+        // 本机 CLI 后端没有 /models HTTP 端点:目录问 CLI 要(失败就报错),
+        // 再并上配置里手工加的名字。只返回 `provider.models` 的话,用户一旦
+        // 只激活一个模型,下次进来就只剩那一个可选(09-03)。
+        return builtin_cli_catalog(config, provider, cli_binary);
+    }
+    let api_key = provider.api_key.as_deref().unwrap_or_default();
+    let mut api_key = if let Some(env_name) = api_key.strip_prefix("$env:") {
+        std::env::var(env_name).unwrap_or_default()
+    } else {
+        api_key.to_string()
+    };
+    if api_key.is_empty() && provider.is_opencode_zen() {
+        api_key = "public".to_string();
+    }
+    let url = provider_models_url(&provider.base_url);
+    let mut request = reqwest::blocking::Client::builder()
+        .timeout(std::time::Duration::from_secs(provider.timeout_seconds))
+        .build()?
+        .get(url)
+        .header("Accept", "application/json")
+        .header("User-Agent", "gqy-config");
+    if !api_key.is_empty() {
+        request = request.bearer_auth(api_key);
+    }
+    let response = request.send()?;
+    let status = response.status();
+    let body = response.text()?;
+    if !status.is_success() {
+        anyhow::bail!("{status}: {body}");
+    }
+    let parsed: ModelsListResponse = serde_json::from_str(&body)?;
+    Ok(parsed
+        .data
+        .into_iter()
+        .map(|model| model.id)
+        .filter(|id| !id.is_empty())
+        .collect())
+}
+
+#[derive(Deserialize)]
+struct ModelsListResponse {
+    data: Vec<ModelsListEntry>,
+}
+
+#[derive(Deserialize)]
+struct ModelsListEntry {
+    id: String,
 }
 
 pub(crate) fn provider_models_url(base_url: &str) -> String {

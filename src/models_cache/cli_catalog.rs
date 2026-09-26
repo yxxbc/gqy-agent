@@ -83,7 +83,7 @@ pub(crate) fn builtin_cli_binary(config: &AppConfig, provider: &ProviderConfig) 
 }
 
 /// 目录 = CLI 实时列表(claude:别名表)∪ 配置里手工加的。CLI 失败即失败。
-pub(in crate::config_tui) fn builtin_cli_catalog(
+pub(in crate::models_cache) fn builtin_cli_catalog(
     config: &AppConfig,
     provider: &ProviderConfig,
     binary: Option<&str>,

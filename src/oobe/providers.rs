@@ -2,7 +2,7 @@
 //!
 //! 三类路：借本机已登录的 CLI（claude / codex / agy，探到才列）、常用供应商
 //! 预设（选一条 → 填 key → 拉目录 → 选模型；opencode Zen 免 key）、自定义供应商
-//! （名字 / id / 地址 / 协议 / key）。CLI 的模型目录最长要 20 秒（`cli_catalog.rs`
+//! （名字 / id / 地址 / 协议 / key）。CLI 的模型目录最长要 20 秒（`models_cache/cli_catalog.rs`
 //! 的超时），所以探到 CLI 就**提前**在后台线程拉，等用户走到最后一屏时目录已经在手里。
 
 use crate::config::{ActiveProviderModelConfig, AppConfig, ProviderConfig};
@@ -325,12 +325,12 @@ pub(super) struct CatalogJob {
 
 impl CatalogJob {
     pub fn spawn(config: &AppConfig, provider: ProviderConfig) -> Self {
-        let binary = crate::config_tui::builtin_cli_binary(config, &provider);
+        let binary = crate::models_cache::builtin_cli_binary(config, &provider);
         // cline 的目录要 `plugins.cline.provider`;config 跟着进线程。
         let config = config.clone();
         let (sender, receiver) = mpsc::channel();
         std::thread::spawn(move || {
-            let result = crate::config_tui::fetch_models(&config, &provider, binary.as_deref())
+            let result = crate::models_cache::fetch_models(&config, &provider, binary.as_deref())
                 .map_err(|error| format!("{error:#}"));
             let _ = sender.send(result);
         });

@@ -54,53 +54,6 @@ impl ModelEntry {
     }
 }
 
-/// `cli_binary`:内置 CLI 供应商列模型要跑的二进制(见 `cli_catalog`);
-/// HTTP 供应商忽略。`config` 供 cline 的目录读 `plugins.cline.provider`。
-pub(crate) fn fetch_models(
-    config: &AppConfig,
-    provider: &ProviderConfig,
-    cli_binary: Option<&str>,
-) -> Result<Vec<String>> {
-    if provider.is_builtin_cli_provider() {
-        // 本机 CLI 后端没有 /models HTTP 端点:目录问 CLI 要(失败就报错),
-        // 再并上配置里手工加的名字。只返回 `provider.models` 的话,用户一旦
-        // 只激活一个模型,下次进来就只剩那一个可选(09-03)。
-        return crate::config_tui::cli_catalog::builtin_cli_catalog(config, provider, cli_binary);
-    }
-    let api_key = provider.api_key.as_deref().unwrap_or_default();
-    let mut api_key = if let Some(env_name) = api_key.strip_prefix("$env:") {
-        std::env::var(env_name).unwrap_or_default()
-    } else {
-        api_key.to_string()
-    };
-    if api_key.is_empty() && provider.is_opencode_zen() {
-        api_key = "public".to_string();
-    }
-    let url = models_url(&provider.base_url);
-    let mut request = reqwest::blocking::Client::builder()
-        .timeout(std::time::Duration::from_secs(provider.timeout_seconds))
-        .build()?
-        .get(url)
-        .header("Accept", "application/json")
-        .header("User-Agent", "gqy-config");
-    if !api_key.is_empty() {
-        request = request.bearer_auth(api_key);
-    }
-    let response = request.send()?;
-    let status = response.status();
-    let body = response.text()?;
-    if !status.is_success() {
-        bail!("{status}: {body}");
-    }
-    let parsed: ModelsResponse = serde_json::from_str(&body)?;
-    Ok(parsed
-        .data
-        .into_iter()
-        .map(|model| model.id)
-        .filter(|id| !id.is_empty())
-        .collect())
-}
-
 /// 该模型在 models.dev 目录里的条目(读磁盘全量目录,没有就联网取一次)。
 pub(in crate::config_tui) fn catalog_entry(
     paths: &GqyPaths,
@@ -143,13 +96,13 @@ pub(crate) fn auto_configure_model_tags(
     }
     if needs_window {
         // CLI 线的模型不在 models.dev 目录里(model.dev 查不到就返回空条目):
-        // 窗口用拉目录时带回来的那份(见 `cli_catalog::remembered_window`)。
+        // 窗口用拉目录时带回来的那份(见 `models_cache::remembered_window`)。
         let window = entry
             .as_ref()
             .and_then(|entry| entry.context_window)
             .filter(|window| *window > 0)
             .map(|window| window as usize)
-            .or_else(|| crate::config_tui::cli_catalog::remembered_window(&provider.id, model));
+            .or_else(|| crate::models_cache::remembered_window(&provider.id, model));
         if let Some(window) = window {
             provider
                 .model_context_window
@@ -162,7 +115,7 @@ pub(crate) fn auto_configure_model_tags(
 /// `filter` 过滤后按组织分组;"All" 组恒收全部。
 ///
 /// 手填的必须置顶:它们不在供应商目录里,混进几百条中间就等于没加。同名去重
-/// 是给内置 CLI 供应商准备的——它的目录本来就并了 `models`(见 `cli_catalog`)。
+/// 是给内置 CLI 供应商准备的——它的目录本来就并了 `models`(见 `models_cache::cli_catalog`)。
 ///
 /// 抽成自由函数是为了能直接测:`ProviderBrowser` 要一份 `GqyPaths`,建一个
 /// 就会去碰真实 home。
@@ -259,28 +212,6 @@ pub(in crate::config_tui) fn remove_custom_model(
     }
     config.remove_active_model_references(&provider_id, model);
     true
-}
-
-pub(in crate::config_tui) fn models_url(base_url: &str) -> String {
-    let mut url = base_url.trim().trim_end_matches('/').to_string();
-    if url.ends_with("/chat/completions") {
-        url.truncate(url.len() - "/chat/completions".len());
-    }
-    if url.ends_with("/v1") {
-        format!("{url}/models")
-    } else {
-        format!("{url}/v1/models")
-    }
-}
-
-#[derive(Deserialize)]
-pub(in crate::config_tui) struct ModelsResponse {
-    pub(in crate::config_tui) data: Vec<ModelInfo>,
-}
-
-#[derive(Deserialize)]
-pub(in crate::config_tui) struct ModelInfo {
-    pub(in crate::config_tui) id: String,
 }
 
 pub(in crate::config_tui) fn select_active_provider(

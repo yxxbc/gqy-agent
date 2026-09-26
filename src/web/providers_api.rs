@@ -35,11 +35,12 @@ pub(in crate::web) async fn cline_provider_candidates(
 ) -> std::result::Result<Response, ApiError> {
     require_admin(&headers, &state)?;
     let config = state.manager.lock().unwrap().config.clone();
-    let candidates =
-        tokio::task::spawn_blocking(move || crate::config_tui::cline_provider_candidates(&config))
-            .await
-            .map_err(ApiError::internal)?
-            .map_err(ApiError::internal)?;
+    let candidates = tokio::task::spawn_blocking(move || {
+        crate::models_cache::cline_provider_candidates(&config)
+    })
+    .await
+    .map_err(ApiError::internal)?
+    .map_err(ApiError::internal)?;
     let providers = candidates
         .into_iter()
         .map(|(id, count)| {
@@ -93,8 +94,9 @@ pub(in crate::web) async fn provider_models(
     let requested = request.models;
     let result = tokio::task::spawn_blocking(move || -> anyhow::Result<ProviderModelsResponse> {
         let (source, ids) = if fetch {
-            let cli_binary = crate::config_tui::builtin_cli_binary(&current, &provider);
-            let ids = crate::config_tui::fetch_models(&current, &provider, cli_binary.as_deref())?;
+            let cli_binary = crate::models_cache::builtin_cli_binary(&current, &provider);
+            let ids =
+                crate::models_cache::fetch_models(&current, &provider, cli_binary.as_deref())?;
             (
                 if provider.is_builtin_cli_provider() {
                     "cli"
@@ -119,7 +121,7 @@ pub(in crate::web) async fn provider_models(
             if model.context_window.is_some_and(|window| window > 0) {
                 continue;
             }
-            if let Some(window) = crate::config_tui::remembered_window(&provider.id, &model.id) {
+            if let Some(window) = crate::models_cache::remembered_window(&provider.id, &model.id) {
                 model.context_window = Some(window as u64);
             }
         }

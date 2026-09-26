@@ -1,6 +1,5 @@
 mod antigravity_form;
 mod claude_code_form;
-mod cli_catalog;
 mod cline_form;
 mod codex_form;
 mod extensions;
@@ -10,10 +9,7 @@ mod plugin_settings;
 mod plugins;
 mod providers;
 mod quota;
-pub(crate) use cli_catalog::builtin_cli_binary;
-pub(crate) use cli_catalog::cline_provider_candidates;
-pub(crate) use cli_catalog::remembered_window;
-pub(crate) use providers::{auto_configure_model_tags, fetch_models};
+pub(crate) use providers::auto_configure_model_tags;
 mod real_context;
 mod scheduled_messages;
 mod settings;
@@ -598,7 +594,7 @@ impl<'a> ProviderBrowser<'a> {
         self.fetch_seq += 1;
         if let Some(provider) = self.config.providers.get(self.provider_idx).cloned() {
             let seq = self.fetch_seq;
-            let cli_binary = cli_catalog::builtin_cli_binary(&self.config, &provider);
+            let cli_binary = crate::models_cache::builtin_cli_binary(&self.config, &provider);
             // 目录拉取要 `plugins.cline.provider`(cline 线),config 跟着进线程。
             let config = self.config.clone();
             let (tx, rx) = mpsc::channel();
@@ -606,8 +602,9 @@ impl<'a> ProviderBrowser<'a> {
             self.loading = true;
             self.status = t("Fetching model list...", "正在获取模型列表...").to_string();
             std::thread::spawn(move || {
-                let result = fetch_models(&config, &provider, cli_binary.as_deref())
-                    .map_err(|err| err.to_string());
+                let result =
+                    crate::models_cache::fetch_models(&config, &provider, cli_binary.as_deref())
+                        .map_err(|err| err.to_string());
                 let _ = tx.send((seq, result));
             });
         } else {
