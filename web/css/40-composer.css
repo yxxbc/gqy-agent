@@ -186,36 +186,16 @@
   flex: 1 1 auto;
   min-width: 8px;
 }
-/* 模型选择器在框内底栏左侧，紧跟附件按钮。不被挤没：不收缩到只剩箭头，
-   名字过长在自己内部省略(#2 手机端也要看得到模型名)。 */
-.composer-inbox-bar .model-menu-wrap {
+/* 模型切换在输入框下的信息行左端(09-26 用户要求,原先在框内底栏)。
+   按钮本体沿用 12-stage-controls 的通用样式,这里只管它在信息行里的伸缩:
+   不收缩到只剩箭头,名字过长在自己内部省略(#2 手机端也要看得到模型名)。 */
+.composer-info .model-menu-wrap {
   flex: 0 1 auto;
   min-width: 0;
+  margin-left: -4px;
 }
-.composer-inbox-bar .model-button {
-  /* 上面框内按钮通用规则是 36×36 的 grid 居中，这里改回横排 */
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-  width: auto;
-  height: 32px;
-  flex: 0 1 auto;
-  max-width: min(46vw, 320px);
-  justify-content: flex-start;
-  padding: 0 10px;
-  background: transparent;
-  font-size: var(--fs-meta);
-}
-.composer-inbox-bar .model-button:hover:not(:disabled),
-.composer-inbox-bar .model-button[aria-expanded="true"] {
-  background: var(--surface-2);
-}
-.composer-inbox-bar .model-label {
-  display: inline;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-  max-width: 100%;
+.composer-info .model-label {
+  max-width: min(40vw, 240px);
 }
 .composer-info .k {
   /* 标签和数值同色(#111:不加粗后颜色还不一样),整行统一用 --text-soft。 */

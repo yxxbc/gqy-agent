@@ -12,13 +12,52 @@
 
 use crate::config::{AppConfig, ProviderConfig};
 use anyhow::{bail, Context, Result};
+use std::collections::HashMap;
 use std::io::Read;
 use std::path::{Path, PathBuf};
 use std::process::{Command, Stdio};
+use std::sync::{LazyLock, Mutex};
 use std::time::{Duration, Instant};
 
 /// agy 要联网取目录,cline 要起 node 读包,给足时间;超时就不让 TUI 干等。
 const CLI_LIST_TIMEOUT: Duration = Duration::from_secs(20);
+
+/// 目录里的一条:模型名 + 已知的上下文窗口(多数 CLI 不给)。
+struct LiveModel {
+    id: String,
+    context_window: Option<u64>,
+}
+
+/// CLI 目录带回的上下文窗口(进程内,键 = 顾清影 供应商 id + 模型名)。
+///
+/// CLI 线的模型不在 models.dev 目录里,激活时 `auto_configure_model_tags` 与
+/// WebUI 的目录补全都查不到窗口;拉目录时顺手把窗口记在这里,之后只查内存,
+/// 不再起一次 CLI。键带供应商 id:同名模型在两家可以是两个窗口。
+static CLI_WINDOWS: LazyLock<Mutex<HashMap<(String, String), usize>>> =
+    LazyLock::new(|| Mutex::new(HashMap::new()));
+
+fn remember_windows(provider_id: &str, models: &[LiveModel]) {
+    let Ok(mut cache) = CLI_WINDOWS.lock() else {
+        return;
+    };
+    for model in models {
+        if let Some(window) = model.context_window.filter(|window| *window > 0) {
+            cache.insert(
+                (provider_id.to_string(), model.id.clone()),
+                window as usize,
+            );
+        }
+    }
+}
+
+/// 拉过目录的模型窗口;没拉过就是 `None`(调用方什么都不做)。
+pub(crate) fn remembered_window(provider_id: &str, model: &str) -> Option<usize> {
+    CLI_WINDOWS
+        .lock()
+        .ok()?
+        .get(&(provider_id.to_string(), model.to_string()))
+        .copied()
+}
 
 /// 该供应商列模型要跑的二进制;`None` = 没有对应的 CLI 子命令。
 pub(crate) fn builtin_cli_binary(config: &AppConfig, provider: &ProviderConfig) -> Option<String> {
@@ -50,10 +89,12 @@ pub(in crate::config_tui) fn builtin_cli_catalog(
     let mut catalog = match binary {
         Some(binary) => {
             let models = live_catalog(config, provider, binary)?;
-            if models.is_empty() {
+            remember_windows(&provider.id, &models);
+            let ids: Vec<String> = models.into_iter().map(|model| model.id).collect();
+            if ids.is_empty() {
                 bail!("{binary} listed no models");
             }
-            models
+            ids
         }
         None => provider
             .preset_model_catalog()
@@ -73,13 +114,25 @@ fn live_catalog(
     config: &AppConfig,
     provider: &ProviderConfig,
     binary: &str,
-) -> Result<Vec<String>> {
+) -> Result<Vec<LiveModel>> {
     if provider.is_antigravity() {
         let stdout = run_with_timeout(binary, &["models"], CLI_LIST_TIMEOUT)?;
-        Ok(parse_agy_models(&stdout))
+        Ok(parse_agy_models(&stdout)
+            .into_iter()
+            .map(|id| LiveModel {
+                id,
+                context_window: None,
+            })
+            .collect())
     } else if provider.is_codex() {
         let stdout = run_with_timeout(binary, &["debug", "models"], CLI_LIST_TIMEOUT)?;
-        parse_codex_models(&stdout)
+        Ok(parse_codex_models(&stdout)?
+            .into_iter()
+            .map(|id| LiveModel {
+                id,
+                context_window: None,
+            })
+            .collect())
     } else if provider.is_cline() {
         cline_catalog(config, binary)
     } else {
@@ -90,9 +143,10 @@ fn live_catalog(
 /// cline 的模型目录:读 cline 本体自带的 `@cline/llms`(与 cline TUI 的模型
 /// 选择器同源),不连 Cline 的服务器。定位方式:把 cline 可执行文件解掉符号
 /// 链接,从它的祖先目录里找 `node_modules/@cline/llms`,再让 node 跑一段小
-/// 脚本把 `getModelsForProvider(<供应商 id>)` 的键打成 JSON。找不到 node 或
-/// 包就报错让用户看见(与另两条线一致:目录问题不悄悄降级)。
-fn cline_catalog(config: &AppConfig, binary: &str) -> Result<Vec<String>> {
+/// 脚本把 `getModelsForProvider(<供应商 id>)` 的条目打成 JSON(带
+/// `contextWindow`,激活时用来填窗口)。找不到 node 或包就报错让用户看见
+/// (与另两条线一致:目录问题不悄悄降级)。
+fn cline_catalog(config: &AppConfig, binary: &str) -> Result<Vec<LiveModel>> {
     let provider_id = {
         let configured = config.plugins.cline.provider.trim();
         if configured.is_empty() {
@@ -111,7 +165,7 @@ fn cline_catalog(config: &AppConfig, binary: &str) -> Result<Vec<String>> {
     let script = format!(
         "const m = await import({});\n\
          const models = await m.getModelsForProvider({});\n\
-         process.stdout.write(JSON.stringify(Object.keys(models ?? {{}})));",
+         process.stdout.write(JSON.stringify(Object.values(models ?? {{}}).map((model) => ({{ id: model.id, contextWindow: model.contextWindow }}))));",
         serde_json::to_string(&entry.display().to_string())?,
         serde_json::to_string(provider_id)?,
     );
@@ -162,19 +216,35 @@ fn locate_cline_llms(binary: &Path) -> Option<PathBuf> {
     None
 }
 
-/// `getModelsForProvider` 的键数组;输出前面可能混着 node 的杂音,从第一个
-/// `[` 起解析。
-fn parse_cline_models(stdout: &str) -> Result<Vec<String>> {
+/// `getModelsForProvider` 的条目:模型 id + 上下文窗口;输出前面可能混着
+/// node 的杂音,从第一个 `[` 起解析。
+fn parse_cline_models(stdout: &str) -> Result<Vec<LiveModel>> {
     let trimmed = stdout.trim();
     let start = trimmed
         .find('[')
         .context("the cline model catalog printed no JSON")?;
-    let ids: Vec<String> =
+    let entries: Vec<serde_json::Value> =
         serde_json::from_str(&trimmed[start..]).context("the cline model catalog JSON")?;
-    Ok(ids
+    Ok(entries
         .into_iter()
-        .map(|id| id.trim().to_string())
-        .filter(|id| !id.is_empty())
+        .filter_map(|entry| {
+            let id = entry
+                .get("id")
+                .and_then(serde_json::Value::as_str)?
+                .trim()
+                .to_string();
+            if id.is_empty() {
+                return None;
+            }
+            let context_window = entry
+                .get("contextWindow")
+                .and_then(serde_json::Value::as_u64)
+                .filter(|window| *window > 0);
+            Some(LiveModel {
+                id,
+                context_window,
+            })
+        })
         .collect())
 }
 
@@ -309,16 +379,30 @@ mod tests {
     /// 报"没列出模型"),不是 JSON 就报错。
     #[test]
     fn cline_listing_parses_the_json_array() {
-        let out = "some node noise\n[\"anthropic/claude-sonnet-4.6\",\" cline-pass/kimi-k3 \"]\n";
-        assert_eq!(
-            parse_cline_models(out).unwrap(),
-            vec![
-                "anthropic/claude-sonnet-4.6".to_string(),
-                "cline-pass/kimi-k3".to_string()
-            ]
-        );
+        let out = "some node noise\n[{\"id\":\"anthropic/claude-sonnet-4.6\",\"contextWindow\":1000000},{\"id\":\" cline-pass/kimi-k3 \"}]";
+        let models = parse_cline_models(out).unwrap();
+        assert_eq!(models.len(), 2);
+        assert_eq!(models[0].id, "anthropic/claude-sonnet-4.6");
+        assert_eq!(models[0].context_window, Some(1_000_000));
+        assert_eq!(models[1].id, "cline-pass/kimi-k3");
+        assert_eq!(models[1].context_window, None);
         assert!(parse_cline_models("[]").unwrap().is_empty());
         assert!(parse_cline_models("nothing here").is_err());
+    }
+
+    /// 拉目录带回来的窗口进进程内缓存:激活时 `auto_configure_model_tags`
+    /// 与 WebUI 的目录补全都从这里取,不再起一次 CLI。
+    #[test]
+    fn live_windows_are_remembered_for_later_activation() {
+        let models = parse_cline_models(
+            "[{\"id\":\"xiaomi/mimo-v2.6\",\"contextWindow\":262144},{\"id\":\"some/other\"}]",
+        )
+        .unwrap();
+        remember_windows("cline", &models);
+        assert_eq!(remembered_window("cline", "xiaomi/mimo-v2.6"), Some(262144));
+        // 没给窗口的条目不记;另一家供应商的同名模型互不干扰。
+        assert_eq!(remembered_window("cline", "some/other"), None);
+        assert_eq!(remembered_window("codex", "xiaomi/mimo-v2.6"), None);
     }
 
     /// `@cline/llms` 的定位:从 cline 可执行文件(解掉符号链接后)向上找,

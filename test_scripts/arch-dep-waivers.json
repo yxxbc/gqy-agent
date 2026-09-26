@@ -71,8 +71,8 @@
       "reason": "Existing at main b4d2ac92: src/web/actor/job_wake.rs"
     },
     "web->config_tui": {
-      "count": 2,
-      "reason": "Existing at main b4d2ac92: src/web/providers_api.rs"
+      "count": 3,
+      "reason": "层序表启用前的既有依赖：src/web/providers_api.rs（模型目录与 CLI binary 解析）；09-26 新增一处：CLI 目录带回的上下文窗口回填（remembered_window）"
     }
   }
 }

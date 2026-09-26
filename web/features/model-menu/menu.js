@@ -17,14 +17,23 @@ const menuState = {
   stagedFollowGlobal: false,
   stagedVariants: null,
   expandedLevelKey: null,
+  groupExpanded: null,
+  modelQuery: "",
   modelMenuTouched: false,
   modelMenuError: "",
   sessionModelOverrideToken: 0
 };
 
+/// 过滤框节点(只建一次,见 ensureModelMenuSearch)。
+let modelMenuSearch = null;
+
 export function openModelMenu() {
   if (elements.modelButton.disabled || state.models.length === 0) return;
   resetModelMenuStaging();
+  // 每次打开都从干净状态开始:过滤框清空,分节展开状态按当前选中重算。
+  menuState.modelQuery = "";
+  menuState.groupExpanded = null;
+  if (modelMenuSearch) modelMenuSearch.input.value = "";
   renderModelMenu();
   elements.modelMenu.hidden = false;
   elements.modelButton.setAttribute("aria-expanded", "true");
@@ -222,13 +231,107 @@ export function modelMenuStaging() {
   return { follow: !override, keys: new Set((override || []).map(modelKey)) };
 }
 
-export function renderModelMenu() {
-  // 重画整张列表会把滚动位置清零。展开档位、选档位都要重画,不记住就
-  // 每次都弹回顶部,而用户正看着列表中间某一行。
-  const scrollTop = elements.modelMenu.querySelector(".model-menu-list")?.scrollTop ?? 0;
-  elements.modelMenu.replaceChildren();
+/// 按供应商分组,保持模型表原有的顺序(供应商按首次出现,组内按目录顺序)。
+/// `query` 非空时只留命中的模型(模型名 / 供应商名 / 供应商 id 里含它就命中)。
+function groupModelsByProvider(models, query = "") {
+  const groups = new Map();
+  for (const model of models) {
+    if (!model || typeof model !== "object") continue;
+    const id = String(model.provider_id || "");
+    const name = String(model.provider_name || id || "未命名供应商");
+    if (query) {
+      const haystack = `${String(model.model || "")} ${name} ${id}`.toLowerCase();
+      if (!haystack.includes(query)) continue;
+    }
+    if (!groups.has(id)) {
+      groups.set(id, { id, name, models: [] });
+    }
+    groups.get(id).models.push(model);
+  }
+  return [...groups.values()];
+}
+
+/// 某个供应商节是否展开。默认展开「有选中/已激活模型」的节与唯一的那个节
+/// (30 多家、上千条模型全铺开等于没有列表);用户点过的状态记在
+/// menuState.groupExpanded 里,重画/重开不丢。
+function modelGroupExpanded(id, group, soleGroup = false) {
+  if (menuState.groupExpanded instanceof Map && menuState.groupExpanded.has(id)) {
+    return menuState.groupExpanded.get(id);
+  }
+  if (soleGroup) return true;
   const staging = modelMenuStaging();
-  const globalKeys = new Set(activeModels().map(modelKey));
+  const keys = staging.follow ? new Set(activeModels().map(modelKey)) : staging.keys;
+  return group.models.some((model) => keys.has(modelKey(model)));
+}
+
+function toggleModelGroup(id, group) {
+  if (!(menuState.groupExpanded instanceof Map)) menuState.groupExpanded = new Map();
+  menuState.groupExpanded.set(id, !modelGroupExpanded(id, group));
+  renderModelMenu();
+  // 节头是重画出来的,焦点跟着回来——不然键盘用户点一下节就掉到 body 上。
+  window.requestAnimationFrame(() => {
+    const header = [...elements.modelMenu.querySelectorAll(".model-menu-group")]
+      .find((node) => node.dataset.provider === id);
+    header?.focus();
+  });
+}
+
+/// 一条模型(可带思考档位小片)。所有节点挂在 `parent` 上——分组后 parent 是
+/// 节内容容器,不再是整个列表。
+function appendModelEntry(parent, model, staging, globalKeys) {
+  const button = document.createElement("button");
+  button.type = "button";
+  button.className = "model-menu-item";
+  button.setAttribute("role", "menuitemcheckbox");
+  button.dataset.modelKey = modelKey(model);
+  const checked = staging.follow ? globalKeys.has(button.dataset.modelKey) : staging.keys.has(button.dataset.modelKey);
+  const selected = checked && !staging.follow;
+  button.setAttribute("aria-checked", String(checked));
+  button.classList.toggle("selected", selected);
+  button.classList.toggle("from-global", checked && staging.follow);
+
+  const copy = document.createElement("span");
+  copy.className = "model-menu-copy";
+  const name = document.createElement("strong");
+  name.textContent = String(model.model || "");
+  copy.append(name);
+  const check = document.createElement("span");
+  check.className = "icon-slot check-slot";
+  check.setAttribute("aria-hidden", "true");
+  if (checked) check.appendChild(createIcon("check"));
+  button.append(copy, check);
+  button.addEventListener("click", () => toggleStagedModel(button.dataset.modelKey));
+
+  // 档位小片和展开的档位行都得在这个按钮外面——按钮里套按钮是非法嵌套,
+  // 浏览器会把内层拎出去,点击就落到外层的「选中模型」上。
+  const key = button.dataset.modelKey;
+  const variants = variantOptionsFor(key);
+  if (!variants.length) {
+    parent.appendChild(button);
+    return;
+  }
+  const row = document.createElement("div");
+  row.className = "model-menu-row";
+  const chip = document.createElement("button");
+  chip.type = "button";
+  chip.className = "model-level-chip";
+  chip.setAttribute("aria-expanded", String(menuState.expandedLevelKey === key));
+  chip.title = `思考程度：${thinkingVariantLabel(stagedVariantFor(key))}`;
+  const chipText = document.createElement("span");
+  chipText.textContent = thinkingVariantLabel(stagedVariantFor(key), true);
+  chip.append(chipText, makeIconSlot("chevron-down"));
+  chip.addEventListener("click", (event) => {
+    event.stopPropagation();
+    if (menuState.expandedLevelKey === key) closeLevelMenu();
+    else openLevelMenu(key, chip, model.model);
+  });
+  row.append(button, chip);
+  parent.appendChild(row);
+}
+
+/// 列表本体(含「跟随全局」与各供应商节)。过滤框输入时只重画它——输入框与
+/// 页脚留在原地,焦点不丢。
+function buildModelList(staging, globalKeys) {
   const list = document.createElement("div");
   list.className = "model-menu-list";
   list.setAttribute("role", "group");
@@ -255,60 +358,55 @@ export function renderModelMenu() {
   follow.addEventListener("click", chooseFollowGlobal);
   list.appendChild(follow);
 
-  for (const model of state.models) {
-    if (!model || typeof model !== "object") continue;
-    const button = document.createElement("button");
-    button.type = "button";
-    button.className = "model-menu-item";
-    button.setAttribute("role", "menuitemcheckbox");
-    button.dataset.modelKey = modelKey(model);
-    const checked = staging.follow ? globalKeys.has(button.dataset.modelKey) : staging.keys.has(button.dataset.modelKey);
-    const selected = checked && !staging.follow;
-    button.setAttribute("aria-checked", String(checked));
-    button.classList.toggle("selected", selected);
-    button.classList.toggle("from-global", checked && staging.follow);
-
-    const copy = document.createElement("span");
-    copy.className = "model-menu-copy";
-    const name = document.createElement("strong");
-    name.textContent = String(model.model || "");
-    const provider = document.createElement("small");
-    provider.textContent = String(model.provider_name || model.provider_id || "");
-    copy.append(name, provider);
-    const check = document.createElement("span");
-    check.className = "icon-slot check-slot";
-    check.setAttribute("aria-hidden", "true");
-    if (checked) check.appendChild(createIcon("check"));
-    button.append(copy, check);
-    button.addEventListener("click", () => toggleStagedModel(button.dataset.modelKey));
-
-    // 档位小片和展开的档位行都得在这个按钮外面——按钮里套按钮是非法嵌套,
-    // 浏览器会把内层拎出去,点击就落到外层的「选中模型」上。
-    const key = button.dataset.modelKey;
-    const variants = variantOptionsFor(key);
-    if (!variants.length) {
-      list.appendChild(button);
-      continue;
+  // 按供应商分组:节头是品牌图标 + 供应商名 + 条数,点开才铺模型(09-26 用户
+  // 要求)。默认只展开有选中模型的节——30 多家、上千条模型全铺开等于没有列表;
+  // 过滤时全部展开(用户就是在找命中项)。
+  const groups = groupModelsByProvider(state.models, menuState.modelQuery);
+  for (const group of groups) {
+    const expanded = menuState.modelQuery
+      ? true
+      : modelGroupExpanded(group.id, group, groups.length === 1);
+    const section = document.createElement("section");
+    section.className = "model-menu-section";
+    // 节 = 一个 aria group;节头是组里的 menuitem,aria-expanded 表示展开。
+    section.setAttribute("role", "group");
+    section.setAttribute("aria-label", group.name);
+    const header = document.createElement("button");
+    header.type = "button";
+    header.className = "model-menu-group";
+    header.setAttribute("role", "menuitem");
+    header.dataset.provider = group.id;
+    header.setAttribute("aria-expanded", String(expanded));
+    // 品牌图标来自 provider-icons.js;认不出的供应商只显示名字(名字就在旁边)。
+    const brand = window.GqyProviderIcons?.providerMark({ id: group.id, display_name: group.name }, "is-small");
+    if (brand) header.appendChild(brand);
+    const groupName = document.createElement("strong");
+    groupName.textContent = group.name;
+    const groupCount = document.createElement("small");
+    groupCount.textContent = String(group.models.length);
+    header.append(groupName, groupCount, makeIconSlot("chevron-down"));
+    header.addEventListener("click", () => toggleModelGroup(group.id, group));
+    section.appendChild(header);
+    if (expanded) {
+      const body = document.createElement("div");
+      body.className = "model-menu-group-models";
+      for (const model of group.models) appendModelEntry(body, model, staging, globalKeys);
+      section.appendChild(body);
     }
-    const row = document.createElement("div");
-    row.className = "model-menu-row";
-    const chip = document.createElement("button");
-    chip.type = "button";
-    chip.className = "model-level-chip";
-    chip.setAttribute("aria-expanded", String(menuState.expandedLevelKey === key));
-    chip.title = `思考程度：${thinkingVariantLabel(stagedVariantFor(key))}`;
-    const chipText = document.createElement("span");
-    chipText.textContent = thinkingVariantLabel(stagedVariantFor(key), true);
-    chip.append(chipText, makeIconSlot("chevron-down"));
-    chip.addEventListener("click", (event) => {
-      event.stopPropagation();
-      if (menuState.expandedLevelKey === key) closeLevelMenu();
-      else openLevelMenu(key, chip, model.model);
-    });
-    row.append(button, chip);
-    list.appendChild(row);
+    list.appendChild(section);
   }
 
+  if (!groups.length) {
+    const empty = document.createElement("p");
+    empty.className = "model-menu-empty";
+    empty.textContent = menuState.modelQuery ? "没有匹配的模型" : "还没有可用模型";
+    list.appendChild(empty);
+  }
+  return list;
+}
+
+/// 页脚(反馈 + 取消/确认)。
+function buildModelFooter() {
   const footer = document.createElement("footer");
   footer.className = "model-menu-footer";
   footer.setAttribute("role", "none");
@@ -329,7 +427,42 @@ export function renderModelMenu() {
   confirm.textContent = "确认";
   confirm.addEventListener("click", confirmModelSelection);
   footer.append(feedback, cancel, confirm);
-  elements.modelMenu.append(list, footer);
+  return footer;
+}
+
+/// 过滤框(菜单顶部,固定不滚动)。节点只建一次:输入时只换列表,输入框与
+/// 页脚留在原地,焦点和光标不丢。
+function ensureModelMenuSearch() {
+  if (!modelMenuSearch) {
+    const wrap = document.createElement("div");
+    wrap.className = "model-menu-search";
+    const input = document.createElement("input");
+    input.type = "search";
+    input.placeholder = "过滤模型或供应商";
+    input.setAttribute("aria-label", "过滤模型");
+    input.autocomplete = "off";
+    input.spellcheck = false;
+    input.addEventListener("input", () => {
+      menuState.modelQuery = input.value.trim().toLowerCase();
+      refreshModelMenuList();
+    });
+    wrap.appendChild(input);
+    modelMenuSearch = { wrap, input };
+  }
+  return modelMenuSearch;
+}
+
+export function renderModelMenu() {
+  // 重画整张列表会把滚动位置清零。展开档位、选档位都要重画,不记住就
+  // 每次都弹回顶部,而用户正看着列表中间某一行。
+  const scrollTop = elements.modelMenu.querySelector(".model-menu-list")?.scrollTop ?? 0;
+  elements.modelMenu.replaceChildren();
+  const staging = modelMenuStaging();
+  const globalKeys = new Set(activeModels().map(modelKey));
+  const search = ensureModelMenuSearch();
+  const list = buildModelList(staging, globalKeys);
+  const footer = buildModelFooter();
+  elements.modelMenu.append(search.wrap, list, footer);
   if (scrollTop) list.scrollTop = scrollTop;
   // 展开/收起档位会改变菜单高度，位置要跟着重算。
   positionModelMenu();
@@ -337,6 +470,17 @@ export function renderModelMenu() {
   updateCurrentModelDisplay();
   refreshLiveEndpointVisibility();
   updateControlState();
+}
+
+/// 过滤框输入:只换掉列表本体,输入框/页脚原地不动。
+function refreshModelMenuList() {
+  const list = elements.modelMenu.querySelector(".model-menu-list");
+  if (!list) return;
+  const staging = modelMenuStaging();
+  const globalKeys = new Set(activeModels().map(modelKey));
+  list.replaceWith(buildModelList(staging, globalKeys));
+  updateModelMenuState();
+  positionModelMenu();
 }
 
 export function updateModelMenuState() {

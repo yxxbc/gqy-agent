@@ -129,21 +129,31 @@ pub(crate) fn auto_configure_model_tags(
     if !needs_modalities && !needs_window {
         return;
     }
-    let Some(entry) = catalog_entry(paths, provider, model) else {
-        return;
-    };
+    let entry = catalog_entry(paths, provider, model);
     if needs_modalities {
-        if let Some(modalities) = entry.modalities.filter(|modalities| !modalities.is_empty()) {
+        if let Some(modalities) = entry
+            .as_ref()
+            .and_then(|entry| entry.modalities.clone())
+            .filter(|modalities| !modalities.is_empty())
+        {
             provider
                 .model_modalities
                 .insert(model.to_string(), modalities);
         }
     }
     if needs_window {
-        if let Some(window) = entry.context_window.filter(|window| *window > 0) {
+        // CLI 线的模型不在 models.dev 目录里(model.dev 查不到就返回空条目):
+        // 窗口用拉目录时带回来的那份(见 `cli_catalog::remembered_window`)。
+        let window = entry
+            .as_ref()
+            .and_then(|entry| entry.context_window)
+            .filter(|window| *window > 0)
+            .map(|window| window as usize)
+            .or_else(|| crate::config_tui::cli_catalog::remembered_window(&provider.id, model));
+        if let Some(window) = window {
             provider
                 .model_context_window
-                .insert(model.to_string(), window as usize);
+                .insert(model.to_string(), window);
         }
     }
 }

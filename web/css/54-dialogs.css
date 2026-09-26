@@ -143,14 +143,16 @@
     height: var(--app-height, calc(100dvh / var(--ui-scale)));
   }
 
-  .model-button {
-    justify-content: center;
-    width: 42px;
-    padding: 0;
+  /* 模型切换在框下信息行(09-26):窄屏不再缩成纯箭头——那一行整行都是空的,
+     留得住模型名(#2 手机端要能看到模型)。 */
+  .composer-info .model-button {
+    width: auto;
+    max-width: 46vw;
+    padding: 0 9px;
   }
 
-  .model-label {
-    display: none;
+  .composer-info .model-label {
+    max-width: 38vw;
   }
 
   .model-menu {

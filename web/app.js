@@ -181,6 +181,8 @@ function bindEvents() {
       const direction = event.key === "ArrowDown" ? 1 : -1;
       items[(index + direction + items.length) % items.length]?.focus();
     } else if (event.key === "Home" || event.key === "End") {
+      // 过滤框里 Home/End 是光标跳首尾,不是列表跳首尾项。
+      if (event.target instanceof HTMLInputElement) return;
       event.preventDefault();
       items[event.key === "Home" ? 0 : items.length - 1]?.focus();
     } else if (event.key === "Escape") {

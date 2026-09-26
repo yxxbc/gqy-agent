@@ -81,8 +81,18 @@ pub(in crate::web) async fn provider_models(
             .map(|id| id.trim().to_string())
             .filter(|id| !id.is_empty())
             .collect();
-        let models =
+        let mut models =
             crate::models_cache::describe_models(&paths, &provider.id, &provider.base_url, &ids);
+        // CLI 线的模型不在 models.dev 目录里:窗口用拉目录带回来的那份填上,
+        // 前端「从目录补全」才拿得到数。
+        for model in &mut models {
+            if model.context_window.is_some_and(|window| window > 0) {
+                continue;
+            }
+            if let Some(window) = crate::config_tui::remembered_window(&provider.id, &model.id) {
+                model.context_window = Some(window as u64);
+            }
+        }
         Ok(ProviderModelsResponse { source, models })
     })
     .await

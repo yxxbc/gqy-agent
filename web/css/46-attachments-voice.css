@@ -38,7 +38,7 @@
   .composer-cumulative,
   .composer-speed { display: none; }
   .composer-info { gap: 8px; }
-  .composer-inbox-bar .model-button { max-width: 42vw; }
+  .composer-info .model-label { max-width: 42vw; }
   .composer-context .ctx-nums .k { display: none; }
 }
 

@@ -44,7 +44,10 @@
   忘链并把该供应商的续传拉闸（进程内不再记映射，全量重放到底）。
 - 模型目录：`config_tui::cli_catalog` 增一条 cline 分支，起 `node` 读 cline 自带
   的 `@cline/llms`（定位法见 §一），与 agy/codex 的 live 目录同一档：拉不到就
-  报错，不悄悄退回快照。
+  报错，不悄悄退回快照。目录带回的 `contextWindow` 记进进程内缓存
+  （`cli_catalog::remembered_window`），激活模型（`auto_configure_model_tags`）
+  与 WebUI 的目录补全（`/api/providers/models`）据此回填 `model_context_window`
+  ——CLI 线的模型不在 models.dev 里，这一步没有就永远没有窗口。
 - 沙盒：`relay_config_grants` 增加 `~/.cline`。
 
 ## 三、已知限制（有意为之）
