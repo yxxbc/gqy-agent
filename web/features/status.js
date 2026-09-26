@@ -28,10 +28,11 @@ export function updateContext() {
     elements.contextNumbers.textContent = windowSize ? `${formatTokens(tokens)} / ${formatTokens(windowSize)}` : `${formatTokens(tokens)} / --`;
   }
   const percent = windowSize > 0 ? Math.min(100, Math.max(0, (tokens / windowSize) * 100)) : 0;
-  // 上下文占用画成一个小圆环(比长条优雅,用户反馈原展示不美观):r=9,周长≈56.55,
-  // 按占用比例设 dashoffset;高/临界用配色区分。
+  // 上下文占用画成一块小表盘(比长条优雅,用户反馈原展示不美观):细外圈 + 按占用
+  // 比例填的扇形。扇形是半径 4.5、描边宽 9 的圆,描边正好铺满到圆心,dashoffset
+  // 决定扇形角度;半径从元素上读,标记里改了尺寸这里不用跟着改。高/临界用配色区分。
   if (elements.contextRing) {
-    const circ = 2 * Math.PI * 9;
+    const circ = 2 * Math.PI * (elements.contextRing.r?.baseVal?.value || 4.5);
     elements.contextRing.style.strokeDasharray = `${circ.toFixed(2)}`;
     elements.contextRing.style.strokeDashoffset = `${(circ * (1 - percent / 100)).toFixed(2)}`;
   }

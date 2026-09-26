@@ -207,6 +207,7 @@ export function updateLocalTurnFromLive(live, terminalStatus, data) {
       assistant_timestamp: new Date().toISOString(),
       token_total: effectiveUsageTotal(data?.usage),
       token_usage_estimated: Boolean(data?.usage_estimated),
+      token_context_end: live.contextEnd || 0,
       question_exchanges: [],
       followups: [],
       assets: [...live.assets],
@@ -226,6 +227,8 @@ export function updateLocalTurnFromLive(live, terminalStatus, data) {
     if (terminalStatus === "completed") {
       turn.token_total = effectiveUsageTotal(data?.usage);
       turn.token_usage_estimated = Boolean(data?.usage_estimated);
+      // 末次请求的占用,给上下文弹窗的走势图(token_total 是整轮累计,见 app.js contextHistory)。
+      if (live.contextEnd > 0) turn.token_context_end = live.contextEnd;
     }
   }
 }
@@ -262,6 +265,7 @@ export function handleRoundUsage(live, data) {
   const round = data?.usage;
   const contextTokens = asFiniteNumber(round?.prompt_tokens, 0) + asFiniteNumber(round?.completion_tokens, 0);
   if (contextTokens > 0) {
+    live.contextEnd = contextTokens;
     state.context.tokens = contextTokens;
     updateContext();
   }

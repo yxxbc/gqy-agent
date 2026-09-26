@@ -671,6 +671,32 @@ impl ConversationDb {
         Ok(map)
     }
 
+    /// 一个会话里每条回合结束时的上下文占用(turn_id → tokens),只带写过的。
+    /// WebUI 的上下文走势图用它:token_prompt/token_total 是整轮所有请求的
+    /// 累计(计费口径),调一次工具就翻倍,画不成走势。
+    pub fn load_turn_context_end(
+        &self,
+        session_id: &str,
+    ) -> Result<std::collections::HashMap<String, u64>> {
+        let conn = self.conn.lock().unwrap();
+        let mut statement = conn.prepare(
+            "SELECT turn_id, token_context_end FROM turns
+              WHERE session_id = ?1 AND token_context_end > 0",
+        )?;
+        let rows = statement.query_map(params![session_id], |row| {
+            Ok((
+                row.get::<_, String>(0)?,
+                row.get::<_, i64>(1)?.max(0) as u64,
+            ))
+        })?;
+        let mut map = std::collections::HashMap::new();
+        for row in rows {
+            let (turn_id, tokens) = row?;
+            map.insert(turn_id, tokens);
+        }
+        Ok(map)
+    }
+
     /// 记下该回合最后一次请求的上下文占用(供应商真实计数)。None = 未知,
     /// 此时上下文表继续用本地估算。
     pub fn set_turn_context_end(&self, turn_id: &str, tokens: Option<u64>) -> Result<()> {

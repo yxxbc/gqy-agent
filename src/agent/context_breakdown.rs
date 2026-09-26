@@ -14,10 +14,7 @@ use crate::llm::{ChatContent, ChatContentPart, ChatMessage, ToolDefinition};
 use crate::tools::PresentedToolKind;
 use serde::Serialize;
 use std::collections::HashMap;
-use std::ops::Range;
 
-const TOP_ITEMS: usize = 5;
-const PREVIEW_CHARS: usize = 60;
 /// `tool_report::summary_checkpoint_message` 的外壳,压缩摘要行靠它认。
 const CHECKPOINT_PREFIX: &str = "<conversation-checkpoint>";
 const SKILL_TOOL: &str = "load_skill";
@@ -29,18 +26,6 @@ enum Category {
     Summary,
     Fossil,
     Messages,
-}
-
-impl Category {
-    fn key(self) -> &'static str {
-        match self {
-            Self::System => "system",
-            Self::Skills => "skills",
-            Self::Summary => "summary",
-            Self::Fossil => "fossil",
-            Self::Messages => "messages",
-        }
-    }
 }
 
 /// 各分项的 o200k 估算。字段名就是前端的分项键。
@@ -88,21 +73,6 @@ impl ContextCategories {
     }
 }
 
-/// 占用最多的单条消息。它是分项内部的明细,不参与合计。
-#[derive(Debug, Clone, Serialize)]
-pub struct ContextTopItem {
-    /// `tool_result` | `tool_call` | `assistant` | `user`
-    pub kind: &'static str,
-    /// 工具名(工具调用与结果);其余为空。
-    pub label: String,
-    pub preview: String,
-    /// 所属分项的键,与 `ContextCategories` 字段同名。
-    pub category: &'static str,
-    pub tokens: u64,
-    /// 第几个可见历史回合(1 起);对不上号时为空,不猜。
-    pub turn_index: Option<usize>,
-}
-
 #[derive(Debug, Clone, Serialize)]
 pub struct ContextBreakdown {
     pub categories: ContextCategories,
@@ -112,18 +82,15 @@ pub struct ContextBreakdown {
     pub measured_tokens: Option<u64>,
     /// stub 模式下还没展开的完整契约。不在上下文里。
     pub deferred_tools_tokens: u64,
-    pub top: Vec<ContextTopItem>,
 }
 
 impl Agent {
     pub fn context_breakdown(&self) -> Result<ContextBreakdown> {
-        let (messages, user_index) = self.chat_messages("", "")?;
-        let owners = self.history_turn_owners(&messages, user_index)?;
+        let (messages, _) = self.chat_messages("", "")?;
         let preset_end = 1 + self.preset_dialogs.len() * 2;
 
         let mut categories = ContextCategories::default();
         let mut tool_names: HashMap<&str, &str> = HashMap::new();
-        let mut candidates = Vec::new();
         for (index, message) in messages.iter().enumerate() {
             for call in message.tool_calls.iter().flatten() {
                 tool_names.insert(call.id.as_str(), call.function.name.as_str());
@@ -145,15 +112,6 @@ impl Agent {
                 Category::Messages
             };
             categories.add(category, tokens);
-            if matches!(category, Category::Messages | Category::Skills) && index != user_index {
-                candidates.push(top_item(
-                    message,
-                    category,
-                    tokens,
-                    owners[index],
-                    tool_name,
-                ));
-            }
         }
 
         let mut deferred_tools_tokens = 0;
@@ -181,96 +139,13 @@ impl Agent {
             }
         }
 
-        candidates.sort_by(|a: &ContextTopItem, b| b.tokens.cmp(&a.tokens));
-        candidates.truncate(TOP_ITEMS);
         let estimate_tokens = categories.total();
         Ok(ContextBreakdown {
             categories,
             estimate_tokens,
             measured_tokens: self.context_anchor_tokens()?,
             deferred_tools_tokens,
-            top: candidates,
         })
-    }
-
-    /// 每条消息属于第几个可见历史回合(1 起)。用 `chat_messages` 同一个
-    /// `push_history_turn` 重渲一遍来对位;历史段对不上「当前用户消息之前那一截」
-    /// 时整张表留空——宁可不标,不猜。
-    fn history_turn_owners(
-        &self,
-        messages: &[ChatMessage],
-        user_index: usize,
-    ) -> Result<Vec<Option<usize>>> {
-        let mut owners = vec![None; messages.len()];
-        if self.suppress_session_history {
-            return Ok(owners);
-        }
-        let turns = self.state.load_visible_turns_excluding("")?;
-        let mut rendered = Vec::new();
-        let mut spans: Vec<(Range<usize>, usize)> = Vec::new();
-        let mut ordinal = 0usize;
-        for turn in &turns {
-            if turn.is_summary || turn.status == crate::state::TurnStatus::Running {
-                continue;
-            }
-            ordinal += 1;
-            let start = rendered.len();
-            self.push_history_turn(&mut rendered, turn);
-            spans.push((start..rendered.len(), ordinal));
-        }
-        let Some(history_start) = user_index.checked_sub(rendered.len()) else {
-            return Ok(owners);
-        };
-        let aligned = rendered
-            .iter()
-            .zip(&messages[history_start..user_index])
-            .all(|(a, b)| a.role == b.role && a.tool_call_id == b.tool_call_id);
-        if !aligned {
-            return Ok(owners);
-        }
-        for (range, ordinal) in spans {
-            for index in range {
-                owners[history_start + index] = Some(ordinal);
-            }
-        }
-        Ok(owners)
-    }
-}
-
-fn top_item(
-    message: &ChatMessage,
-    category: Category,
-    tokens: u64,
-    turn_index: Option<usize>,
-    tool_name: Option<&str>,
-) -> ContextTopItem {
-    let text = text_of(message);
-    let calls = message.tool_calls.as_deref().unwrap_or_default();
-    let (kind, label, preview_source) = match message.role.as_str() {
-        "tool" => (
-            "tool_result",
-            tool_name.unwrap_or_default().to_string(),
-            text,
-        ),
-        "assistant" if text.trim().is_empty() && !calls.is_empty() => (
-            "tool_call",
-            calls
-                .iter()
-                .map(|call| call.function.name.as_str())
-                .collect::<Vec<_>>()
-                .join(", "),
-            calls[0].function.arguments.as_str(),
-        ),
-        "assistant" => ("assistant", String::new(), text),
-        _ => ("user", String::new(), text),
-    };
-    ContextTopItem {
-        kind,
-        label,
-        preview: preview(preview_source),
-        category: category.key(),
-        tokens,
-        turn_index,
     }
 }
 
@@ -286,13 +161,4 @@ fn text_of(message: &ChatMessage) -> &str {
             .unwrap_or_default(),
         None => "",
     }
-}
-
-fn preview(text: &str) -> String {
-    let collapsed = text.split_whitespace().collect::<Vec<_>>().join(" ");
-    let mut out = collapsed.chars().take(PREVIEW_CHARS).collect::<String>();
-    if collapsed.chars().count() > PREVIEW_CHARS {
-        out.push('…');
-    }
-    out
 }

@@ -70,7 +70,6 @@ fn context_breakdown_for(state: &DaemonState, session_id: &str) -> Result<Value>
         "estimate_tokens": breakdown.estimate_tokens,
         "categories": breakdown.categories,
         "deferred_tools_tokens": breakdown.deferred_tools_tokens,
-        "top": breakdown.top,
         "thresholds": {
             "trim_at_ratio": config.context.trim_at_ratio,
             "compact_force_ratio": config.context.compact_force_ratio,

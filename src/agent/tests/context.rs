@@ -494,8 +494,8 @@ fn turn_context_blocks_already_visible_in_fossils_are_skipped() {
 }
 
 /// 上下文分项(2026-09-14):各分项之和必须等于估算总数——分项与真实请求出自
-/// 同一份字节。另写一套渲染、或漏归一类消息,这里先报红。技能结果、MCP 工具、
-/// 回合归属与「占用最多」的排序各钉一条。
+/// 同一份字节。另写一套渲染、或漏归一类消息,这里先报红。技能结果与 MCP 工具
+/// 的归类各钉一条。
 #[test]
 fn context_breakdown_sums_to_the_estimate() {
     let temp = tempfile::tempdir().unwrap();
@@ -568,11 +568,6 @@ fn context_breakdown_sums_to_the_estimate() {
     );
     assert!(breakdown.categories.tools_full > 0);
     assert!(breakdown.categories.system > 0 && breakdown.categories.messages > 0);
-    let top = &breakdown.top[0];
-    assert_eq!(
-        (top.kind, top.label.as_str(), top.turn_index),
-        ("tool_result", "web_search", Some(1))
-    );
 }
 
 #[test]

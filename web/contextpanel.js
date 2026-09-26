@@ -8,7 +8,7 @@
  * - 顶部总数有实测用实测,否则估算;分项一律是 o200k 估算。
  * - 实测 − 估算合计单列「分词器差异」,不按比例摊进各分项。
  * - 中转后端(claude-code / codex / agy)的差额是「CLI 自带(推算)」。
- * - 「占用最多」是分项内部的明细,在分界线以下,不参与合计。
+ * - 「上下文走势」是每回合结束时的占用,数据由挂载方给(getContextHistory),不参与合计。
  *
  * 单独成文件:app.js 已经上万行(与 todos.js / diff.js 同构)。弹窗挂在 dock 上而不是
  * .composer 里——后者 overflow:hidden 会把它裁掉,和模型菜单同一个原因。
@@ -40,8 +40,9 @@ window.GqyContextPanel = (() => {
     buffer: "到自动压缩水位就开始压缩,这段实际用不到",
     deferred: "load_tools 能展开但还没展开的完整契约;展开前不占上下文",
   };
-  const KIND_LABELS = { tool_result: "工具结果", tool_call: "工具调用", assistant: "她的回复", user: "用户消息" };
   const BACKEND_LABELS = { claude_code: "claude-code", codex: "codex", antigravity: "agy" };
+  // 走势图:最多画最近 max 轮;预测看最近 recent 轮的增量;算出来超过 far 轮就不报数了。
+  const TREND = { max: 48, recent: 5, far: 500, w: 240, h: 56 };
 
   let ctx = null;
   let pop = null;
@@ -181,16 +182,26 @@ window.GqyContextPanel = (() => {
     return node;
   }
 
-  function row({ name, sub, tokens, numText, windowSize, color, dotClass, dim, zero, helpText }) {
+  /// share:这一行在同组里的相对分量(0–1),画成名字后面的一截小条;
+  /// 按组内最大值归一,不按窗口——否则几十 token 的项永远是一条看不见的线。
+  function row({ name, sub, tokens, numText, windowSize, color, dotClass, dim, zero, helpText, share = null }) {
     const node = el("div", `ctx-row${dim ? " is-dim" : ""}${zero ? " is-zero" : ""}`);
     const dot = el("i", `ctx-dot${dotClass ? ` ${dotClass}` : ""}`);
     if (color) dot.style.background = color;
     const label = el("span", "ctx-name", name);
     if (sub) label.appendChild(el("small", null, sub));
     if (helpText) label.appendChild(help(helpText));
+    const meter = el("span", "ctx-meter");
+    if (share != null && share > 0) {
+      const fill = el("i");
+      fill.style.width = `${Math.max(4, Math.min(100, share * 100))}%`;
+      if (color) fill.style.background = color;
+      meter.appendChild(fill);
+    }
     node.append(
       dot,
       label,
+      meter,
       el("span", "ctx-num", numText ?? fmt(tokens)),
       el("span", "ctx-pct", tokens == null ? "" : pct(tokens, windowSize))
     );
@@ -227,50 +238,93 @@ window.GqyContextPanel = (() => {
     const fallback = ctx.getContext?.() || {};
     const used = data ? usedOf(data) : Number(fallback.tokens) || 0;
     const windowSize = data ? data.window : fallback.window;
+    const hero = el("div", "ctx-hero");
+    if (windowSize) hero.appendChild(renderDonut(data, used, windowSize));
+    const stats = el("div", "ctx-stats");
     const total = el("div", "ctx-total");
     total.append(
       el("span", "ctx-used", fmt(used)),
-      el("span", "ctx-win", windowSize ? `/ ${fmt(windowSize)}${data?.window_assumed ? " · 按配置" : ""}` : "/ 窗口未知"),
-      el("span", "ctx-total-pct", windowSize ? pct(used, windowSize) : "")
+      el("span", "ctx-win", windowSize ? `/ ${fmt(windowSize)}${data?.window_assumed ? " · 按配置" : ""}` : "/ 窗口未知")
     );
-    head.appendChild(total);
-    if (data && windowSize) head.appendChild(renderBar(data, used, windowSize));
+    stats.appendChild(total);
+    if (windowSize) {
+      const trim = Number(data?.thresholds?.trim_at_ratio) || 0.8;
+      const left = Math.round(windowSize * trim) - used;
+      stats.appendChild(el("span", `ctx-runway${left <= 0 ? " is-over" : ""}`,
+        left > 0 ? `距自动压缩还有 ${fmt(left)}` : "已到自动压缩水位"));
+    }
+    hero.appendChild(stats);
+    head.appendChild(hero);
     return head;
   }
 
-  function renderBar(payload, used, windowSize) {
-    const wrap = el("div", "ctx-bar-wrap");
-    const bar = el("div", "ctx-bar");
-    for (const key of BAR_ORDER) {
-      const value = payload.categories?.[key] || 0;
-      if (!value) continue;
-      const segment = el("i");
-      segment.style.width = `${(value / windowSize) * 100}%`;
-      segment.style.background = `var(--ctx-cat-${key})`;
-      segment.title = `${LABELS[key]} ${fmt(value)}`;
-      bar.appendChild(segment);
+  /// 头部的环形图:分项按顺序首尾相接,缓冲区是末段的淡色,两根刻度标出
+  /// 自动压缩与强制压缩。环心是占比。和输入框里那块小表盘是同一个读法。
+  function renderDonut(payload, used, windowSize) {
+    const NS = "http://www.w3.org/2000/svg";
+    const R = 26;
+    const C = 2 * Math.PI * R;
+    const svg = document.createElementNS(NS, "svg");
+    svg.setAttribute("viewBox", "0 0 64 64");
+    svg.setAttribute("class", "ctx-donut");
+    svg.setAttribute("aria-hidden", "true");
+    const ring = document.createElementNS(NS, "g");
+    ring.setAttribute("transform", "rotate(-90 32 32)");
+    const arc = (className, from, length, color, title) => {
+      const circle = document.createElementNS(NS, "circle");
+      circle.setAttribute("cx", "32");
+      circle.setAttribute("cy", "32");
+      circle.setAttribute("r", String(R));
+      circle.setAttribute("class", className);
+      circle.style.strokeDasharray = `${Math.max(0, length).toFixed(2)} ${C.toFixed(2)}`;
+      circle.style.strokeDashoffset = `${(-from).toFixed(2)}`;
+      if (color) circle.style.stroke = color;
+      if (title) {
+        const label = document.createElementNS(NS, "title");
+        label.textContent = title;
+        circle.appendChild(label);
+      }
+      ring.appendChild(circle);
+    };
+    const trim = Number(payload?.thresholds?.trim_at_ratio) || 0.8;
+    const force = Number(payload?.thresholds?.compact_force_ratio) || 0.9;
+    arc("ctx-donut-track", 0, C);
+    arc("ctx-donut-buffer", trim * C, (1 - trim) * C, null, "自动压缩缓冲");
+    let offset = 0;
+    if (payload) {
+      for (const key of BAR_ORDER) {
+        const value = payload.categories?.[key] || 0;
+        if (!value) continue;
+        const length = (value / windowSize) * C;
+        arc("ctx-donut-seg", offset, length, `var(--ctx-cat-${key})`, `${LABELS[key]} ${fmt(value)}`);
+        offset += length;
+      }
+      const extra = used - payload.estimate_tokens;
+      if (extra > 0) {
+        const length = (extra / windowSize) * C;
+        arc("ctx-donut-seg is-extra", offset, length, null, payload.backend?.kind !== "native" ? "CLI 自带(推算)" : "分词器差异");
+      }
+    } else {
+      arc("ctx-donut-seg", 0, (used / windowSize) * C, "var(--accent)");
     }
-    const extra = used - payload.estimate_tokens;
-    if (extra > 0) {
-      const segment = el("i", "is-extra");
-      segment.style.width = `${(extra / windowSize) * 100}%`;
-      segment.title = payload.backend?.kind !== "native" ? "CLI 自带(推算)" : "分词器差异";
-      bar.appendChild(segment);
+    for (const [ratio, className] of [[trim, "is-trim"], [force, "is-force"]]) {
+      const angle = ratio * 2 * Math.PI;
+      const tick = document.createElementNS(NS, "line");
+      tick.setAttribute("x1", String(32 + (R - 7) * Math.cos(angle)));
+      tick.setAttribute("y1", String(32 + (R - 7) * Math.sin(angle)));
+      tick.setAttribute("x2", String(32 + (R + 7) * Math.cos(angle)));
+      tick.setAttribute("y2", String(32 + (R + 7) * Math.sin(angle)));
+      tick.setAttribute("class", `ctx-donut-tick ${className}`);
+      ring.appendChild(tick);
     }
-    const trim = Number(payload.thresholds?.trim_at_ratio) || 0.8;
-    const force = Number(payload.thresholds?.compact_force_ratio) || 0.9;
-    const buffer = el("i", "is-buffer");
-    buffer.style.width = `${(1 - trim) * 100}%`;
-    buffer.title = "自动压缩缓冲";
-    bar.appendChild(buffer);
-    wrap.appendChild(bar);
-    for (const [ratio, label, className] of [[trim, "压缩", ""], [force, "强制", " is-force"]]) {
-      const tick = el("i", `ctx-tick${className}`);
-      tick.style.left = `${ratio * 100}%`;
-      tick.dataset.label = `${Math.round(ratio * 100)}% ${label}`;
-      wrap.appendChild(tick);
-    }
-    return wrap;
+    svg.appendChild(ring);
+    const center = document.createElementNS(NS, "text");
+    center.setAttribute("x", "32");
+    center.setAttribute("y", "32");
+    center.setAttribute("class", "ctx-donut-pct");
+    center.textContent = pct(used, windowSize);
+    svg.appendChild(center);
+    return svg;
   }
 
   function renderBody() {
@@ -298,17 +352,25 @@ window.GqyContextPanel = (() => {
     }
 
     body.appendChild(groupLabel("在上下文里", "分项为估算 · o200k"));
+    const largest = Math.max(1, ...LIST_ORDER.map((key) => data.categories?.[key] || 0));
+    const zeros = [];
     for (const key of LIST_ORDER) {
       const value = data.categories?.[key] || 0;
+      // 为 0 的分项折成一行:一整列灰掉的 0 只是在挤真正有量的那几行。
+      if (!value) {
+        zeros.push(LABELS[key]);
+        continue;
+      }
       body.appendChild(row({
         name: LABELS[key],
         tokens: value,
         windowSize,
         color: `var(--ctx-cat-${key})`,
-        zero: value === 0,
         helpText: HELP[key],
+        share: value / largest,
       }));
     }
+    if (zeros.length) body.appendChild(el("div", "ctx-zero-line", `为 0:${zeros.join("、")}`));
     if (relay && data.backend.cli_overhead_tokens != null) {
       const value = data.backend.cli_overhead_tokens;
       body.appendChild(row({
@@ -339,35 +401,94 @@ window.GqyContextPanel = (() => {
       body.appendChild(deferred);
     }
 
-    const items = Array.isArray(data.top) ? data.top : [];
-    if (items.length) {
-      const divider = el("div", "ctx-divider");
-      divider.append(el("strong", null, `占用最多的 ${items.length} 条`), el("span", null, "明细 · 已计入上方分项,不另算"));
-      body.appendChild(divider);
-      const max = Math.max(1, ...items.map((item) => item.tokens || 0));
-      items.forEach((item, index) => {
-        const node = el("div", "ctx-top-row");
-        const main = el("div", "ctx-top-main");
-        const title = el("div", "ctx-top-title");
-        const kind = item.category === "skills" ? "技能" : KIND_LABELS[item.kind] || item.kind;
-        const label = el("span", "ctx-top-label");
-        if (item.label) label.appendChild(document.createTextNode(`${item.label} `));
-        if (item.preview) label.appendChild(el("code", null, item.preview));
-        label.title = `${item.label ? `${item.label} ` : ""}${item.preview || ""}`;
-        title.append(el("span", "ctx-top-kind", kind), label);
-        const where = item.turn_index ? `第 ${item.turn_index} 回合` : "回合未对上";
-        const sub = el("div", "ctx-top-sub", `${where} · 属于「${LABELS[item.category] || item.category}」`);
-        const meter = el("div", "ctx-top-meter");
-        const fill = el("i");
-        fill.style.width = `${((item.tokens || 0) / max) * 100}%`;
-        fill.style.background = `var(--ctx-cat-${item.category})`;
-        meter.appendChild(fill);
-        main.append(title, sub, meter);
-        node.append(el("span", "ctx-top-rank", String(index + 1)), main, el("span", "ctx-top-num", fmt(item.tokens)));
-        body.appendChild(node);
-      });
-    }
+    body.appendChild(renderTrend(windowSize, used));
     return body;
+  }
+
+  /// 「上下文走势」:本会话每回合结束时的上下文大小,旧 → 新。数据来自挂载方
+  /// 的 getContextHistory(口径见 app.js 的 contextHistory),弹窗不碰模块状态。
+  /// 压缩不单独标注,那一轮的线自然落下去。
+  function renderTrend(windowSize, used) {
+    const section = el("section", "ctx-trend");
+    const points = (ctx.getContextHistory?.() || []).slice(-TREND.max);
+    section.appendChild(groupLabel("上下文走势", points.length >= 2 ? `最近 ${points.length} 轮` : ""));
+    if (points.length < 2) {
+      section.appendChild(el("div", "ctx-trend-note is-empty", "再聊几轮就能看到走势"));
+      return section;
+    }
+    const trimAt = windowSize ? windowSize * (Number(data.thresholds?.trim_at_ratio) || 0.8) : 0;
+    const forceAt = windowSize ? windowSize * (Number(data.thresholds?.compact_force_ratio) || 0.9) : 0;
+    section.appendChild(renderSparkline(points, trimAt, forceAt));
+    const forecast = forecastText(points, used, trimAt);
+    if (forecast) section.appendChild(el("div", "ctx-trend-note", forecast));
+    return section;
+  }
+
+  /// 画布:viewBox 固定、preserveAspectRatio=none 横向拉满,线宽靠 CSS 的
+  /// vector-effect 保持不变形。末点圆点是叠在上面的 HTML,免得被拉成椭圆。
+  function renderSparkline(points, trimAt, forceAt) {
+    const NS = "http://www.w3.org/2000/svg";
+    const { w, h } = TREND;
+    const svgNode = (tag, attrs) => {
+      const node = document.createElementNS(NS, tag);
+      for (const [key, value] of Object.entries(attrs)) node.setAttribute(key, String(value));
+      return node;
+    };
+    const peak = Math.max(1, ...points.map((point) => point.tokens));
+    let top = peak * 1.15;
+    // 峰值过了自动压缩水位的一半,才把纵轴拉到看得见两条水位线;否则大窗口里
+    // 几万 token 会被压成贴底的一条线,走势反而看不出来。
+    if (trimAt && peak >= trimAt * 0.5) top = Math.max(top, forceAt * 1.04);
+    const x = (index) => (index / (points.length - 1)) * w;
+    const y = (value) => h - (Math.min(value, top) / top) * h;
+    const last = points[points.length - 1];
+
+    const svg = svgNode("svg", { viewBox: `0 0 ${w} ${h}`, preserveAspectRatio: "none", class: "ctx-trend-svg", role: "img" });
+    svg.setAttribute("aria-label", `上下文走势,最近 ${points.length} 轮,最新 ${fmt(last.tokens)}`);
+    const line = points.map((point, index) => `${index ? "L" : "M"}${x(index).toFixed(1)} ${y(point.tokens).toFixed(1)}`).join(" ");
+    svg.appendChild(svgNode("path", { d: `${line} L${w} ${h} L0 ${h} Z`, class: "ctx-trend-area" }));
+    for (const [value, className] of [[trimAt, "is-trim"], [forceAt, "is-force"]]) {
+      if (!value || value > top) continue;
+      const at = y(value).toFixed(1);
+      svg.appendChild(svgNode("line", { x1: 0, x2: w, y1: at, y2: at, class: `ctx-trend-rule ${className}` }));
+    }
+    svg.appendChild(svgNode("path", { d: line, class: "ctx-trend-line" }));
+    // 每轮一条透明竖条接住悬停,<title> 给出这一轮的数字。
+    const step = w / (points.length - 1);
+    points.forEach((point, index) => {
+      const from = Math.max(0, x(index) - step / 2);
+      const to = Math.min(w, x(index) + step / 2);
+      const hit = svgNode("rect", { x: from.toFixed(1), y: 0, width: (to - from).toFixed(1), height: h, class: "ctx-trend-hit" });
+      const title = svgNode("title", {});
+      title.textContent = `第 ${point.seq ?? index + 1} 轮 · ${fmt(point.tokens)}`;
+      hit.appendChild(title);
+      svg.appendChild(hit);
+    });
+
+    const chart = el("div", "ctx-trend-chart");
+    const dot = el("i", "ctx-trend-dot");
+    dot.style.left = "100%";
+    dot.style.top = `${((y(last.tokens) / h) * 100).toFixed(1)}%`;
+    chart.append(svg, dot);
+    return chart;
+  }
+
+  /// 预测只看最近几轮的平均增长,压缩造成的回落(负增量)不算——否则刚压完
+  /// 一次就会得出「没有增长」。当前值和头部用同一个数(实测优先),两处说法一致。
+  function forecastText(points, used, trimAt) {
+    if (!trimAt) return "";
+    if (used >= trimAt) return "已到自动压缩水位";
+    const recent = points.slice(-(TREND.recent + 1));
+    const deltas = [];
+    for (let index = 1; index < recent.length; index += 1) {
+      const delta = recent[index].tokens - recent[index - 1].tokens;
+      if (delta >= 0) deltas.push(delta);
+    }
+    const average = deltas.length ? deltas.reduce((sum, delta) => sum + delta, 0) / deltas.length : 0;
+    if (average <= 0) return "最近几轮没有增长";
+    const rounds = Math.max(1, Math.ceil((trimAt - used) / average));
+    if (rounds > TREND.far) return "最近几轮几乎没有增长";
+    return `按最近的速度,约 ${rounds} 轮后自动压缩`;
   }
 
   function renderFoot() {

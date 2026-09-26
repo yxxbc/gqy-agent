@@ -4,16 +4,18 @@
   flex: none;
   transform: rotate(-90deg);
 }
+/* 表盘:细外圈 + 实心扇形。原来是一段圆头细弧,用量低时只剩一小截,看着
+   就是「加载中」的转圈;扇形在任何比例下都读成一块表。 */
 .composer-context .ctx-ring-bg {
   fill: none;
-  stroke: color-mix(in srgb, var(--text) 14%, transparent);
-  stroke-width: 3;
+  stroke: color-mix(in srgb, var(--text) 30%, transparent);
+  stroke-width: 1.5;
 }
 .composer-context .ctx-ring-fg {
   fill: none;
   stroke: var(--accent);
-  stroke-width: 3;
-  stroke-linecap: round;
+  stroke-width: 9;
+  stroke-linecap: butt;
   transition: stroke-dashoffset 0.4s ease, stroke 0.3s ease;
 }
 .composer-context.is-high .ctx-ring-fg {

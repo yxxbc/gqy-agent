@@ -208,6 +208,13 @@ impl StateStore {
         self.conv_db.load_turn_generation(session_id)
     }
 
+    pub fn load_turn_context_end(
+        &self,
+        session_id: &str,
+    ) -> Result<std::collections::HashMap<String, u64>> {
+        self.conv_db.load_turn_context_end(session_id)
+    }
+
     pub fn load_context_anchor(&self) -> Result<Option<crate::state::ContextAnchor>> {
         self.conv_db.load_context_anchor(&self.session())
     }

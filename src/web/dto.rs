@@ -186,6 +186,10 @@ pub(in crate::web) struct SafeTurn {
     /// 输出速度样本(09-11 落库):0 = 没测到,前端不显示「每秒」。
     pub(in crate::web) generation_tokens: u64,
     pub(in crate::web) generation_ms: u64,
+    /// 回合结束时的上下文占用(最后一次请求的供应商计数),上下文走势图用;
+    /// 没记下的回合不发这个字段。
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub(in crate::web) token_context_end: Option<u64>,
     pub(in crate::web) question_exchanges: Vec<crate::question::QuestionExchange>,
     /// 这一轮调过哪些工具、拿到什么结果。
     ///
@@ -359,6 +363,7 @@ impl SafeTurn {
             token_usage_estimated: turn.token_usage_estimated,
             generation_tokens: 0,
             generation_ms: 0,
+            token_context_end: None,
             question_exchanges: turn.question_exchanges,
             tool_flow: turn
                 .tool_flow
@@ -589,5 +594,29 @@ pub(in crate::web) fn real_tool_name(event_name: &str) -> &str {
         "load_tools"
     } else {
         event_name
+    }
+}
+
+/// 回合在 turns 行之外单独落库的两项样本:输出速度、结束时的上下文占用。
+/// bootstrap 与切会话两处都要按会话一次取齐再填进 DTO,收在这里别写两遍。
+pub(in crate::web) struct TurnSamples {
+    generation: HashMap<String, (u64, u64)>,
+    context_end: HashMap<String, u64>,
+}
+
+impl TurnSamples {
+    pub(in crate::web) fn load(store: &crate::state::StateStore, session_id: &str) -> Result<Self> {
+        Ok(Self {
+            generation: store.load_turn_generation(session_id)?,
+            context_end: store.load_turn_context_end(session_id)?,
+        })
+    }
+
+    pub(in crate::web) fn apply(&self, safe: &mut SafeTurn) {
+        if let Some((tokens, millis)) = self.generation.get(&safe.id) {
+            safe.generation_tokens = *tokens;
+            safe.generation_ms = *millis;
+        }
+        safe.token_context_end = self.context_end.get(&safe.id).copied();
     }
 }

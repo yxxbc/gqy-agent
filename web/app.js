@@ -39,6 +39,27 @@ const appState = {
   composing: false
 };
 
+/// 上下文弹窗「上下文走势」的数据:每个已完成回合结束时的上下文大小,旧 → 新。
+///
+/// 口径要的是「这一轮最后一次请求的占用」,和圆环同一个读数。回合 DTO 里现成的
+/// token_prompt / token_total 是整轮所有请求的累计(计费口径,见 Rust 的
+/// UsageAccumulator::add_usage):调了几轮工具就放大几倍,不能当上下文大小。所以:
+/// - token_context_end 优先:实时回合在 chat.round_usage 里记下末次请求的
+///   prompt+completion(live/run.js);库里同名列 turns.token_context_end 目前没进 DTO。
+/// - 没有它时,只有不带工具流的回合(单次请求)用 token_total——那一次的
+///   prompt+completion 正好就是结束时的占用;带工具的回合跳过,不画错的数。
+function contextHistory(turns) {
+  const points = [];
+  for (const turn of Array.isArray(turns) ? turns : []) {
+    if (turn?.status !== "completed") continue;
+    const end = Number(turn.token_context_end) || 0;
+    const singleRequest = !(Array.isArray(turn.tool_flow) && turn.tool_flow.length);
+    const tokens = end > 0 ? end : singleRequest ? Number(turn.token_total) || 0 : 0;
+    if (tokens > 0) points.push({ seq: turn.seq, tokens });
+  }
+  return points;
+}
+
 function bindEvents() {
   bindConsoleEvents();
   elements.mobileMenuButton.addEventListener("click", (event) => openSidebar(event.currentTarget));
@@ -59,6 +80,7 @@ function bindEvents() {
     uiScale: () => UI_SCALE,
     getSessionId: () => state.viewSessionId || state.currentSessionId,
     getContext: () => ({ tokens: state.context?.tokens, window: state.context?.window }),
+    getContextHistory: () => contextHistory(state.turns),
     isRunning: () => conversationRunning(),
     onCompacted: async (sessionId) => {
       if (state.viewSessionId && state.viewSessionId !== state.currentSessionId) {

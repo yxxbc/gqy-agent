@@ -847,9 +847,7 @@ pub(in crate::web) async fn bootstrap(
             .or_default()
             .push(artifact);
     }
-    let generation_by_turn = store
-        .load_turn_generation(&current_session)
-        .map_err(ApiError::internal)?;
+    let samples = TurnSamples::load(&store, &current_session).map_err(ApiError::internal)?;
     let turns = store
         .load_turns()
         .map_err(ApiError::internal)?
@@ -859,10 +857,7 @@ pub(in crate::web) async fn bootstrap(
             let assets = assets_by_turn.remove(&turn.turn_id).unwrap_or_default();
             let artifacts = artifacts_by_turn.remove(&turn.turn_id).unwrap_or_default();
             let mut safe = SafeTurn::from_turn(turn, assets, artifacts);
-            if let Some((tokens, millis)) = generation_by_turn.get(&safe.id) {
-                safe.generation_tokens = *tokens;
-                safe.generation_ms = *millis;
-            }
+            samples.apply(&mut safe);
             safe
         })
         .collect();
