@@ -70,6 +70,19 @@ pub(super) fn take(key: &WarmKey) -> Option<RelayProcess> {
     Some(slot.process)
 }
 
+/// 池里那个的当前状态;没晾,或晾着的那只已经死了,都算 None。给 UI 显示用,
+/// 不改池子——清理留给 take/stash/定时器。
+pub(super) fn snapshot() -> Option<super::WarmSnapshot> {
+    let guard = pool();
+    let slot = guard.as_ref()?;
+    if !slot.process.is_alive() {
+        return None;
+    }
+    Some(super::WarmSnapshot {
+        seconds_left: slot.ttl.saturating_sub(slot.at.elapsed()).as_secs(),
+    })
+}
+
 /// 把预热好的进程存进池子。已经有一个的话先杀掉旧的——只留一个。
 pub(super) fn stash(key: WarmKey, process: RelayProcess, ttl: Duration) {
     let generation = GENERATION.fetch_add(1, Ordering::Relaxed) + 1;

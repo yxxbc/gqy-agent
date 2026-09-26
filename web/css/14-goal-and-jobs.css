@@ -269,6 +269,16 @@
   color: var(--danger, #d08080);
 }
 
+/* 预热进程行:后台晾着一个 agy 等下一轮。只报状态,不可点、不可停。 */
+.job-chip.is-warm {
+  background: color-mix(in srgb, var(--surface-2) 55%, transparent);
+  color: var(--text-faint);
+}
+
+.job-chip.is-warm .job-chip-marker {
+  color: var(--gold);
+}
+
 .job-chip-marker {
   flex: none;
   width: 1.2em;

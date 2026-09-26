@@ -16,8 +16,11 @@ mod sse;
 mod variants;
 mod wire;
 mod zen_headers;
-pub(crate) use antigravity::remove_relay_files_now as remove_antigravity_relay_files;
 use antigravity::AntigravityRuntime;
+pub(crate) use antigravity::{
+    remove_relay_files_now as remove_antigravity_relay_files,
+    warm_snapshot as antigravity_warm_snapshot,
+};
 use claude_code::ClaudeCodeRuntime;
 pub(crate) use cli_relay::forget_relay_sessions;
 use cline::ClineRuntime;

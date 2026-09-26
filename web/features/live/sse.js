@@ -9,7 +9,7 @@ import { liveViewed, updateConversationChrome } from "../conversation/chrome.js"
 import { jobStreamSink, renderConversation } from "../conversation/render.js";
 import { renderSubagentProgress } from "../conversation/subagent.js";
 import { loadGoal } from "../goal.js";
-import { renderJobsStrip } from "../jobs.js";
+import { renderJobsStrip, seedJobsStrip } from "../jobs.js";
 import { handleContextEvent } from "./context.js";
 import { consumeLiveQueue, finishLiveRun, handleRoundUsage, refreshComposerCumulative } from "./run.js";
 import { commitRedoLive, ensureLiveUser, removeRunningStatus, renderQueueTray, showTypingIndicator } from "./state.js";
@@ -137,6 +137,8 @@ export function handleRunEvent(name, data) {
       renderSessionList();
     }
   }
+  // 回合收尾会顺手把下一轮的 agy 晾起来(预热);任务条要跟着更新这一行。
+  if (terminal) void seedJobsStrip();
 
   let live = state.liveRuns.get(runId);
   if (!live && !terminal && !state.terminalRunIds.has(runId) && sessionId && sessionId === state.viewSessionId) {

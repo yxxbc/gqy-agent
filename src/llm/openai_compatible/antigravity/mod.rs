@@ -33,6 +33,19 @@ pub(crate) fn remove_relay_files_now() {
     setup::remove_relay_files(&setup::default_config_dir());
 }
 
+/// 预热池快照:给 WebUI 显示「后台还晾着一个进程」用。它不是任务,也不该
+/// 神秘地出现在活动监视器里——晾着谁、还能晾多久,前端如实展示。
+#[derive(Debug, Clone, serde::Serialize)]
+pub(crate) struct WarmSnapshot {
+    /// 距离自动收摊还剩多少秒。
+    pub(crate) seconds_left: u64,
+}
+
+/// 当前晾着的 agy 预热进程;没晾(或晾着的那只已经死了)就是 None。
+pub(crate) fn warm_snapshot() -> Option<WarmSnapshot> {
+    warm::snapshot()
+}
+
 /// 桥上按 eager 常驻的内置工具：以 `mcp_gqy_<名>` 原生名直接可调，完整说明
 /// 进 agy 的系统提示词。其余工具仍挂在桥上，走 agy 的懒加载（先读 schema 再
 /// `call_mcp_tool`），不再每次模型调用都背着完整说明。

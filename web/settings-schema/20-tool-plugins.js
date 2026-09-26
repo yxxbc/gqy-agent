@@ -706,7 +706,7 @@ const toolPlugins = {
       {
         key: "warm_idle_seconds",
         label: "预热进程保留时长",
-        hint: "一轮结束后提前拉起下一轮的 agy,省约 6 秒;这么久没人用就关掉。0 = 不预热",
+        hint: "一轮结束后提前拉起下一轮的 agy(占一个 agy 进程 + 一条 MCP 桥,约 60MB),省约 6 秒;这么久没人领就自动收摊,换会话/换模型不复用。0 = 不预热",
         kind: "number",
         integer: true,
         min: 0,

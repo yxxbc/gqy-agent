@@ -212,6 +212,12 @@ impl RelayProcess {
         kill_process_group(self.pid);
     }
 
+    /// 这个子进程此刻还活着吗(PID 判活)。给 UI 显示「晾着的那只还在不在」用;
+    /// PID 会被复用,但这里只作展示,错了也只是显示多一条。
+    pub(in crate::llm::openai_compatible) fn is_alive(&self) -> bool {
+        unsafe { libc::kill(self.pid as i32, 0) == 0 }
+    }
+
     pub(in crate::llm::openai_compatible) fn stderr_tail(&self) -> String {
         self.stderr_tail
             .lock()

@@ -17,7 +17,9 @@ const jobsState = {
   jobsStripOpen: localStorage.getItem("gqy.web.jobsStripOpen") === "1",
   commandLogs: new Map(),
   commandPeekLine: new Map(),
-  commandPeekTimers: new Map()
+  commandPeekTimers: new Map(),
+  /// 预热点快照(不是任务):后台晾着的 agy,随 /api/jobs 更新。
+  warm: null
 };
 
 export function jobStatusDisplay(status) {
@@ -126,22 +128,56 @@ export function trackCommandPeek(jobId) {
   jobsState.commandPeekTimers.set(jobId, setInterval(tick, 1500));
 }
 
+/// 预热点快照的本地读法:随 /api/jobs 拉回,按秒自减;到点当作没有。
+/// 它不是一个任务——没有停止按钮、不能展开,只是把「后台还晾着一个进程」
+/// 如实说出来(以前这件事只存在于活动监视器里,没人知道那是什么)。
+function liveWarmInfo() {
+  const warm = jobsState.warm;
+  if (!warm) return null;
+  const left = Math.round(warm.seconds_left - (Date.now() - warm.receivedAt) / 1000);
+  if (left <= 0) {
+    jobsState.warm = null;
+    return null;
+  }
+  return { secondsLeft: left };
+}
+
+function warmProcessRow(warm) {
+  const row = document.createElement("div");
+  row.className = "job-chip is-warm";
+  const marker = document.createElement("span");
+  marker.className = "job-chip-marker";
+  marker.appendChild(makeIconSlot("pause-solid"));
+  const label = document.createElement("span");
+  label.className = "job-chip-label";
+  label.textContent = "预热进程";
+  label.title = "上一轮结束后提前拉起的 agy(占一个进程 + 一条 MCP 桥),下一轮直接用;到期没人用就自动关掉";
+  const time = document.createElement("span");
+  time.className = "job-chip-time";
+  time.dataset.warmTime = "1";
+  time.textContent = `剩 ${formatJobDuration(warm.secondsLeft)}`;
+  row.append(marker, label, time);
+  return row;
+}
+
 export function renderJobsStrip() {
   const strip = elements.jobsStrip;
   if (!strip) return;
   const jobs = visibleBackgroundJobs();
+  const warm = liveWarmInfo();
   // 并行任务数首次达到收缩阈值(≥3)时自动收起成「后台任务 ×N」一行(#11):
   // 从 <3 跨到 ≥3 的那一刻强制收起(刷新时 prev=0 也算跨越),之后用户手动展开保留。
   const prevJobCount = state.prevJobCount || 0;
   state.prevJobCount = jobs.length;
   if (jobs.length >= 3 && prevJobCount < 3) jobsState.jobsStripOpen = false;
-  if (!jobs.length) {
+  if (!jobs.length && !warm) {
     strip.hidden = true;
     strip.replaceChildren();
     updateJumpButtonOffset();
     return;
   }
   const fragment = document.createDocumentFragment();
+  if (warm) fragment.appendChild(warmProcessRow(warm));
   const collapsible = jobs.length >= 3;
   if (collapsible) {
     // 合并行做成和单行一样的 job-chip 外观(09-12 用户报):braille spinner +
@@ -301,6 +337,11 @@ export async function seedJobsStrip() {
       // 继续往同一个 sink 追加。每个 sink 只回放一次。
       if (job.kind === "subagent") seedJobTrace(jid);
     }
+    // 预热点(不是任务):后台晾着的 agy。没有就是 null。
+    const warmSeconds = Number(data?.warm?.seconds_left);
+    jobsState.warm = Number.isFinite(warmSeconds) && warmSeconds > 0
+      ? { seconds_left: Math.round(warmSeconds), receivedAt: Date.now() }
+      : null;
     renderJobsStrip();
   } catch {
     /* daemon may predate the jobs API */
@@ -341,6 +382,13 @@ export function start() {
 
   setInterval(() => {
     if (document.hidden) return;
+    // 预热行的倒计时:本地自减,到点把整行撤掉。
+    const warm = liveWarmInfo();
+    const warmTime = elements.jobsStrip?.querySelector(".job-chip-time[data-warm-time]");
+    if (warmTime) {
+      if (warm) warmTime.textContent = `剩 ${formatJobDuration(warm.secondsLeft)}`;
+      else renderJobsStrip();
+    }
     const visible = visibleBackgroundJobs();
     if (!visible.length) return;
     // 只更新计时文本：全量重建会重启 CSS 旋转动画，导致 spinner 每秒瞬移回原点。
