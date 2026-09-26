@@ -11,6 +11,7 @@ import { updateModelMenuState } from "../model-menu/menu.js";
 import { updateSettingsControls } from "../settings/config.js";
 import { elements } from "../../state/elements.js";
 import { state } from "../../state/store.js";
+import { scheduleDraftSave } from "./drafts.js";
 
 export function countCharacters(value) {
   return Array.from(String(value || "")).length;
@@ -35,6 +36,8 @@ export function resizeComposer() {
   elements.characterCount.textContent = `${formatInteger(count)} / 20,000`;
   elements.characterCount.hidden = count < 18_000;
   elements.characterCount.classList.toggle("is-error", count > MAX_CONTENT_CHARS);
+  // 打字、发送后清空、命令回填都会走到这里:草稿随之写回当前会话的键。
+  scheduleDraftSave();
   updateControlState();
   // 输入框多行增高时,artifact 浮层的让位高度跟着更新(#2)。
   if (state.artifactOpen) syncComposerDockHeight();
@@ -45,7 +48,7 @@ export function updateControlState() {
   syncRunIndicator();
   const running = conversationRunning();
   const busy = state.adminBusy || state.submitting;
-  const locked = state.blocked || state.adminBusy || state.modeChooserOpen;
+  const locked = state.blocked || state.adminBusy;
   const inputCount = countCharacters(elements.composerInput.value.trim());
   const attachmentUploading = state.composerAttachments.some((item) => item.status === "uploading");
   const attachmentError = state.composerAttachments.some((item) => item.status === "error");
@@ -72,6 +75,8 @@ export function updateControlState() {
   // 语音与发送合并成同一个位置(用户):gqy voice 可用、且没有输入、且不在排队/运行时
   // 显麦克风(点了走语音),否则显发送。voice 不可用就永远是发送。
   const hasDraft = inputCount > 0 || attachmentReady;
+  // 有话要说时输入框换一圈流动的描边(普通)/亮起左侧竖线(开发),见 40-composer.css。
+  elements.composerForm.classList.toggle("has-draft", hasDraft && !locked);
   const showMic = state.voiceEnabled === true && !hasDraft && !running && !state.submitting;
   elements.micButton.hidden = !showMic;
   elements.sendButton.hidden = showMic;

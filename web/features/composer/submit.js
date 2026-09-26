@@ -12,7 +12,7 @@ import { scheduleViewSync } from "../live/sse.js";
 import { cancelLiveRun, ensureLiveUser, renderQueueTray, showTypingIndicator } from "../live/state.js";
 import { renderSessionList } from "../sessions/list.js";
 import { trackRun, viewSessionEntry } from "../sessions/runs.js";
-import { beginRunReplay, createLiveForRun, loadSessionView } from "../sessions/view.js";
+import { beginRunReplay, createLiveForRun, loadSessionView, materializeDraftSession } from "../sessions/view.js";
 import { updateRuntimeUsage } from "../status.js";
 import { elements } from "../../state/elements.js";
 import { state } from "../../state/store.js";
@@ -26,6 +26,12 @@ const submitState = {
 export async function submitTurn() {
   if (state.adminBusy || state.submitting || state.blocked) return;
   if (hasPendingQuestion()) return;
+  const content = elements.composerInput.value.trim();
+  // 草稿页没有会话：先按当前模式建出来再发（命令也一样——空 id 的命令会打到
+  // 服务端默认会话上，/reset 就清错了地方）。空输入不建，免得留下空会话。
+  if (state.draftMode && (content || state.composerAttachments.length)) {
+    if (!(await materializeDraftSession())) return;
+  }
   const sessionId = state.viewSessionId;
   const queueing = conversationRunning();
   const updateTarget = queueing ? activeTurnUpdateTarget(sessionId) : null;
@@ -33,7 +39,6 @@ export async function submitTurn() {
   // 子代理执行中——手机端尤甚)改走 /api/turns,由后端按会话排进当前在跑的轮
   // (09-12 #10:手机端子代理执行时新消息/followup 发不出)。
   const canQueue = queueing && !!updateTarget;
-  const content = elements.composerInput.value.trim();
   // 命中命令表就当命令执行，不当消息发。不命中的 `/xxx` 照常发给模型
   // ——与 REPL 同一语义（slash_commands::parse_repl_input）。
   if (window.GqyCommands?.match(content)) {

@@ -5,6 +5,7 @@ import { makeIconSlot } from "../../core/icons.js";
 import { showToast } from "../../core/toast.js";
 import { updateControlState } from "./input.js";
 import { updateJumpButtonOffset } from "../conversation/scroll.js";
+import { materializeDraftSession } from "../sessions/view.js";
 import { elements } from "../../state/elements.js";
 import { state } from "../../state/store.js";
 
@@ -163,6 +164,13 @@ export function addComposerFiles(files) {
   if (!state.capabilities?.attachments) return;
   const incoming = Array.isArray(files) ? files : Array.from(files || []);
   if (!incoming.length) return;
+  // 附件存在会话自己的存储里（开发模式记忆独立），草稿页得先有会话再传。
+  if (state.draftMode) {
+    materializeDraftSession().then((sessionId) => {
+      if (sessionId) addComposerFiles(incoming);
+    });
+    return;
+  }
   const available = Math.max(0, MAX_ATTACHMENTS - state.composerAttachments.length);
   if (incoming.length > available) {
     showToast(`每条消息最多添加 ${MAX_ATTACHMENTS} 个附件，已忽略 ${incoming.length - available} 个`, "error");

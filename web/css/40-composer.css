@@ -65,6 +65,59 @@
   box-shadow: var(--bubble-shadow);
 }
 
+/*
+ * 有话要说时(输入框非空或有附件)描边换成一圈缓缓流动的墨色:她的雾蓝、
+ * 发金、丝带红。空框保持安静——页面一打开就聚焦,常亮的光环用户否过,所以
+ * 这圈只跟「有草稿」挂钩,不跟聚焦挂钩。用 mask 只留 1px 的边,不发光不外扩。
+ */
+@property --ink-angle {
+  syntax: "<angle>";
+  inherits: false;
+  initial-value: 0deg;
+}
+
+.composer {
+  position: relative;
+}
+
+.composer::before {
+  position: absolute;
+  z-index: 1;
+  inset: 0;
+  padding: 1.5px;
+  border-radius: inherit;
+  background: conic-gradient(from var(--ink-angle), var(--accent), var(--gold), var(--ribbon), var(--accent));
+  content: "";
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity var(--motion-slow) ease;
+  -webkit-mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0);
+  -webkit-mask-composite: xor;
+  mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0);
+  mask-composite: exclude;
+}
+
+.composer.has-draft {
+  border-color: transparent;
+}
+
+.composer.has-draft::before {
+  opacity: 1;
+  animation: ink-flow 7s linear infinite;
+}
+
+@keyframes ink-flow {
+  to {
+    --ink-angle: 360deg;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .composer.has-draft::before {
+    animation: none;
+  }
+}
+
 .composer textarea {
   display: block;
   width: 100%;
