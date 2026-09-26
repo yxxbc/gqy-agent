@@ -1,0 +1,707 @@
+/*
+ * 侧栏与会话的两种形态(09-26 重做)。
+ *
+ * 会话不再常驻侧栏:普通模式的侧栏是「她的房间」(月洞窗、问候、信匣
+ * 入口),会话收进「信匣」——一叠花笺;开发模式的会话在底部 tmux 状态栏
+ * 里(94-dev-statusbar.css),侧栏退成抽屉,外加 Ctrl+K 指令面板。两种面板
+ * 是同一个元素(#sessionSwitcher),样子按 body[data-mode] 分开。
+ */
+
+/* ───────── 模式徽章 ───────── */
+.mode-badges {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  margin: 0 14px 4px;
+  gap: 8px;
+}
+
+.mode-badges[hidden] {
+  display: none;
+}
+
+.mode-badge {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding: 10px 0 8px;
+  border: 0;
+  border-radius: var(--radius);
+  background: transparent;
+  color: var(--text-faint);
+  cursor: pointer;
+  font: inherit;
+  gap: 6px;
+  transition: background var(--motion) ease, color var(--motion) ease;
+}
+
+.mode-badge:hover {
+  background: color-mix(in srgb, var(--surface-2) 60%, transparent);
+  color: var(--text-soft);
+}
+
+.mode-badge:focus-visible {
+  outline: 2px solid color-mix(in srgb, var(--accent) 60%, transparent);
+  outline-offset: 2px;
+}
+
+.mode-badge-face {
+  position: relative;
+  width: 44px;
+  height: 44px;
+  /* 不在场的那一枚褪成灰影。 */
+  filter: grayscale(0.9);
+  opacity: 0.5;
+  transition: filter var(--motion-slow) ease, opacity var(--motion-slow) ease, box-shadow var(--motion-slow) ease;
+}
+
+.mode-badge.is-her .mode-badge-face {
+  border: 2px solid var(--ribbon);
+}
+
+.mode-badge.is-active .mode-badge-face {
+  filter: none;
+  opacity: 1;
+}
+
+.mode-badge.is-her.is-active .mode-badge-face {
+  box-shadow: 0 0 0 4px color-mix(in srgb, var(--ribbon) 16%, transparent), 0 0 22px color-mix(in srgb, var(--ribbon) 45%, transparent);
+}
+
+/* 开发徽章:三圈能量环,亮着时外圈慢转。 */
+.mode-badge-core {
+  display: grid;
+  place-items: center;
+  border: 2px solid var(--hud);
+  border-radius: 50%;
+  background: color-mix(in srgb, var(--hud) 8%, var(--sidebar-bg));
+}
+
+.mode-badge-core svg {
+  width: 32px;
+  height: 32px;
+  fill: none;
+  stroke: var(--hud);
+  stroke-width: 1.6;
+}
+
+.mode-badge-core svg circle:nth-child(1) {
+  stroke-dasharray: 6 4;
+  transform-origin: 20px 20px;
+}
+
+.mode-badge-core svg circle:nth-child(3) {
+  fill: var(--hud);
+}
+
+.mode-badge.is-dev.is-active .mode-badge-face {
+  box-shadow: 0 0 0 4px color-mix(in srgb, var(--hud) 16%, transparent), 0 0 22px color-mix(in srgb, var(--hud) 50%, transparent);
+}
+
+.mode-badge.is-dev.is-active .mode-badge-core svg circle:nth-child(1) {
+  animation: hud-spin 8s linear infinite;
+}
+
+.mode-badge-label {
+  font-size: var(--fs-micro);
+  letter-spacing: 0.1em;
+}
+
+.mode-badge.is-active .mode-badge-label {
+  color: var(--text);
+  font-weight: 500;
+}
+
+.mode-badge.is-her .mode-badge-label {
+  font-family: var(--serif);
+}
+
+.mode-badge.is-dev .mode-badge-label {
+  font-family: var(--font-mono);
+}
+
+@keyframes hud-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+/* ───────── 她的房间(普通模式侧栏) ───────── */
+.her-room {
+  display: grid;
+  min-height: 0;
+  align-content: center;
+  justify-items: center;
+  padding: 12px 18px;
+  gap: 10px;
+  text-align: center;
+}
+
+/*
+ * 月洞窗:她的立绘嵌在一轮圆窗里,窗沿一圈月白的晕,右上角斜出一枝白梅。
+ * 整个侧栏最显眼的就是这一扇窗——其余都收着。
+ */
+.moon-gate {
+  position: relative;
+  width: 176px;
+  height: 176px;
+  margin: 8px 0 6px;
+}
+
+.moon-gate::before {
+  position: absolute;
+  inset: -14px;
+  border-radius: 50%;
+  background: radial-gradient(circle, color-mix(in srgb, var(--moonlight) 26%, transparent) 55%, transparent 72%);
+  content: "";
+  animation: moon-breathe 6s ease-in-out infinite;
+}
+
+.moon-gate-window {
+  position: absolute;
+  inset: 0;
+  overflow: hidden;
+  border: 1.5px solid color-mix(in srgb, var(--gold) 70%, transparent);
+  border-radius: 50%;
+  background: var(--surface-2);
+  box-shadow:
+    inset 0 0 0 5px color-mix(in srgb, var(--sidebar-bg) 70%, transparent),
+    inset 0 0 0 6px color-mix(in srgb, var(--gold) 30%, transparent),
+    0 0 30px color-mix(in srgb, var(--ribbon) 18%, transparent);
+}
+
+.moon-gate-window img {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+/* 窗里是她的房间,不是她的大头照:看板是横幅水墨,取亭台、水面和她都在的那
+   一段(只取脸就和头像一模一样,09-26 用户指出)。暗色下压一点亮度,像月光里。 */
+.moon-gate-window img.is-board {
+  object-position: 44% 50%;
+}
+
+body:not([data-theme="linen"]) .moon-gate-window img.is-board {
+  filter: brightness(0.86) saturate(0.85);
+}
+
+.moon-gate-plum {
+  position: absolute;
+  top: -20px;
+  right: -16px;
+  width: 124px;
+  height: 104px;
+  overflow: visible;
+  pointer-events: none;
+}
+
+.plum-branch {
+  fill: none;
+  stroke: var(--plum-branch);
+  stroke-linecap: round;
+  stroke-width: 2.4;
+}
+
+.plum-flower circle {
+  fill: var(--plum-flower);
+}
+
+.plum-flower .plum-heart {
+  fill: var(--gold);
+}
+
+.plum-flower.is-bud circle {
+  fill: color-mix(in srgb, var(--ribbon) 70%, var(--plum-flower));
+}
+
+.her-room-name {
+  color: var(--text);
+  font-family: var(--serif);
+  font-size: var(--fs-title);
+  font-weight: 600;
+  letter-spacing: 0.3em;
+  text-indent: 0.3em;
+}
+
+.her-room-status {
+  color: var(--text-soft);
+  font-family: var(--serif);
+  font-size: var(--fs-meta);
+  letter-spacing: 0.12em;
+}
+
+.her-room-days {
+  display: inline-flex;
+  align-items: center;
+  color: var(--ribbon);
+  font-family: var(--serif);
+  font-size: var(--fs-micro);
+  gap: 6px;
+  letter-spacing: 0.16em;
+}
+
+.her-room-days::before,
+.her-room-days::after {
+  width: 18px;
+  height: 1px;
+  background: color-mix(in srgb, var(--ribbon) 50%, transparent);
+  content: "";
+}
+
+.her-room-days[hidden] {
+  display: none;
+}
+
+@keyframes moon-breathe {
+  50% {
+    opacity: 0.55;
+    transform: scale(1.04);
+  }
+}
+
+/* 她的名字和头像搬进了房间,品牌行只留在线状态和按钮。 */
+body:not([data-mode="dev"]) .brand-identity .brand-avatar,
+body:not([data-mode="dev"]) #brandName {
+  display: none;
+}
+
+body[data-mode="dev"] .her-room {
+  display: none;
+}
+
+/* ───────── 会话入口 ───────── */
+.session-entry {
+  position: relative;
+  display: flex;
+  align-items: center;
+  margin: 0 14px 10px;
+  padding: 11px 14px;
+  border: 1px solid color-mix(in srgb, var(--line) 80%, transparent);
+  border-radius: var(--radius);
+  background: var(--surface-1);
+  color: var(--text);
+  cursor: pointer;
+  font: inherit;
+  gap: 10px;
+  transition: border-color var(--motion) ease, background var(--motion) ease;
+}
+
+.session-entry:hover {
+  border-color: color-mix(in srgb, var(--accent) 45%, transparent);
+}
+
+.session-entry:focus-visible {
+  outline: 2px solid color-mix(in srgb, var(--accent) 60%, transparent);
+  outline-offset: 2px;
+}
+
+.session-entry .icon-slot {
+  width: 16px;
+  height: 16px;
+  color: var(--gold);
+}
+
+.session-entry-label {
+  flex: 1;
+  font-family: var(--serif);
+  font-size: var(--fs-ui);
+  letter-spacing: 0.2em;
+  text-align: left;
+}
+
+.session-entry-count {
+  min-width: 20px;
+  padding: 0 6px;
+  border-radius: var(--radius-pill);
+  background: color-mix(in srgb, var(--gold) 16%, transparent);
+  color: var(--gold);
+  font-size: var(--fs-micro);
+  font-variant-numeric: tabular-nums;
+  font-weight: 500;
+  line-height: 18px;
+  text-align: center;
+}
+
+.session-entry-unread {
+  position: absolute;
+  top: 8px;
+  left: 26px;
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: var(--ribbon);
+  box-shadow: 0 0 0 2px var(--surface-1);
+}
+
+.session-entry-key {
+  color: var(--text-faint);
+  font-family: var(--font-mono);
+  font-size: var(--fs-micro);
+}
+
+body[data-mode="dev"] .session-entry .icon-slot {
+  color: var(--hud);
+}
+
+body[data-mode="dev"] .session-entry-label {
+  font-family: var(--font-mono);
+  letter-spacing: 0.04em;
+}
+
+body[data-mode="dev"] .session-entry-count {
+  background: color-mix(in srgb, var(--hud) 16%, transparent);
+  color: var(--hud);
+}
+
+/* ───────── 会话面板:共用骨架 ───────── */
+.session-switcher {
+  position: fixed;
+  z-index: var(--z-overlay);
+  inset: 0;
+}
+
+.session-switcher[hidden] {
+  display: none;
+}
+
+.session-switcher-scrim {
+  position: absolute;
+  inset: 0;
+  padding: 0;
+  border: 0;
+  background: color-mix(in srgb, #000 38%, transparent);
+  -webkit-backdrop-filter: blur(3px);
+  backdrop-filter: blur(3px);
+  animation: switcher-fade var(--motion-slow) ease both;
+}
+
+.session-switcher-panel {
+  position: absolute;
+  display: grid;
+  grid-template-rows: auto minmax(0, 1fr) auto;
+  overflow: hidden;
+  box-shadow: var(--float-shadow);
+}
+
+.session-switcher-head {
+  display: flex;
+  align-items: center;
+  padding: 14px 14px 10px;
+  gap: 8px;
+}
+
+.session-switcher-head strong {
+  flex: none;
+}
+
+.session-search {
+  flex: 1;
+  min-width: 0;
+  height: 34px;
+  padding: 0 12px;
+  border: 1px solid color-mix(in srgb, var(--line) 80%, transparent);
+  border-radius: var(--radius);
+  outline: 0;
+  background: var(--surface-1);
+  color: var(--text);
+  font: inherit;
+  font-size: var(--fs-ui);
+}
+
+.session-search:focus {
+  border-color: color-mix(in srgb, var(--accent) 60%, transparent);
+}
+
+.session-switcher .session-list {
+  min-height: 0;
+  padding: 4px 14px 14px;
+  overflow: auto;
+}
+
+.session-switcher-foot {
+  display: flex;
+  align-items: center;
+  padding: 8px 14px 10px;
+  border-top: 1px solid color-mix(in srgb, var(--line) 60%, transparent);
+  color: var(--text-faint);
+  font-size: var(--fs-micro);
+  gap: 5px;
+}
+
+.session-switcher-foot kbd {
+  padding: 1px 5px;
+  border-radius: var(--radius-sm);
+  background: var(--surface-2);
+  font-family: var(--font-mono);
+}
+
+.session-item.is-cursor {
+  outline: 2px solid color-mix(in srgb, var(--accent) 55%, transparent);
+  outline-offset: -2px;
+}
+
+.session-date,
+.session-snippet {
+  display: block;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+@keyframes switcher-fade {
+  from {
+    opacity: 0;
+  }
+}
+
+@keyframes letterbox-in {
+  from {
+    opacity: 0;
+    transform: translateX(-18px);
+  }
+}
+
+@keyframes palette-in {
+  from {
+    opacity: 0;
+    transform: translate(-50%, -8px) scale(0.98);
+  }
+}
+
+/* ───────── 普通模式:信匣 ───────── */
+body:not([data-mode="dev"]) .session-switcher-panel {
+  top: 12px;
+  bottom: 12px;
+  left: 12px;
+  width: min(600px, calc(100vw / var(--ui-scale) - 24px));
+  border-radius: var(--radius-lg);
+  background:
+    radial-gradient(ellipse 70% 40% at 0% 0%, var(--window-light), transparent 70%),
+    var(--app-bg);
+  animation: letterbox-in var(--motion-slow) cubic-bezier(0.2, 0.8, 0.2, 1) backwards;
+}
+
+body:not([data-mode="dev"]) .session-switcher-head strong {
+  color: var(--gold);
+  font-family: var(--serif);
+  font-size: var(--fs-chat);
+  letter-spacing: 0.3em;
+}
+
+body:not([data-mode="dev"]) .session-switcher .session-items {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+}
+
+/* 一封信:宋体标题、金色落款日期、两行首句;当前那封夹着丝带书签。 */
+/* 花笺:信纸上印着淡淡的朱丝栏竖线,右下角一枚她名字的朱印,微微歪着。 */
+body:not([data-mode="dev"]) .session-switcher .session-item {
+  display: block;
+  min-height: 118px;
+  border: 1px solid color-mix(in srgb, var(--line) 70%, transparent);
+  border-radius: var(--radius);
+  background:
+    repeating-linear-gradient(90deg, transparent 0 25px, color-mix(in srgb, var(--ribbon) 9%, transparent) 25px 26px),
+    var(--surface-1);
+  box-shadow: var(--card-shadow);
+  transition: transform var(--motion) ease, border-color var(--motion) ease;
+}
+
+body:not([data-mode="dev"]) .session-switcher .session-item::after {
+  position: absolute;
+  right: 40px;
+  bottom: 10px;
+  display: grid;
+  width: 22px;
+  height: 22px;
+  place-items: center;
+  border: 1.5px solid color-mix(in srgb, var(--ribbon) 75%, transparent);
+  border-radius: var(--radius-sm);
+  color: var(--ribbon);
+  content: attr(data-seal);
+  font-family: var(--serif);
+  font-size: var(--fs-micro);
+  font-weight: 700;
+  opacity: 0.72;
+  pointer-events: none;
+  transform: rotate(-8deg);
+}
+
+body:not([data-mode="dev"]) .session-switcher .session-item:hover {
+  border-color: color-mix(in srgb, var(--gold) 45%, transparent);
+  transform: translateY(-2px);
+}
+
+body:not([data-mode="dev"]) .session-switcher .session-item-main {
+  display: block;
+  width: 100%;
+  height: 100%;
+  padding: 14px 34px 14px 16px;
+}
+
+body:not([data-mode="dev"]) .session-switcher .session-lead {
+  position: absolute;
+  top: 12px;
+  right: 12px;
+}
+
+body:not([data-mode="dev"]) .session-switcher .session-copy {
+  gap: 6px;
+}
+
+body:not([data-mode="dev"]) .session-switcher .session-copy strong {
+  font-family: var(--serif);
+  font-size: var(--fs-chat);
+  font-weight: 600;
+}
+
+body:not([data-mode="dev"]) .session-switcher .session-date {
+  order: -1;
+  color: var(--gold);
+  font-family: var(--serif);
+  font-size: var(--fs-micro);
+  letter-spacing: 0.1em;
+}
+
+body:not([data-mode="dev"]) .session-switcher .session-snippet {
+  display: -webkit-box;
+  color: var(--text-soft);
+  font-size: var(--fs-meta);
+  line-height: 1.6;
+  white-space: normal;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+}
+
+body:not([data-mode="dev"]) .session-switcher .session-item.active::before {
+  top: -1px;
+  bottom: auto;
+  left: 18px;
+  width: 10px;
+  height: 22px;
+  border-radius: 0 0 2px 2px;
+  clip-path: polygon(0 0, 100% 0, 100% 100%, 50% 78%, 0 100%);
+}
+
+body:not([data-mode="dev"]) .session-switcher .session-trailing {
+  position: absolute;
+  right: 6px;
+  bottom: 6px;
+}
+
+/* ───────── 开发模式:指令面板 ───────── */
+body[data-mode="dev"] .session-switcher-panel {
+  top: 12vh;
+  left: 50%;
+  width: min(640px, calc(100vw / var(--ui-scale) - 24px));
+  max-height: 70vh;
+  border: 1px solid color-mix(in srgb, var(--hud) 35%, transparent);
+  border-radius: var(--radius);
+  background: color-mix(in srgb, var(--app-bg) 92%, transparent);
+  box-shadow: 0 0 0 1px color-mix(in srgb, var(--hud) 10%, transparent), 0 0 40px color-mix(in srgb, var(--hud) 18%, transparent), var(--float-shadow);
+  transform: translateX(-50%);
+  -webkit-backdrop-filter: blur(14px);
+  backdrop-filter: blur(14px);
+  animation: palette-in var(--motion-slow) cubic-bezier(0.2, 0.8, 0.2, 1) backwards;
+}
+
+body[data-mode="dev"] .session-switcher-head strong {
+  color: var(--hud);
+  font-family: var(--font-mono);
+  font-size: var(--fs-meta);
+  letter-spacing: 0.12em;
+}
+
+body[data-mode="dev"] .session-search {
+  font-family: var(--font-mono);
+}
+
+body[data-mode="dev"] .session-switcher .session-items {
+  display: grid;
+  gap: 2px;
+}
+
+body[data-mode="dev"] .session-switcher .session-item-main {
+  padding: 6px 10px;
+}
+
+body[data-mode="dev"] .session-switcher .session-copy {
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: baseline;
+  column-gap: 12px;
+}
+
+body[data-mode="dev"] .session-switcher .session-copy strong {
+  font-family: var(--font-mono);
+  font-size: var(--fs-ui);
+  font-weight: 400;
+}
+
+body[data-mode="dev"] .session-switcher .session-date {
+  color: var(--text-faint);
+  font-family: var(--font-mono);
+  font-size: var(--fs-micro);
+}
+
+body[data-mode="dev"] .session-switcher .session-snippet {
+  grid-column: 1 / -1;
+  color: var(--text-faint);
+  font-size: var(--fs-micro);
+  white-space: nowrap;
+}
+
+body[data-mode="dev"] .session-switcher .session-item.is-cursor {
+  outline: 0;
+  background: color-mix(in srgb, var(--hud) 12%, transparent);
+  box-shadow: inset 2px 0 0 var(--hud);
+}
+
+@media (max-width: 836px) {
+  body:not([data-mode="dev"]) .session-switcher .session-items {
+    grid-template-columns: 1fr;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .moon-gate::before,
+  .mode-badge.is-dev.is-active .mode-badge-core svg circle:nth-child(1) {
+    animation: none;
+  }
+
+  .session-switcher-scrim,
+  .session-switcher-panel {
+    animation: none;
+  }
+}
+
+/* ───────── 普通模式:落梅层与对话里的小心思 ───────── */
+.petal-layer {
+  position: absolute;
+  z-index: 0;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  pointer-events: none;
+}
+
+body[data-mode="dev"] .petal-layer {
+  display: none;
+}
+
+/* 她的名字前开一朵小梅。 */
+body:not([data-mode="dev"]) .assistant-label strong::before {
+  margin-right: 5px;
+  color: var(--ribbon);
+  content: "✿";
+}
+
+/* 你的气泡从雾蓝晕到一点胭脂色,像被她的颜色染到了。 */
+body:not([data-mode="dev"]):not([data-theme="linen"]) .user-bubble {
+  background: linear-gradient(135deg, var(--user-bg) 30%, color-mix(in srgb, var(--md-sys-color-tertiary-container) 80%, var(--user-bg)));
+}
+
+body[data-theme="linen"]:not([data-mode="dev"]) .user-bubble {
+  background: linear-gradient(135deg, var(--user-bg) 35%, color-mix(in srgb, var(--md-sys-color-tertiary) 70%, var(--user-bg)));
+}

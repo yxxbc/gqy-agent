@@ -2,12 +2,17 @@ import { apiRequest } from "../../core/api.js";
 import { BRAILLE_FRAMES } from "../../core/constants.js";
 import { firstLine, formatRelativeTime } from "../../core/format.js";
 import { makeIconSlot } from "../../core/icons.js";
+import { visualPixelsToLayout } from "../../core/ui-scale.js";
 import { showToast } from "../../core/toast.js";
 import { updateConversationChrome } from "../conversation/chrome.js";
 import { scrollToBottom } from "../conversation/scroll.js";
 import { requestClearConversation } from "../session-mode.js";
 import { deriveConversationDetails, findSession, multiSessionEnabled, sessionDisplayName, sessionHasRuns } from "./runs.js";
 import { deleteSession, openSessionView, refreshSessions } from "./view.js";
+import { sessionsInMode } from "./mode.js";
+import { closeSessionSwitcher, restoreSwitcherCursor } from "./switcher.js";
+import { renderStatusBar } from "./statusbar.js";
+import { syncHerRoom } from "../her-room.js";
 import { closeSidebar } from "../sidebar.js";
 import { elements } from "../../state/elements.js";
 import { state } from "../../state/store.js";
@@ -28,14 +33,49 @@ export function toggleSessionMenu(sessionId) {
   state.sessionMenuFor = state.sessionMenuFor === sessionId ? null : sessionId;
   renderSessionList();
   if (!state.sessionMenuFor) return;
-  const item = elements.sessionItems.querySelector(`.session-item[data-session-id="${CSS.escape(sessionId)}"]`);
+  const menu = placeSessionMenu();
+  if (menu) window.requestAnimationFrame(() => menu.querySelector("button")?.focus());
+}
+
+/// 会话菜单钉在视口上,贴着「…」按钮弹出。
+///
+/// 菜单原本是会话行里的 absolute 元素,会话收进面板(信匣/指令面板)之后,
+/// 面板的滚动容器 overflow:auto 会把它裁掉——信笺卡片比列表行高,最下面
+/// 那几张一点「编辑」就只露半截。改成 fixed 定位 + 压在所有浮层之上,放不下
+/// 就往上翻。列表每次重画都会重建菜单,所以重画后也要再摆一次。
+export function placeSessionMenu() {
+  if (!state.sessionMenuFor) return null;
+  const item = elements.sessionItems.querySelector(`.session-item[data-session-id="${CSS.escape(state.sessionMenuFor)}"]`);
   const menu = item?.querySelector(".session-menu");
-  if (menu) {
-    const menuRect = menu.getBoundingClientRect();
-    const listRect = elements.sessionList.getBoundingClientRect();
-    if (menuRect.bottom > listRect.bottom - 4) menu.classList.add("open-up");
-    window.requestAnimationFrame(() => menu.querySelector("button")?.focus());
+  const anchor = item?.querySelector(".session-menu-button");
+  if (!menu || !anchor) return null;
+  menu.classList.add("is-floating");
+  // 外壳有 zoom(--ui-scale):矩形是视觉像素,fixed 的坐标要换回布局像素。
+  const rect = anchor.getBoundingClientRect();
+  const button = {
+    top: visualPixelsToLayout(rect.top),
+    right: visualPixelsToLayout(rect.right),
+    bottom: visualPixelsToLayout(rect.bottom)
+  };
+  const width = menu.offsetWidth;
+  const height = menu.offsetHeight;
+  const viewportWidth = visualPixelsToLayout(document.documentElement.clientWidth);
+  const viewportHeight = visualPixelsToLayout(document.documentElement.clientHeight);
+  const left = Math.max(8, Math.min(button.right - width, viewportWidth - width - 8));
+  const below = button.bottom + 4;
+  const top = below + height > viewportHeight - 8 ? Math.max(8, button.top - height - 4) : below;
+  menu.style.left = `${left}px`;
+  menu.style.top = `${top}px`;
+  // 祖先带 transform(开发模式的指令面板靠 translateX 居中)时,fixed 的参照
+  // 系是那个祖先而不是视口。量一下实际落点,差多少补多少。
+  const placed = menu.getBoundingClientRect();
+  const driftX = visualPixelsToLayout(placed.left) - left;
+  const driftY = visualPixelsToLayout(placed.top) - top;
+  if (Math.abs(driftX) > 0.5 || Math.abs(driftY) > 0.5) {
+    menu.style.left = `${left - driftX}px`;
+    menu.style.top = `${top - driftY}px`;
   }
+  return menu;
 }
 
 export function beginSessionRename(sessionId) {
@@ -116,6 +156,8 @@ export function buildSessionItem(session) {
   const item = document.createElement("div");
   item.className = `session-item${isView ? " active" : ""}`;
   item.dataset.sessionId = id;
+  // 花笺右下角那枚小印:她名字的最后一个字(信匣样式里用)。
+  item.dataset.seal = Array.from(String(state.persona?.name || "影")).pop() || "影";
 
   const renaming = state.sessionRenaming === id;
   // 侧栏拖拽排序(组内):HTML5 DnD,drop 时全量提交新顺序。
@@ -125,7 +167,10 @@ export function buildSessionItem(session) {
   if (!renaming) {
     main.type = "button";
     main.title = isView ? sessionDisplayName(session) : `查看「${sessionDisplayName(session)}」`;
-    main.addEventListener("click", () => openSessionView(id));
+    main.addEventListener("click", () => {
+      closeSessionSwitcher({ restoreFocus: false });
+      openSessionView(id);
+    });
   }
   // 行首那一格只放状态指示器。模式图标搬去了分组标题——同一组里每行都
   // 画一遍相同的图标，重复十几次也说不出新东西，还占着状态该用的位置。
@@ -188,6 +233,22 @@ export function buildSessionItem(session) {
       titleRow.appendChild(badge);
     }
     copy.appendChild(titleRow);
+    // 信笺卡片上的落款日期与首句(开发模式的面板里画成一行等宽的时间)。
+    const when = session?.updated_at || session?.created_at;
+    if (when) {
+      const date = document.createElement("time");
+      date.className = "session-date";
+      date.dateTime = String(when);
+      date.textContent = formatRelativeTime(when);
+      copy.appendChild(date);
+    }
+    const snippet = firstLine(session?.last_user_content || "");
+    if (snippet) {
+      const line = document.createElement("span");
+      line.className = "session-snippet";
+      line.textContent = snippet;
+      copy.appendChild(line);
+    }
   }
 
   // Gemini-style list rows: name only; details live in the hover tooltip.
@@ -262,28 +323,55 @@ export function buildFallbackSessionItem() {
 export function renderSessionList() {
   if (!elements.sessionItems) return;
   if (state.sessionRenaming && elements.sessionItems.querySelector(".session-rename-input")) return;
+  // 整列重建会让滚动容器先塌成空的,scrollTop 被夹回 0——在信匣里滚到下面
+  // 点「…」,列表一重画就跳回顶上,菜单也就挂到了看不见的按钮上。先记下再还原。
+  const scrollTop = elements.sessionList?.scrollTop || 0;
   elements.sessionItems.replaceChildren();
   if (!multiSessionEnabled() || state.sessions.length === 0) {
     elements.sessionItems.appendChild(buildFallbackSessionItem());
     return;
   }
-  // 侧栏按会话模式分组(创建时定死)。终端集成会话不列出——它是 shellhook
-  // 那条车道,由终端驱动,WebUI 里既不该被误点进去也不该被误删;要看它的
-  // 历史用 REPL 的 /session 切过去。
-  const normal = state.sessions.filter(
-    (session) => !isTerminalSession(session?.session_id) && session?.mode !== "dev"
-  );
-  const dev = state.sessions.filter(
-    (session) => !isTerminalSession(session?.session_id) && session?.mode === "dev"
-  );
-  if (normal.length) {
-    elements.sessionItems.appendChild(buildSessionGroupHeader("普通模式", "message-circle"));
-    for (const session of normal) elements.sessionItems.appendChild(buildSessionItem(session));
+  // 侧栏只列当前模式的会话（左上角开关切换，模式创建时定死）。终端集成会话
+  // 不列出——它是 shellhook 那条车道,由终端驱动,WebUI 里既不该被误点进去
+  // 也不该被误删;要看它的历史用 REPL 的 /session 切过去。
+  const all = sessionsInMode(state.sessionMode);
+  const visible = filterSessions(all, state.sessionFilter);
+  if (!visible.length) {
+    elements.sessionItems.appendChild(all.length ? buildNoMatchHint() : buildModeEmptyHint(state.sessionMode));
+  } else {
+    for (const session of visible) elements.sessionItems.appendChild(buildSessionItem(session));
   }
-  if (dev.length) {
-    elements.sessionItems.appendChild(buildSessionGroupHeader("开发模式", "code"));
-    for (const session of dev) elements.sessionItems.appendChild(buildSessionItem(session));
-  }
+  if (elements.sessionList) elements.sessionList.scrollTop = scrollTop;
+  syncSessionEntry(all);
+  renderStatusBar();
+  restoreSwitcherCursor();
+  placeSessionMenu();
+}
+
+/// 面板里的搜索:名字或最后一句里含关键字就留下,大小写不敏感。
+function filterSessions(sessions, query) {
+  const needle = String(query || "").trim().toLowerCase();
+  if (!needle) return sessions;
+  return sessions.filter((session) => [sessionDisplayName(session), session?.last_user_content || ""]
+    .some((text) => String(text).toLowerCase().includes(needle)));
+}
+
+/// 侧栏的会话入口:数量 + 有没有未读(面板收起来了,未读得在入口上看得见)。
+function syncSessionEntry(sessions) {
+  if (!elements.sessionEntryCount) return;
+  elements.sessionEntryCount.textContent = String(sessions.length);
+  const unread = sessions.some((session) => state.unreadSessions.has(String(session.session_id)));
+  elements.sessionEntryUnread.hidden = !unread;
+  elements.sessionEntryLabel.textContent = state.sessionMode === "dev" ? "会话" : "信匣";
+  // 相识天数从会话列表里算,列表一变就跟着更新。
+  syncHerRoom();
+}
+
+function buildNoMatchHint() {
+  const hint = document.createElement("p");
+  hint.className = "session-mode-empty";
+  hint.textContent = "没有匹配的会话";
+  return hint;
 }
 
 /// 一个计时器喂所有转圈。
@@ -379,12 +467,9 @@ export async function commitSessionReorder(dragId, targetId, before) {
   }
 }
 
-export function buildSessionGroupHeader(label, icon) {
-  const header = document.createElement("div");
-  header.className = "session-group-header";
-  if (icon) header.appendChild(makeIconSlot(icon));
-  const text = document.createElement("span");
-  text.textContent = label;
-  header.appendChild(text);
-  return header;
+function buildModeEmptyHint(mode) {
+  const hint = document.createElement("p");
+  hint.className = "session-mode-empty";
+  hint.textContent = mode === "dev" ? "还没有开发会话" : "还没有对话";
+  return hint;
 }

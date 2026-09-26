@@ -1,0 +1,196 @@
+/*
+ * 开发模式的切入动画:HUD 启动序列(widgets/hud-boot.js)。
+ *
+ * 能量环展开、扫描线扫过、网格亮起,一行等宽字打出 GQY · DEV MODE。
+ * 颜色读 --hud,和开发模式其余地方同一支薰衣草(取自 TUI 的主色)。
+ * 页面本身的样式在 90-mode-dev.css 与 94-dev-statusbar.css。
+ */
+
+/* ───────── HUD 启动序列 ───────── */
+.hud-boot {
+  position: absolute;
+  z-index: calc(var(--z-popover) - 1);
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  align-items: center;
+  justify-content: center;
+  gap: 18px;
+  background: radial-gradient(circle at 50% 46%, color-mix(in srgb, var(--hud) 10%, transparent), transparent 62%);
+  pointer-events: none;
+  animation: hud-boot-out 420ms ease 1500ms both;
+}
+
+.hud-boot.is-leaving {
+  animation: hud-boot-out 180ms ease both;
+}
+
+/* 网格从中心亮起再退去。 */
+.hud-boot-grid {
+  position: absolute;
+  inset: 0;
+  background:
+    linear-gradient(color-mix(in srgb, var(--hud) 16%, transparent) 1px, transparent 1px) 0 0 / 32px 32px,
+    linear-gradient(90deg, color-mix(in srgb, var(--hud) 16%, transparent) 1px, transparent 1px) 0 0 / 32px 32px;
+  -webkit-mask-image: radial-gradient(circle at 50% 46%, #000, transparent 60%);
+  mask-image: radial-gradient(circle at 50% 46%, #000, transparent 60%);
+  animation: hud-grid 1200ms ease-out both;
+}
+
+/* 扫描线自上而下扫一遍。 */
+.hud-boot-scan {
+  position: absolute;
+  top: 0;
+  right: 0;
+  left: 0;
+  height: 2px;
+  background: linear-gradient(90deg, transparent, var(--hud), transparent);
+  box-shadow: 0 0 18px var(--hud), 0 0 4px var(--hud);
+  animation: hud-scan 900ms cubic-bezier(0.4, 0, 0.2, 1) 120ms both;
+}
+
+.hud-boot-core {
+  position: relative;
+  display: grid;
+  width: 220px;
+  height: 220px;
+  place-items: center;
+}
+
+.hud-boot-rings {
+  position: absolute;
+  inset: 0;
+  overflow: visible;
+  fill: none;
+  stroke: var(--hud);
+  filter: drop-shadow(0 0 6px color-mix(in srgb, var(--hud) 70%, transparent));
+}
+
+.hud-boot-rings circle,
+.hud-boot-rings path {
+  transform-origin: 110px 110px;
+}
+
+.hud-boot-rings .ring-outer {
+  stroke-dasharray: 3 7;
+  stroke-width: 1.2;
+  animation: hud-ring-in 700ms cubic-bezier(0.2, 0.8, 0.2, 1) both, hud-spin-ccw 6s linear infinite;
+}
+
+.hud-boot-rings .ring-mid {
+  stroke-dasharray: 120 40 60 40;
+  stroke-width: 3;
+  animation: hud-ring-in 700ms cubic-bezier(0.2, 0.8, 0.2, 1) 90ms both, hud-spin 3.2s linear infinite;
+}
+
+.hud-boot-rings .ring-inner {
+  stroke-width: 1.5;
+  opacity: 0.8;
+  animation: hud-ring-in 700ms cubic-bezier(0.2, 0.8, 0.2, 1) 180ms both;
+}
+
+.hud-boot-rings .ring-core {
+  fill: color-mix(in srgb, var(--hud) 30%, transparent);
+  stroke-width: 2;
+  animation: hud-core 900ms ease 260ms both;
+}
+
+.hud-boot-text {
+  position: relative;
+  display: grid;
+  justify-items: center;
+  color: var(--hud);
+  font-family: var(--font-mono);
+  gap: 4px;
+  text-shadow: 0 0 10px color-mix(in srgb, var(--hud) 60%, transparent);
+}
+
+.hud-boot-title {
+  overflow: hidden;
+  font-size: var(--fs-ui);
+  letter-spacing: 0.32em;
+  white-space: nowrap;
+  animation: hud-type 520ms steps(16, end) 380ms both;
+}
+
+.hud-boot-status {
+  color: var(--text-soft);
+  font-size: var(--fs-micro);
+  letter-spacing: 0.24em;
+  animation: hud-blink 500ms steps(2, end) 900ms 2 both;
+}
+
+@keyframes hud-boot-out {
+  to {
+    opacity: 0;
+  }
+}
+
+@keyframes hud-grid {
+  from {
+    opacity: 0;
+    transform: scale(1.08);
+  }
+  40% {
+    opacity: 1;
+  }
+  to {
+    opacity: 0.35;
+  }
+}
+
+@keyframes hud-scan {
+  from {
+    transform: translateY(0);
+    opacity: 1;
+  }
+  to {
+    transform: translateY(100vh);
+    opacity: 0.2;
+  }
+}
+
+@keyframes hud-ring-in {
+  from {
+    opacity: 0;
+    transform: scale(0.4) rotate(-90deg);
+  }
+}
+
+@keyframes hud-spin-ccw {
+  to {
+    transform: rotate(-360deg);
+  }
+}
+
+@keyframes hud-core {
+  from {
+    opacity: 0;
+    transform: scale(0.2);
+  }
+  60% {
+    transform: scale(1.25);
+  }
+}
+
+@keyframes hud-type {
+  from {
+    max-width: 0;
+  }
+  to {
+    max-width: 40ch;
+  }
+}
+
+@keyframes hud-blink {
+  from {
+    opacity: 0;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .hud-boot {
+    display: none;
+  }
+}

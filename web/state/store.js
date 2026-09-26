@@ -45,7 +45,12 @@ export const state = {
   sessionMenuFor: null,
   sessionRenaming: null,
   lastReorderIds: "",
-  modeChooserOpen: false,
+  // 侧栏开关选中的模式（普通/开发），决定列哪些会话、新对话建在哪。
+  sessionMode: "normal",
+  // 非空=当前是该模式的空白草稿页：还没有服务端会话，发第一条消息时才建。
+  draftMode: "",
+  // 会话面板里的搜索词(sessions/switcher.js)。
+  sessionFilter: "",
   sessionBusy: false,
   display: {
     reasoning: "summary",

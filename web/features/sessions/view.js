@@ -5,7 +5,8 @@ import { showToast } from "../../core/toast.js";
 import { showBlockedState } from "../auth.js";
 import { VIEW_SESSION_KEY, loadBootstrap } from "../boot.js";
 import { clearComposerAttachments } from "../composer/attachments.js";
-import { focusComposerIfDesktop, updateControlState } from "../composer/input.js";
+import { swapDraft } from "../composer/drafts.js";
+import { focusComposerIfDesktop, resizeComposer, updateControlState } from "../composer/input.js";
 import { closeRevisionEditor } from "../conversation/actions.js";
 import { updateConversationChrome } from "../conversation/chrome.js";
 import { reasoningHidden } from "../conversation/reasoning.js";
@@ -19,6 +20,7 @@ import { createLiveState, disposeLiveState, ensureLiveArticle, renderQueueTray, 
 import { appendAssistantDelta, handleReasoningEvent } from "../live/stream.js";
 import { refreshSessionModelOverride, setSessionModelOverride, updateCurrentModelDisplay } from "../model-menu/menu.js";
 import { isTerminalSession, renderSessionList } from "./list.js";
+import { normalizeMode, sessionMode, sessionsInMode, setActiveMode } from "./mode.js";
 import { findSession, sessionDisplayName } from "./runs.js";
 import { closeSidebar } from "../sidebar.js";
 import { handleToolEvent } from "../tools/events.js";
@@ -48,27 +50,81 @@ export function setSessionBusy(value) {
   updateControlState();
 }
 
-export async function createSession(mode) {
-  if (state.blocked || state.sessionBusy || state.adminBusy || state.submitting) return;
+/// 切到某个模式的空白草稿页：清掉当前视图，但不向服务端建会话。
+///
+/// 来回点开关、点新对话都不会留下空会话；真正的会话在发第一条消息（或加
+/// 第一个附件）时由 materializeDraftSession() 建出来。草稿页的 viewSessionId
+/// 是 null，所以发送前必须先建好会话——空 id 的 /api/turns 会落进服务端的
+/// 默认指针，可能就是隐藏的终端车道。
+export function enterDraftView(mode) {
+  const target = normalizeMode(mode);
+  viewState.viewLoadGeneration += 1;
+  state.viewLoading = false;
+  state.switchingToSessionId = "";
+  elements.conversationStage?.classList.remove("is-switching");
+  if (state.composerAttachments.length) clearComposerAttachments(true);
+  retireLiveRunsForSwitch();
+  clearViewSyncTimer();
+  setActiveMode(target);
+  state.draftMode = target;
+  state.viewSessionId = null;
+  if (swapDraft()) resizeComposer();
+  state.sessionModelOverride = null;
+  state.sessionModelOverrideFor = "";
+  updateCurrentModelDisplay();
+  state.turns = [];
+  state.queuedPrompts = [];
+  state.redoCandidate = null;
+  state.viewRunningTurnId = null;
+  state.pendingSubmission = null;
+  closeRevisionEditor();
+  renderConversation({ forceScroll: true });
+  renderQueueTray();
+  renderJobsStrip();
+  renderSessionList();
+  updateConversationChrome();
+  updateControlState();
+}
+
+/// 草稿页落地成真会话。返回新会话 id，失败返回空串（已提示用户）。
+export async function materializeDraftSession() {
+  const mode = state.draftMode;
+  if (!mode) return state.viewSessionId || "";
   setSessionBusy(true);
   try {
     const response = await apiRequest("/api/sessions", {
       method: "POST",
       body: JSON.stringify(mode === "dev" ? { mode: "dev" } : {})
     });
-    const payload = await response.json();
-    const record = payload?.session && typeof payload.session === "object" ? payload.session : null;
+    const record = (await response.json())?.session;
     const sessionId = String(record?.session_id || "");
-    if (sessionId && !findSession(sessionId)) {
-      state.sessions.unshift(record);
-      renderSessionList();
-    }
-    if (sessionId) await loadSessionView(sessionId);
-    focusComposerIfDesktop();
+    if (!sessionId) throw new Error("新建会话失败");
+    // 等待期间用户可能已经切走了（换模式、点了别的会话），那就不再占用视图。
+    if (state.draftMode !== mode || state.viewSessionId) return "";
+    if (!findSession(sessionId)) state.sessions.unshift(record);
+    // 输入框里正是要发出去的那句话,随会话一起落地,不换草稿。
+    applySessionView({ session_id: sessionId, turns: [], runs: [] }, { carryDraft: true });
+    renderSessionList();
+    return sessionId;
   } catch (error) {
     showToast(error.message || "新建会话失败", "error");
+    return "";
   } finally {
     setSessionBusy(false);
+  }
+}
+
+/// 切换侧栏模式：打开该模式最近的会话；一个都没有就进草稿页。
+export async function switchSessionMode(mode) {
+  const target = normalizeMode(mode);
+  if (target === state.sessionMode && (state.draftMode === target || state.viewSessionId)) return;
+  const first = sessionsInMode(target)[0];
+  if (first) {
+    setActiveMode(target);
+    renderSessionList();
+    await loadSessionView(String(first.session_id), { userInitiated: true });
+  } else {
+    enterDraftView(target);
   }
 }
 
@@ -144,7 +200,7 @@ export function retireLiveRunsForSwitch() {
   elements.liveStopRail.hidden = true;
 }
 
-export function applySessionView(payload) {
+export function applySessionView(payload, { carryDraft = false } = {}) {
   const sessionId = String(payload?.session_id || "");
   if (!sessionId) return;
   if (state.viewSessionId && state.viewSessionId !== sessionId && state.composerAttachments.length) {
@@ -153,6 +209,14 @@ export function applySessionView(payload) {
   retireLiveRunsForSwitch();
   clearViewSyncTimer();
   state.viewSessionId = sessionId;
+  state.draftMode = "";
+  if (swapDraft({ carry: carryDraft })) resizeComposer();
+  // 打开哪个会话，侧栏就站到它那个模式里（终端车道不属于任何一边）。
+  const entry = findSession(sessionId);
+  if (entry && !isTerminalSession(sessionId) && sessionMode(entry) !== state.sessionMode) {
+    setActiveMode(sessionMode(entry));
+    renderSessionList();
+  }
   // 记住浏览位置，刷新后回到这里而不是跳去终端车道（见 preferredBootSession）。
   if (!isTerminalSession(sessionId)) safeStorageSet(VIEW_SESSION_KEY, sessionId);
   if (state.sessionModelOverrideFor !== sessionId) {
@@ -386,16 +450,21 @@ export async function openFallbackSessionView(excludedSessionId) {
 export async function openFallbackSessionViewInner(excluded) {
   // 终端集成会话不能当兜底：它在侧栏里是隐藏的，掉进去看着就像「我的对话
   // 全没了」。一个可见会话都不剩时走 loadBootstrap()，让空状态兜底。
-  const fallback = state.currentSessionId
-    && state.currentSessionId !== excluded
-    && !isTerminalSession(state.currentSessionId)
-    ? state.currentSessionId
-    : String(state.sessions.find((session) => {
-        const id = String(session?.session_id || "");
-        return id !== excluded && !isTerminalSession(id);
-      })?.session_id || "");
+  // 兜底只在当前模式里找：删掉最后一个开发会话不该把人甩回普通模式。
+  const mode = state.sessionMode;
+  const sameMode = sessionsInMode(mode).filter((session) => String(session?.session_id || "") !== excluded);
+  const current = sameMode.find((session) => String(session?.session_id) === String(state.currentSessionId || ""));
+  const fallback = String((current || sameMode[0])?.session_id || "");
   if (fallback) {
     await loadSessionView(fallback);
+    return;
+  }
+  // 这个模式空了，而别的模式还有会话：进草稿页，不替用户建空会话。
+  if (state.sessions.some((session) => {
+    const id = String(session?.session_id || "");
+    return id !== excluded && !isTerminalSession(id);
+  })) {
+    enterDraftView(mode);
     return;
   }
   // 本地列表空了先跟服务端对一次：删最后一个会话时顶替的新会话由服务端建
@@ -413,7 +482,7 @@ export async function openFallbackSessionViewInner(excluded) {
   }
   // 一个可见会话都不剩：直接新建一个顶上。落进空状态的话，用户面对的是一个
   // 不在侧栏里的「幽灵视图」，在里面打字实际写进隐藏的终端集成车道。
-  // 不走 createSession()——删除流程还举着 sessionBusy，它会直接返回。
+  // 不走 materializeDraftSession()——它会动 sessionBusy，而删除流程还举着它。
   try {
     const response = await apiRequest("/api/sessions", {
       method: "POST",

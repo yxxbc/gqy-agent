@@ -222,91 +222,146 @@
   animation: spin 850ms linear infinite;
 }
 
+/*
+ * 普通模式的空白页:她的立绘像晕开的墨一样淡进页面,旁边是竖排的问候。
+ * 看板图是水墨风(白衣、雾、亭台),硬边矩形框住会像贴了张照片;用遮罩把
+ * 四周羽化掉,人在雾里。竖排用 vertical-rl:右起第一列是她的名字,接着是
+ * 大字问候,最左一列是小字——一封信的读法。这是整个界面唯一张扬的地方。
+ */
 .empty-state {
   display: grid;
-  padding: 30px 24px 48px;
+  grid-template-areas:
+    "visual copy"
+    "prompts prompts";
+  grid-template-columns: auto auto;
+  justify-content: center;
+  align-items: center;
+  column-gap: 8px;
+  padding: 24px 24px 48px;
 }
 
 .empty-visual {
-  width: min(330px, 69.0909vw);
-  height: 178px;
+  grid-area: visual;
+  width: 280px;
+  height: 340px;
   overflow: hidden;
-  margin-bottom: 20px;
-  border-radius: var(--radius);
+  -webkit-mask-image: radial-gradient(ellipse 48% 47% at 50% 50%, #000 24%, rgba(0, 0, 0, 0.5) 62%, transparent 100%);
+  mask-image: radial-gradient(ellipse 48% 47% at 50% 50%, #000 24%, rgba(0, 0, 0, 0.5) 62%, transparent 100%);
 }
 
 .empty-visual img {
   width: 100%;
   height: 100%;
   object-fit: cover;
-  object-position: 55% 42%;
-  filter: saturate(0.82) contrast(0.96);
+  object-position: 57% 22%;
+  filter: saturate(0.8) contrast(0.98);
 }
 
+/* 暗色底上整张白图会亮成一块灯箱。压亮度再调透明,只留一道影子——
+   「清影」本来就是这个意思。 */
+body:not([data-theme="linen"]) .empty-visual img {
+  filter: saturate(0.7) brightness(0.8) contrast(1.05);
+  opacity: 0.62;
+}
+
+/* 竖排里 flex 的 column 方向是横向从右往左:名字、问候、小字各占一列。 */
 .empty-copy {
-  display: grid;
-  justify-items: center;
-  gap: 7px;
+  display: flex;
+  flex-direction: column;
+  grid-area: copy;
+  max-height: 340px;
+  align-items: flex-start;
+  gap: 16px;
+  writing-mode: vertical-rl;
+}
+
+.empty-copy-dev {
+  display: none;
 }
 
 .empty-kicker {
-  display: inline-flex;
+  display: flex;
   align-items: center;
-  color: var(--text-soft);
-  font-size: var(--fs-micro);
-  gap: 7px;
+  color: var(--gold);
+  font-family: var(--serif);
+  font-size: var(--fs-ui);
+  gap: 8px;
+  letter-spacing: 0.3em;
 }
 
 .empty-copy h1 {
   margin: 0;
-  font-size: 22px;
+  color: var(--text);
+  font-family: var(--serif);
+  font-size: 30px;
   font-weight: 600;
+  letter-spacing: 0.22em;
+  line-height: 1.2;
 }
 
 .empty-copy p {
   margin: 0;
   color: var(--text-soft);
-  font-size: var(--fs-meta);
+  font-family: var(--serif);
+  font-size: var(--fs-ui);
+  letter-spacing: 0.18em;
+  line-height: 1.9;
+}
+
+/* 没配看板图:只剩竖排那几列,居中站着。 */
+.empty-visual[hidden] + .empty-copy {
+  grid-column: 1 / -1;
+  justify-self: center;
 }
 
 .prompt-grid {
   display: grid;
+  grid-area: prompts;
   grid-template-columns: repeat(2, minmax(0, 1fr));
-  width: min(100%, 580px);
-  margin-top: 23px;
+  width: min(100%, 520px);
+  margin: 28px auto 0;
   gap: 8px;
 }
 
+/* 起手语是轻轻递过去的一句话,不是功能卡:无底色,只有一圈细线。 */
 .prompt-grid button {
   display: grid;
-  grid-template-columns: 24px minmax(0, 1fr);
-  min-height: 45px;
+  grid-template-columns: 20px minmax(0, 1fr);
+  min-height: 42px;
   align-items: center;
-  padding: 7px 12px;
-  border: 0;
-  border-radius: var(--radius);
-  background: var(--surface-1);
-  box-shadow: var(--bubble-shadow);
+  padding: 8px 14px;
+  border: 1px solid color-mix(in srgb, var(--line) 80%, transparent);
+  border-radius: var(--radius-bubble);
+  background: transparent;
   color: var(--text-soft);
   cursor: pointer;
   gap: 8px;
   text-align: left;
-  transition: transform var(--motion) ease, box-shadow var(--motion) ease;
+  transition: background var(--motion) ease, border-color var(--motion) ease, color var(--motion) ease;
 }
 
 .prompt-grid button:hover:not(:disabled) {
-  box-shadow: var(--card-shadow);
+  border-color: color-mix(in srgb, var(--accent) 45%, transparent);
+  background: color-mix(in srgb, var(--accent-soft) 35%, transparent);
   color: var(--text);
-  transform: translateY(-1px);
+}
+
+.prompt-grid button:focus-visible {
+  outline: 2px solid color-mix(in srgb, var(--accent) 60%, transparent);
+  outline-offset: 2px;
 }
 
 .prompt-grid button:disabled {
   opacity: 0.48;
 }
 
+.prompt-grid .prompt-dev {
+  display: none;
+}
+
 .prompt-grid .icon-slot {
-  width: 16px;
-  height: 16px;
+  width: 15px;
+  height: 15px;
   color: var(--accent);
 }
 
@@ -342,3 +397,35 @@
   height: 14px;
 }
 
+
+/*
+ * 模式切换的粒子幕(widgets/particle-veil.js):盖在正文区上,不接事件。
+ * 先铺一层页面底色,壁纸在上面由粒子拼出来。
+ */
+.particle-veil {
+  position: absolute;
+  /* 压在正文、输入坞之上,但让开菜单与弹层:动画期间打开的菜单不能被盖住。 */
+  z-index: calc(var(--z-popover) - 1);
+  inset: 0;
+  overflow: hidden;
+  background: var(--app-bg);
+  pointer-events: none;
+  animation: particle-veil-in 280ms ease both;
+  transition: opacity 700ms ease;
+}
+
+.particle-veil.is-leaving {
+  opacity: 0;
+}
+
+.particle-veil canvas {
+  display: block;
+  width: 100%;
+  height: 100%;
+}
+
+@keyframes particle-veil-in {
+  from {
+    opacity: 0;
+  }
+}

@@ -1,0 +1,249 @@
+/*
+ * 开发模式的 tmux 状态栏(features/sessions/statusbar.js)与侧栏抽屉。
+ *
+ * 状态栏钉在视口最底下一条:左边 [DEV] 模式块和 ☰ 菜单,中间是会话窗口
+ * `0:名字*`,右边是指令面板入口、模型、上下文和时钟。这是开发模式唯一
+ * 张扬的地方,其余都是平的。开发模式不再常驻侧栏,☰ 把它拉成左侧抽屉。
+ */
+body.has-statusbar {
+  --statusbar-height: 28px;
+}
+
+body.has-statusbar .app-shell {
+  padding-bottom: var(--statusbar-height);
+}
+
+.dev-statusbar {
+  position: fixed;
+  z-index: calc(var(--z-overlay) - 1);
+  right: 0;
+  bottom: 0;
+  left: 0;
+  display: flex;
+  height: calc(var(--statusbar-height, 28px) + env(safe-area-inset-bottom));
+  align-items: stretch;
+  padding-bottom: env(safe-area-inset-bottom);
+  border-top: 1px solid var(--term-line);
+  background: var(--term-panel);
+  color: var(--term-dim);
+  font-family: var(--font-mono);
+  font-size: var(--fs-micro);
+  line-height: var(--statusbar-height, 28px);
+  user-select: none;
+}
+
+.dev-statusbar[hidden] {
+  display: none;
+}
+
+/* :where 把底子的特异性压到一个类,后面各格的规则按顺序就能盖过它。 */
+.dev-statusbar :where(button) {
+  border: 0;
+  background: transparent;
+  color: inherit;
+  cursor: pointer;
+  font: inherit;
+}
+
+.dev-statusbar :where(button):focus-visible {
+  outline: 2px solid var(--hud);
+  outline-offset: -2px;
+}
+
+/* [DEV]:实心的模式块,点它回普通模式。 */
+.tsb-mode {
+  flex: none;
+  padding: 0 12px;
+  background: var(--hud);
+  color: var(--hud-ink);
+  font-weight: 700;
+  letter-spacing: 0.14em;
+}
+
+.tsb-mode:hover {
+  filter: brightness(1.08);
+}
+
+.tsb-menu {
+  flex: none;
+  width: 34px;
+  border-right: 1px solid var(--term-line);
+}
+
+.tsb-menu:hover {
+  background: var(--term-echo);
+  color: var(--term-fg);
+}
+
+/* 会话窗口:当前那个整格亮起,在跑的挂转圈,跑完没看的挂 ! */
+.tsb-windows {
+  display: flex;
+  flex: 1;
+  min-width: 0;
+  overflow-x: auto;
+  scrollbar-width: none;
+}
+
+.tsb-windows::-webkit-scrollbar {
+  display: none;
+}
+
+.tsb-window {
+  display: inline-flex;
+  flex: none;
+  max-width: 220px;
+  align-items: center;
+  padding: 0 10px;
+  gap: 1px;
+}
+
+.tsb-window:hover {
+  background: var(--term-echo);
+  color: var(--term-fg);
+}
+
+.tsb-index {
+  color: var(--term-dim);
+}
+
+.tsb-name {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.tsb-flag {
+  min-width: 1ch;
+  margin-left: 2px;
+}
+
+.tsb-window.is-active {
+  background: var(--term-echo);
+  box-shadow: inset 0 -2px 0 var(--hud);
+  color: var(--term-fg);
+}
+
+.tsb-window.is-active .tsb-flag {
+  color: var(--hud);
+}
+
+.tsb-window.is-running .tsb-flag {
+  color: var(--term-ok);
+}
+
+.tsb-window.is-unread .tsb-flag {
+  color: var(--term-warn);
+  font-weight: 700;
+}
+
+.tsb-window.is-draft {
+  font-style: italic;
+}
+
+.tsb-new {
+  flex: none;
+  padding: 0 10px;
+  color: var(--term-dim);
+}
+
+.tsb-new:hover {
+  color: var(--hud);
+}
+
+/* 右侧:一格一格,用竖线隔开,像 tmux 的 status-right。 */
+.tsb-right {
+  display: flex;
+  flex: none;
+  min-width: 0;
+}
+
+.tsb-seg {
+  display: inline-block;
+  max-width: 220px;
+  overflow: hidden;
+  padding: 0 10px;
+  border-left: 1px solid var(--term-line);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.tsb-palette:hover {
+  background: var(--term-echo);
+  color: var(--hud);
+}
+
+.tsb-model {
+  color: var(--term-fg);
+}
+
+.tsb-clock {
+  color: var(--term-fg);
+  font-variant-numeric: tabular-nums;
+}
+
+/* 模型和上下文已经在状态栏上了,输入框下那一行只留模型切换按钮;
+   窄屏上状态栏右侧收掉模型与上下文,只留时钟。 */
+@media (max-width: 836px) {
+  .tsb-model,
+  .tsb-context {
+    display: none;
+  }
+
+  .tsb-window {
+    max-width: 140px;
+  }
+}
+
+/* ───────── 开发模式的侧栏:宽屏上也是抽屉 ───────── */
+@media (min-width: 837px) {
+  /* 抽屉不占宽:sidebar.js 的自动收起按这个宽度算,别让它误判空间不够。 */
+  body[data-mode="dev"] {
+    --sidebar-width: 0px;
+  }
+
+  body[data-mode="dev"] .app-shell {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  body[data-mode="dev"] .sidebar {
+    position: fixed;
+    z-index: var(--z-overlay);
+    top: 0;
+    bottom: var(--statusbar-height, 0px);
+    left: 0;
+    width: 280px;
+    box-shadow: var(--float-shadow);
+    transform: translateX(-102%);
+    transition: transform var(--motion-slow) ease;
+  }
+
+  body[data-mode="dev"] .sidebar.open {
+    transform: translateX(0);
+  }
+
+  /* 抽屉里没有她的房间:品牌行、徽章、会话入口排在上面,页脚沉底。 */
+  body[data-mode="dev"] .sidebar {
+    display: flex;
+    flex-direction: column;
+  }
+
+  body[data-mode="dev"] .sidebar-footer {
+    margin-top: auto;
+  }
+
+  body[data-mode="dev"] .sidebar-collapse-button,
+  body[data-mode="dev"] .sidebar-expand-button {
+    display: none;
+  }
+
+  body[data-mode="dev"] .sidebar-close {
+    display: inline-grid;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  body[data-mode="dev"] .sidebar {
+    transition: none;
+  }
+}

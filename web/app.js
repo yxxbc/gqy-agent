@@ -28,7 +28,10 @@ import { closeLevelMenu, closeModelMenu, openModelMenu, positionModelMenu, rende
 import { bindOobeEvents, openOobe } from "./features/oobe.js";
 import { requestNewConversation, resetConversation } from "./features/session-mode.js";
 import { closeSessionMenu, startBrailleTicker } from "./features/sessions/list.js";
-import { loadSessionView } from "./features/sessions/view.js";
+import { loadSessionView, openSessionView, switchSessionMode } from "./features/sessions/view.js";
+import { bindSessionSwitcher, closeSessionSwitcher, openSessionSwitcher } from "./features/sessions/switcher.js";
+import { bindStatusBar } from "./features/sessions/statusbar.js";
+import { startHerRoomClock } from "./features/her-room.js";
 import { applyAdvancedConfig, clearProviderSecretChanges, configValue, loadConfigDraft, markConfigDirty, refreshProviderSecretStates, saveConfigDraft, setConfigValue, setSettingsView, updateAdvancedConfigEditor, updateSettingsControls } from "./features/settings/config.js";
 import { closeSidebar, openSidebar, setSidebarCollapsed } from "./features/sidebar.js";
 import { elements } from "./state/elements.js";
@@ -335,6 +338,29 @@ function bindEvents() {
   elements.personaCreate.addEventListener("click", () => openOobe({ reason: "create" }));
   bindOobeEvents();
   elements.newChatButton.addEventListener("click", requestNewConversation);
+  bindSessionSwitcher();
+  startHerRoomClock();
+  elements.sessionSwitcherNew?.addEventListener("click", () => {
+    closeSessionSwitcher({ restoreFocus: false });
+    requestNewConversation();
+  });
+  bindStatusBar({
+    onOpen: (id) => openSessionView(id),
+    onNew: requestNewConversation,
+    onPalette: openSessionSwitcher,
+    onNormal: () => switchSessionMode("normal"),
+    onMenu: (opener) => openSidebar(opener)
+  });
+  elements.modeSwitch?.addEventListener("click", (event) => {
+    const option = event.target.closest?.("[data-mode]");
+    if (option && !state.sessionBusy) switchSessionMode(option.dataset.mode);
+  });
+  elements.modeSwitch?.addEventListener("keydown", (event) => {
+    if (!["ArrowLeft", "ArrowRight"].includes(event.key)) return;
+    event.preventDefault();
+    const next = event.key === "ArrowRight" ? "dev" : "normal";
+    switchSessionMode(next).then(() => elements.modeSwitch.querySelector(`[data-mode="${next}"]`)?.focus());
+  });
   elements.retryBootstrapButton.addEventListener("click", loadBootstrap);
   elements.resetConfirmButton.addEventListener("click", resetConversation);
   elements.chatScroll.addEventListener("scroll", () => {

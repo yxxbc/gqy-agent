@@ -13,6 +13,8 @@
   --fs-meta: 12px;
   --fs-micro: 11px;
   --fs-artifact-chat: 16.3636px;
+  /* 空白页标题:开发模式横排、手机上的竖排问候都用它;桌面竖排问候另写 30px。 */
+  --fs-title: 24px;
 
   /*
    * 圆角。原来散着 22 种取值（4/5/6/7/9/10/11/12/14/16px…），同一类控件在
@@ -28,6 +30,9 @@
    */
   --radius: 10px;
   --radius-lg: 18px;
+  /* 普通模式里「说话」的形状:用户气泡、起手语。比控件圆一档,读起来是
+     对话而不是表单;开发模式覆盖回 --radius(90-mode-dev.css)。 */
+  --radius-bubble: 16px;
   --radius-sm: 3px;
   --radius-pill: 999px;
 
@@ -134,6 +139,33 @@ body[data-theme="linen"] {
      终端那侧(src/render/style.rs 的 LINK_LABEL_STYLE)也是固定蓝,两端一致。 */
   --link: #8fb6ec;
 
+  /* 窗边光:普通模式正文区左上角那一束斜光,暮色里是雾蓝,晨光里是暖金。
+     整个界面唯一的氛围装饰,开发模式关掉。 */
+  --window-light: color-mix(in srgb, var(--md-sys-color-primary) 9%, transparent);
+
+  /*
+   * 开发模式 = 终端的高级形态,配色直接取 REPL 那一侧(src/render/style.rs):
+   * 主色是 TUI 的 PRIMARY 薰衣草,输入回显底是 ECHO_BG,成败警示是 INSERT/
+   * DELETE/NUMBER 那几支。和链接色一样不跟壁纸走——两端认得出是同一个东西。
+   */
+  --hud: #c9c9ff;
+  --hud-ink: #1a1a33;
+  --term-bg: #16171d;
+  --term-panel: #1d1e25;
+  --term-echo: #262831;
+  --term-line: #2e3039;
+  --term-fg: #dcdce6;
+  --term-dim: #8b8d9a;
+  --term-ok: #afffaf;
+  --term-warn: #f6c177;
+  --term-err: #ff8787;
+
+  /* 普通模式的「月下花笺」:月白的晕、白梅的枝与花、飘落的花瓣。 */
+  --moonlight: #dfe6fb;
+  --plum-branch: #8a787d;
+  --plum-flower: #f4ebef;
+  --petal: rgba(255, 196, 214, 0.62);
+
   /* 三档软阴影(阴影 rgba 常量按主题,允许保留) */
   /* 细描边为主、阴影为辅：暗底上阴影几乎看不见，层级靠一圈 1px 的亮边分开。 */
   --bubble-shadow: 0 0 0 1px rgba(255, 255, 255, 0.05);
@@ -237,6 +269,22 @@ body[data-theme="linen"] {
   --hl: color-mix(in srgb, var(--md-sys-color-primary) 78%, var(--md-sys-color-on-surface));
   /* 亮色那支要压得住奶油纸:实测 4.65:1(近白的 matugen 亮色板上 4.87:1)。 */
   --link: #3a6ea8;
+  --window-light: color-mix(in srgb, var(--md-sys-color-secondary) 11%, transparent);
+  --hud: #3a3a6a;
+  --hud-ink: #ffffff;
+  --term-bg: #f6f5f1;
+  --term-panel: #ecebe5;
+  --term-echo: #e7e8ee;
+  --term-line: #d9d7cf;
+  --term-fg: #25222b;
+  --term-dim: #6b6571;
+  --term-ok: #1d6b2f;
+  --term-warn: #9a5b00;
+  --term-err: #a31d2b;
+  --moonlight: #ffe9bf;
+  --plum-branch: #6a5750;
+  --plum-flower: #f6dce2;
+  --petal: rgba(208, 120, 142, 0.42);
   --bubble-shadow: 0 0 0 1px rgba(40, 32, 18, 0.06);
   --card-shadow: 0 0 0 1px rgba(40, 32, 18, 0.07), 0 1px 2px rgba(40, 32, 18, 0.04);
   --float-shadow: 0 0 0 1px rgba(40, 32, 18, 0.08), 0 14px 40px rgba(40, 32, 18, 0.14), 0 3px 10px rgba(40, 32, 18, 0.06);

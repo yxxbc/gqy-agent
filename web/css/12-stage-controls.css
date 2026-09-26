@@ -14,92 +14,14 @@
   display: none;
 }
 
-/* 模式图标在这里出现一次,不在每一行会话前面重复。 */
-.session-group-header {
-  display: flex;
-  align-items: center;
-  margin: 12px 4px 3px;
-  padding-left: 7px;
+.session-mode-empty {
+  margin: 18px 12px;
   color: var(--text-faint);
-  font-size: var(--fs-micro);
-  font-weight: 600;
-  gap: 6px;
-  letter-spacing: 0.04em;
-  user-select: none;
-}
-
-.session-group-header .icon-slot {
-  width: 12px;
-  height: 12px;
-  flex: 0 0 12px;
-}
-
-.mode-chooser-overlay {
-  position: fixed;
-  inset: 0;
-  z-index: var(--z-overlay);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  background: color-mix(in srgb, var(--md-sys-color-scrim, #000) 32%, transparent);
-}
-
-.mode-chooser {
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
-  width: min(340px, calc(100vw - 48px));
-  padding: 16px;
-  border-radius: var(--radius);
-  background: var(--surface-1, var(--surface-2));
-  box-shadow: 0 12px 40px color-mix(in srgb, #000 26%, transparent);
-}
-
-.mode-chooser > strong {
-  font-size: 14px;
-}
-
-.mode-chooser > small {
-  color: var(--text-soft);
   font-size: var(--fs-meta);
+  line-height: 1.6;
+  text-align: center;
 }
 
-.mode-chooser-option {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  padding: 10px 12px;
-  border-radius: var(--radius);
-  background: var(--surface-2);
-  color: var(--text);
-  cursor: pointer;
-  text-align: left;
-}
-
-.mode-chooser-option:hover {
-  background: var(--surface-3);
-}
-
-.mode-chooser-option[data-mode="dev"]:hover {
-  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--md-sys-color-tertiary) 40%, transparent);
-}
-
-.mode-chooser-option .icon-slot {
-  width: 18px;
-  height: 18px;
-  flex: 0 0 18px;
-}
-
-.mode-chooser-copy {
-  display: flex;
-  flex-direction: column;
-  gap: 2px;
-}
-
-.mode-chooser-copy small {
-  color: var(--text-soft);
-  font-size: var(--fs-micro);
-}
 
 .model-menu-wrap {
   position: relative;

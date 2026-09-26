@@ -189,18 +189,24 @@
     max-width: 86%;
   }
 
+  /* 手机上头像最多 30px:再大就吃掉正文宽度。 */
+  .assistant-message,
+  .turn-status-line {
+    padding-left: calc(min(var(--chat-avatar-size, 30px), 30px) + 8px);
+  }
+
   .assistant-message {
     max-width: 100%;
-    padding-left: 38px;
   }
 
-  .turn-status-line {
-    padding-left: 38px;
+  body.has-user-avatar .user-message {
+    padding-right: calc(min(var(--chat-avatar-size, 30px), 30px) + 8px);
   }
 
-  .assistant-label img {
-    width: 28px;
-    height: 28px;
+  .assistant-label .avatar-frame,
+  .user-message > .avatar-frame {
+    width: min(var(--chat-avatar-size, 30px), 30px);
+    height: min(var(--chat-avatar-size, 30px), 30px);
   }
 
   .tool-title .tool-summary {
@@ -265,20 +271,25 @@
   }
 
   .empty-state {
-    padding: 22px 13px 34px;
+    padding: 16px 13px 34px;
   }
 
   .empty-visual {
-    height: 145px;
-    margin-bottom: 15px;
+    width: 180px;
+    height: 240px;
+  }
+
+  .empty-copy {
+    max-height: 240px;
+    gap: 12px;
   }
 
   .empty-copy h1 {
-    font-size: 20px;
+    font-size: var(--fs-title);
   }
 
   .prompt-grid {
-    margin-top: 17px;
+    margin-top: 18px;
   }
 
   .settings-layout {

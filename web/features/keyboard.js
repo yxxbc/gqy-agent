@@ -4,6 +4,8 @@ import { consoleIsOpen } from "./console/panel.js";
 import { closeModelMenu } from "./model-menu/menu.js";
 import { requestNewConversation } from "./session-mode.js";
 import { closeSessionMenu } from "./sessions/list.js";
+import { multiSessionEnabled } from "./sessions/runs.js";
+import { toggleSessionSwitcher } from "./sessions/switcher.js";
 import { closeSettings, settingsIsOpen } from "./settings/panel.js";
 import { closeSidebar } from "./sidebar.js";
 import { elements } from "../state/elements.js";
@@ -78,8 +80,11 @@ export function handleGlobalKeydown(event) {
       state.sidebarOpener?.focus?.();
     }
   }
+  // Ctrl/Cmd+K:会话面板(普通模式是信匣,开发模式是指令面板);面板里第一个
+  // 按钮就是新对话。单会话部署没有面板,仍是新对话。
   if ((event.ctrlKey || event.metaKey) && event.key.toLowerCase() === "k" && !event.shiftKey && !event.altKey) {
     event.preventDefault();
-    requestNewConversation();
+    if (multiSessionEnabled()) toggleSessionSwitcher();
+    else requestNewConversation();
   }
 }

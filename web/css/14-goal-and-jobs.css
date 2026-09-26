@@ -60,23 +60,28 @@
   padding: 24px 30px 42px;
 }
 
+/* 日期线:两道细线夹一行宋体小字,像信纸上的落款日期。 */
 .day-divider {
   display: flex;
   align-items: center;
-  justify-content: center;
-  margin: 0 0 22px;
-  color: var(--text-soft);
+  margin: 0 0 24px;
+  color: var(--text-faint);
+  font-family: var(--serif);
   font-size: var(--fs-micro);
+  gap: 14px;
+  letter-spacing: 0.12em;
+}
+
+.day-divider::before,
+.day-divider::after {
+  flex: 1;
+  height: 1px;
+  background: linear-gradient(90deg, transparent, color-mix(in srgb, var(--line) 90%, transparent) 40%, transparent);
+  content: "";
 }
 
 .day-divider:not(:first-child) {
-  margin-top: 28px;
-}
-
-.day-divider > span {
-  border-radius: var(--radius);
-  background: var(--surface-2);
-  padding: 3px 12px;
+  margin-top: 32px;
 }
 
 .system-event {
@@ -525,7 +530,7 @@
 .user-bubble {
   max-width: min(62%, 640px);
   padding: 10px 16px;
-  border-radius: var(--radius) var(--radius) var(--radius-sm) var(--radius);
+  border-radius: var(--radius-bubble) var(--radius-bubble) var(--radius-sm) var(--radius-bubble);
   background: var(--user-bg);
   color: var(--user-text);
   font-size: var(--fs-chat);

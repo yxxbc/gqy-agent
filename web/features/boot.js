@@ -12,10 +12,12 @@ import { renderQueueTray } from "./live/state.js";
 import { renderModelMenu, updateCurrentModelDisplay } from "./model-menu/menu.js";
 import { loadThinkingVariants } from "./model-menu/variants.js";
 import { oobeState, openOobe } from "./oobe.js";
-import { applyPersona } from "./persona.js";
+import { applyAvatarDisplay, applyPersona, setUserAvatarUrl } from "./persona.js";
+import { refreshToday } from "./today.js";
 import { isTerminalSession } from "./sessions/list.js";
-import { findSession, trackRun } from "./sessions/runs.js";
-import { applySessionView, disposeAllLiveRuns, loadSessionView } from "./sessions/view.js";
+import { findSession, multiSessionEnabled, trackRun } from "./sessions/runs.js";
+import { setActiveMode, sessionsInMode, storedSessionMode } from "./sessions/mode.js";
+import { applySessionView, disposeAllLiveRuns, enterDraftView, loadSessionView } from "./sessions/view.js";
 import { setConnectionStatus, updateCapabilities, updateContext, updateRuntimeUsage } from "./status.js";
 import { elements } from "../state/elements.js";
 import { state } from "../state/store.js";
@@ -35,17 +37,15 @@ export const VIEW_SESSION_KEY = "gqy.web.viewSession";
 /// 与 CLI 用它），而终端集成会话在 WebUI 的侧栏里是隐藏的——刷新一下就掉进
 /// 一个列表里根本看不到的会话，看着像「我的对话没了」。
 ///
-/// 顺序：上次浏览的 → 当前指针（如果它在列表里可见）→ 列表第一个。
-export function preferredBootSession() {
+/// 只在上次所在的模式里挑（侧栏开关，见 sessions/mode.js）：上次浏览的 →
+/// 当前指针 → 该模式列表第一个。都没有返回空串，由调用方进草稿页。
+export function preferredBootSession(mode) {
+  const candidates = sessionsInMode(mode);
+  const has = (id) => Boolean(id) && candidates.some((session) => String(session?.session_id) === String(id));
   const remembered = safeStorageGet(VIEW_SESSION_KEY);
-  if (remembered && findSession(remembered) && !isTerminalSession(remembered)) return remembered;
-  if (state.currentSessionId
-    && findSession(state.currentSessionId)
-    && !isTerminalSession(state.currentSessionId)) {
-    return state.currentSessionId;
-  }
-  const visible = state.sessions.find((session) => !isTerminalSession(session?.session_id));
-  return visible ? String(visible.session_id) : "";
+  if (has(remembered)) return remembered;
+  if (has(state.currentSessionId)) return state.currentSessionId;
+  return candidates.length ? String(candidates[0].session_id) : "";
 }
 
 export function applyBootstrap(snapshot) {
@@ -67,6 +67,8 @@ export function applyBootstrap(snapshot) {
   state.usage = snapshot?.usage && typeof snapshot.usage === "object" ? snapshot.usage : {};
     state.capabilities = snapshot?.capabilities && typeof snapshot.capabilities === "object" ? snapshot.capabilities : {};
   state.account = snapshot?.account && typeof snapshot.account === "object" ? snapshot.account : null;
+  applyAvatarDisplay();
+  setUserAvatarUrl(state.account?.avatar_url);
   applyRoleVisibility();
   if (state.account?.oobe_pending && !oobeState.open) window.setTimeout(() => openOobe({ reason: "first" }), 350);
   state.sessions = Array.isArray(snapshot?.sessions) ? snapshot.sessions : [];
@@ -93,10 +95,17 @@ export function applyBootstrap(snapshot) {
   updateContext();
   state.replayRunIds = null;
   state.replayCutoff = 0;
-  const boot = preferredBootSession();
+  const mode = state.draftMode || (state.viewSessionId ? state.sessionMode : storedSessionMode());
+  setActiveMode(mode);
+  const boot = preferredBootSession(mode);
   if (boot && boot !== state.viewSessionId) state.viewSessionId = boot;
   const keepView = state.viewSessionId && state.viewSessionId !== state.currentSessionId && findSession(state.viewSessionId);
-  if (keepView) {
+  if (multiSessionEnabled() && !boot) {
+    // 这个模式还没有会话：停在草稿页，不去画别的模式或终端车道的内容。
+    enterDraftView(mode);
+    state.lastEventId = state.latestEventId;
+    connectEventSource(state.latestEventId);
+  } else if (keepView) {
     // 视图停留在非默认会话：全局重载不改变浏览位置，改用会话接口回填。
     state.lastEventId = state.latestEventId;
     connectEventSource(state.latestEventId);
@@ -167,6 +176,7 @@ export async function loadBootstrap() {
       if (!state.blocked) {
         window.GqyCommands?.load(apiRequest);
         refreshVoiceButton();
+        refreshToday();
       }
     } catch (error) {
       showBlockedState(error.status === 401, error.message);

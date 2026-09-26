@@ -74,9 +74,46 @@
         </button>
       </header>
 
-      <nav class="session-list" id="sessionList" aria-label="会话">
-        <div class="session-items" id="sessionItems"></div>
-      </nav>
+      <!-- 两枚徽章切换两间屋子:左是她(普通),右是能量环(开发)。当前那枚亮着。 -->
+      <div class="mode-badges" id="modeSwitch" role="radiogroup" aria-label="会话模式" hidden>
+        <button class="mode-badge is-her is-active" type="button" role="radio" aria-checked="true" data-mode="normal" title="普通模式:和她聊天">
+          <span class="mode-badge-face avatar-frame is-her"><img src="/assets/gqy-logo.png" alt="" id="modeBadgeAvatar"></span>
+          <span class="mode-badge-label">她</span>
+        </button>
+        <button class="mode-badge is-dev" type="button" role="radio" aria-checked="false" tabindex="-1" data-mode="dev" title="开发模式:编码工作台">
+          <span class="mode-badge-face mode-badge-core" aria-hidden="true">
+            <svg viewBox="0 0 40 40"><circle cx="20" cy="20" r="16"></circle><circle cx="20" cy="20" r="10"></circle><circle cx="20" cy="20" r="4"></circle></svg>
+          </span>
+          <span class="mode-badge-label">开发</span>
+        </button>
+      </div>
+
+      <!-- 普通模式的侧栏是「她的房间」:一扇月洞窗,窗里是她,窗外斜出一枝白梅;
+           下面是名字、按时辰变的问候与相识天数(features/her-room.js)。 -->
+      <section class="her-room" id="herRoom" aria-label="她">
+        <div class="moon-gate">
+          <span class="moon-gate-window"><img src="/assets/gqywallpaper.png" alt="" id="herRoomBoard"></span>
+          <svg class="moon-gate-plum" viewBox="0 0 140 110" aria-hidden="true">
+            <path class="plum-branch" d="M138 4 C118 10 104 22 92 38 C84 49 78 58 66 66 M92 38 C98 46 100 56 98 68 M66 66 C56 72 44 74 30 72 M104 22 C112 26 118 32 120 42"></path>
+            <g class="plum-flower" transform="translate(66 66)"><circle r="5.2" cx="0" cy="-5.6"></circle><circle r="5.2" cx="5.3" cy="-1.7"></circle><circle r="5.2" cx="3.3" cy="4.5"></circle><circle r="5.2" cx="-3.3" cy="4.5"></circle><circle r="5.2" cx="-5.3" cy="-1.7"></circle><circle class="plum-heart" r="2.2"></circle></g>
+            <g class="plum-flower" transform="translate(98 68) scale(0.8)"><circle r="5.2" cx="0" cy="-5.6"></circle><circle r="5.2" cx="5.3" cy="-1.7"></circle><circle r="5.2" cx="3.3" cy="4.5"></circle><circle r="5.2" cx="-3.3" cy="4.5"></circle><circle r="5.2" cx="-5.3" cy="-1.7"></circle><circle class="plum-heart" r="2.2"></circle></g>
+            <g class="plum-flower" transform="translate(120 42) scale(0.65)"><circle r="5.2" cx="0" cy="-5.6"></circle><circle r="5.2" cx="5.3" cy="-1.7"></circle><circle r="5.2" cx="3.3" cy="4.5"></circle><circle r="5.2" cx="-3.3" cy="4.5"></circle><circle r="5.2" cx="-5.3" cy="-1.7"></circle><circle class="plum-heart" r="2.2"></circle></g>
+            <g class="plum-flower is-bud" transform="translate(30 72) scale(0.5)"><circle r="5.2" cx="0" cy="-5.6"></circle><circle r="5.2" cx="5.3" cy="-1.7"></circle><circle r="5.2" cx="3.3" cy="4.5"></circle><circle r="5.2" cx="-3.3" cy="4.5"></circle><circle r="5.2" cx="-5.3" cy="-1.7"></circle></g>
+          </svg>
+        </div>
+        <strong class="her-room-name" id="herRoomName">顾清影</strong>
+        <span class="her-room-status" id="herRoomStatus">晚上好,今天辛苦了</span>
+        <span class="her-room-days" id="herRoomDays" hidden></span>
+      </section>
+
+      <!-- 会话入口:普通模式叫「信匣」,开发模式是指令面板(Ctrl+K)。 -->
+      <button class="session-entry" id="sessionSwitcherButton" type="button" aria-haspopup="dialog">
+        <span class="icon-slot" data-icon="messages-square" aria-hidden="true"><span class="icon-fallback">≡</span></span>
+        <span class="session-entry-label" id="sessionEntryLabel">信匣</span>
+        <b class="session-entry-count" id="sessionEntryCount">0</b>
+        <i class="session-entry-unread" id="sessionEntryUnread" hidden></i>
+        <kbd class="session-entry-key">⌘K</kbd>
+      </button>
 
       <footer class="sidebar-footer">
         <div class="sidebar-actions">
@@ -93,6 +130,27 @@
         </div>
       </footer>
     </aside>
+
+    <!-- 会话面板(features/sessions/switcher.js):普通模式是一叠信笺,开发模式是指令面板。 -->
+    <div class="session-switcher" id="sessionSwitcher" hidden>
+      <button class="session-switcher-scrim" id="sessionSwitcherScrim" type="button" aria-label="关闭会话面板" tabindex="-1"></button>
+      <section class="session-switcher-panel" role="dialog" aria-modal="true" aria-labelledby="sessionSwitcherTitle">
+        <header class="session-switcher-head">
+          <strong id="sessionSwitcherTitle">信匣</strong>
+          <input class="session-search" id="sessionSearch" type="search" placeholder="找一封信" aria-label="搜索会话" autocomplete="off" spellcheck="false">
+          <button class="icon-button" id="sessionSwitcherNew" type="button" title="新对话" aria-label="新对话">
+            <span class="icon-slot" data-icon="square-pen" aria-hidden="true"><span class="icon-fallback">＋</span></span>
+          </button>
+          <button class="icon-button" id="sessionSwitcherClose" type="button" title="关闭" aria-label="关闭">
+            <span class="icon-slot" data-icon="x" aria-hidden="true"><span class="icon-fallback">×</span></span>
+          </button>
+        </header>
+        <nav class="session-list" id="sessionList" aria-label="会话">
+          <div class="session-items" id="sessionItems"></div>
+        </nav>
+        <footer class="session-switcher-foot"><kbd>↑</kbd><kbd>↓</kbd> 选择 <kbd>Enter</kbd> 打开 <kbd>Esc</kbd> 关闭</footer>
+      </section>
+    </div>
 
     <main class="main-stage" id="mainStage">
       <!-- 顶栏没了：那一整条只为放几个按钮,把正文往下压。侧栏控制改成浮在
@@ -385,6 +443,9 @@
         <div class="artifact-view" id="artifactView"></div>
       </aside>
     </main>
+
+    <!-- 开发模式的底部状态栏(features/sessions/statusbar.js):tmux 那一条,会话是窗口。 -->
+    <footer class="dev-statusbar" id="devStatusbar" aria-label="开发状态栏" hidden></footer>
 
     <section class="console-view" id="consoleView" aria-label="控制台" aria-hidden="true" hidden>
       <aside class="con-rail" id="conRail">

@@ -1,0 +1,251 @@
+/*
+ * 开发模式覆盖层:终端的高级形态。
+ *
+ * 前面的文件画的是普通模式:和她说话的房间(月洞窗、落梅、花笺)。开发模式
+ * 说 REPL 的话:配色取自 TUI(00-tokens.css 的 --term-*),你的话是 ❯ 提示符
+ * 行,她的回复挂一道细细的左边线,输入框是一行平的终端输入,会话在底部
+ * tmux 状态栏里(94-dev-statusbar.css)。只在 body[data-mode="dev"] 下生效。
+ *
+ * 强调色别名在 :root 上已经按主题算好了,body 上改 md token 传不下去,所以
+ * 这里直接覆盖别名本身;发送键等少数地方直接读 md token,一并覆盖。
+ */
+body[data-mode="dev"] {
+  --radius-bubble: var(--radius-sm);
+  --window-light: transparent;
+  --app-bg: var(--term-bg);
+  --sidebar-bg: var(--term-panel);
+  --accent: var(--hud);
+  --accent-strong: color-mix(in srgb, var(--hud) 82%, #ffffff);
+  --accent-soft: color-mix(in srgb, var(--hud) 16%, var(--term-panel));
+  --cyan: var(--hud);
+  --cyan-soft: var(--accent-soft);
+  --hl: var(--hud);
+  --user-bg: transparent;
+  --user-text: var(--term-fg);
+  --md-sys-color-on-primary: var(--hud-ink);
+  --md-sys-color-on-primary-container: var(--term-fg);
+}
+
+/* 侧栏(开发模式下是抽屉):头像褪色,她不在场。 */
+body[data-mode="dev"] .brand-avatar {
+  filter: grayscale(0.85);
+  opacity: 0.7;
+}
+
+body[data-mode="dev"] .brand-identity strong {
+  font-family: var(--font-ui);
+  letter-spacing: 0;
+}
+
+body[data-mode="dev"] .session-item.active::before {
+  background: var(--hud);
+}
+
+/* ───────── 空白页:一段终端欢迎语 + 几条可点的命令 ───────── */
+body[data-mode="dev"] .empty-state {
+  grid-template-areas:
+    "copy"
+    "prompts";
+  grid-template-columns: minmax(0, 560px);
+}
+
+body[data-mode="dev"] .empty-visual,
+body[data-mode="dev"] .empty-copy:not(.empty-copy-dev),
+body[data-mode="dev"] .prompt-grid button:not(.prompt-dev) {
+  display: none;
+}
+
+body[data-mode="dev"] .empty-copy-dev {
+  display: grid;
+  max-height: none;
+  justify-self: stretch;
+  justify-items: start;
+  gap: 8px;
+  text-align: left;
+  writing-mode: horizontal-tb;
+}
+
+body[data-mode="dev"] .empty-copy-dev .empty-kicker {
+  color: var(--term-ok);
+  font-family: var(--font-mono);
+  font-size: var(--fs-meta);
+  gap: 6px;
+  letter-spacing: 0;
+}
+
+body[data-mode="dev"] .empty-copy-dev .empty-kicker .icon-slot {
+  width: 14px;
+  height: 14px;
+}
+
+body[data-mode="dev"] .empty-copy-dev h1 {
+  color: var(--term-fg);
+  font-family: var(--font-ui);
+  font-size: var(--fs-title);
+  letter-spacing: 0;
+}
+
+body[data-mode="dev"] .empty-copy-dev p {
+  color: var(--term-dim);
+  font-family: var(--font-ui);
+  font-size: var(--fs-meta);
+  letter-spacing: 0;
+  line-height: 1.6;
+}
+
+/* 起手语是一列命令:$ 开头,悬停整行高亮,像在终端里翻历史。 */
+body[data-mode="dev"] .prompt-grid {
+  grid-template-columns: 1fr;
+  width: 100%;
+  margin-top: 18px;
+  gap: 2px;
+}
+
+body[data-mode="dev"] .prompt-grid .prompt-dev {
+  display: grid;
+  grid-template-columns: 16px 20px minmax(0, 1fr);
+  min-height: 34px;
+  padding: 6px 10px;
+  border: 0;
+  border-radius: var(--radius-sm);
+  background: transparent;
+  color: var(--term-fg);
+  font-family: var(--font-mono);
+}
+
+body[data-mode="dev"] .prompt-grid .prompt-dev::before {
+  color: var(--term-ok);
+  content: "$";
+}
+
+body[data-mode="dev"] .prompt-grid .prompt-dev:hover:not(:disabled) {
+  background: var(--term-echo);
+}
+
+body[data-mode="dev"] .prompt-grid .prompt-dev .icon-slot {
+  color: var(--term-dim);
+}
+
+/* ───────── 对话流:终端记录 ───────── */
+body[data-mode="dev"] .timeline {
+  width: min(100%, 1040px);
+}
+
+body[data-mode="dev"] .day-divider {
+  font-family: var(--font-mono);
+  letter-spacing: 0;
+}
+
+/* 你的话:一行 ❯ 提示符,底色是 REPL 的输入回显色,铺满整列。 */
+body[data-mode="dev"] .user-message {
+  justify-items: stretch;
+  margin-bottom: 18px;
+}
+
+body[data-mode="dev"] .user-bubble {
+  position: relative;
+  max-width: 100%;
+  padding: 7px 12px 7px 32px;
+  border-radius: var(--radius-sm);
+  background: var(--term-echo);
+  color: var(--term-fg);
+}
+
+body[data-mode="dev"] .user-bubble::before {
+  position: absolute;
+  top: 7px;
+  left: 12px;
+  color: var(--hud);
+  content: "❯";
+  font-family: var(--font-mono);
+  font-weight: 700;
+}
+
+body[data-mode="dev"] .assistant-message {
+  max-width: 100%;
+  margin-bottom: 22px;
+  padding-left: 0;
+}
+
+body[data-mode="dev"] .assistant-label .avatar-frame,
+body.has-user-avatar[data-mode="dev"] .user-message > .avatar-frame {
+  display: none;
+}
+
+body.has-user-avatar[data-mode="dev"] .user-message {
+  padding-right: 0;
+}
+
+/* 她的回复:名字换成等宽小字,正文挂一道细左边线,像 REPL 的输出块。 */
+body[data-mode="dev"] .assistant-label strong {
+  color: var(--hud);
+  font-family: var(--font-mono);
+  font-size: var(--fs-micro);
+  font-weight: 500;
+  letter-spacing: 0.04em;
+}
+
+body[data-mode="dev"] .assistant-label strong::before {
+  color: var(--term-dim);
+  content: "● ";
+}
+
+body[data-mode="dev"] .assistant-message .assistant-blocks {
+  padding-left: 14px;
+  border-left: 1px solid var(--term-line);
+}
+
+body[data-mode="dev"] .turn-status-line {
+  padding-left: 14px;
+}
+
+/* ───────── 输入框:一行平的终端输入,不是卡片 ───────── */
+body[data-mode="dev"] .composer-dock {
+  background: var(--term-bg);
+}
+
+body[data-mode="dev"] .composer {
+  border: 1px solid var(--term-line);
+  border-radius: var(--radius-sm);
+  background: var(--term-panel);
+  box-shadow: none;
+}
+
+body[data-mode="dev"] .composer::before {
+  display: none;
+}
+
+body[data-mode="dev"] .composer:focus-within,
+body[data-mode="dev"] .composer.has-draft {
+  border-color: color-mix(in srgb, var(--hud) 55%, var(--term-line));
+}
+
+body[data-mode="dev"] .composer-input-row {
+  position: relative;
+}
+
+body[data-mode="dev"] .composer-input-row::before {
+  position: absolute;
+  top: 10px;
+  left: 14px;
+  color: var(--hud);
+  content: "❯";
+  font-family: var(--font-mono);
+  font-size: var(--fs-chat);
+  font-weight: 700;
+  line-height: 1.5;
+  pointer-events: none;
+}
+
+body[data-mode="dev"] .composer textarea {
+  padding-left: 34px;
+}
+
+body[data-mode="dev"] .composer textarea::placeholder {
+  font-family: var(--font-mono);
+  font-size: var(--fs-ui);
+}
+
+body[data-mode="dev"] .composer-inbox-bar .send-button {
+  border-radius: var(--radius-sm);
+}
