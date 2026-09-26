@@ -1523,31 +1523,3 @@ fn auto_compact_folds_its_summary_into_a_block_in_fullscreen() {
         );
     });
 }
-
-#[test]
-fn zzz_probe_file_tool_blocks() {
-    with_blocks(|| {
-        for (name, args, output) in [
-            ("read", r#"{"path":"/tmp/a.txt"}"#, r#"{"type":"text-page","path":"/tmp/a.txt","offset":1,"limit":2000,"truncated":false,"next":null,"content":"1: hello\n2: world"}"#),
-            ("list_directory", r#"{"path":"/tmp"}"#, "a.txt\nb.txt"),
-            ("glob", r#"{"pattern":"*.rs"}"#, "src/main.rs"),
-            ("grep", r#"{"pattern":"hello"}"#, "src/main.rs:1:hello"),
-            ("mcp_file_system_read_file", r#"{"path":"/tmp/a.txt"}"#, "hello world"),
-            ("Read", r#"{"file_path":"/tmp/a.txt"}"#, "1\tHello"),
-        ] {
-            let mut renderer = timeline_renderer();
-            renderer.use_buffered_output();
-            renderer.write_tool_call(name, args).unwrap();
-            renderer.write_tool_result(name, true, output).unwrap();
-            let (_, live) = renderer.timeline_waiting();
-            let live = live.unwrap_or_default();
-            let row = live.lines().find(|l| block_id_in(l).is_some()).map(str::to_string);
-            eprintln!("=== {name}: row={row:?}\n live={:?}", crate::render::strip_ansi_text(&live));
-            if let Some(row) = row {
-                let id = block_id_in(&row).unwrap();
-                let body: Vec<String> = crate::render::blocks::get(id).unwrap_or_default().iter().map(|l| crate::render::strip_ansi_text(l)).collect();
-                eprintln!("    body={body:?}");
-            }
-        }
-    });
-}

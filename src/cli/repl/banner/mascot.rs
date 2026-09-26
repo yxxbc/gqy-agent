@@ -392,7 +392,9 @@ mod tests {
     #[test]
     fn small_rungs_keep_a_solid_silhouette() {
         for max_cols in [43, 20] {
-            let cat = Mascot::Cat.render(theme(Depth::True), max_cols, 30).unwrap();
+            let cat = Mascot::Cat
+                .render(theme(Depth::True), max_cols, 30)
+                .unwrap();
             let inked: usize = cat
                 .rows
                 .iter()

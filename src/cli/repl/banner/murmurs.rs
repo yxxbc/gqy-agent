@@ -12,7 +12,10 @@ pub(in crate::cli) const MURMURS_FILE: &str = "murmurs.txt";
 
 /// 内置文案（顾清影）。中文是她自己的话，英文是给英文界面用的同一份意思。
 const BUILTIN: &[(&str, &str)] = &[
-    ("I'm here — start whenever you're ready.", "我在，你想开始就开始。"),
+    (
+        "I'm here — start whenever you're ready.",
+        "我在，你想开始就开始。",
+    ),
     (
         "I'd like to hear what your day has been like.",
         "今天过得怎么样，说给我听听。",
@@ -22,10 +25,7 @@ const BUILTIN: &[(&str, &str)] = &[
         "卡住的事说出来，就小了一半。",
     ),
     ("Change your tea once it goes cold.", "茶凉了记得换一杯。"),
-    (
-        "Did you sleep enough last night?",
-        "昨晚睡够了吗？",
-    ),
+    ("Did you sleep enough last night?", "昨晚睡够了吗？"),
     (
         "Don't stay up late. I've seen how that ends.",
         "别熬夜，熬夜的后果我见过。",
@@ -101,7 +101,9 @@ mod tests {
     #[test]
     fn builtin_lines_are_said_in_the_active_language() {
         assert!(BUILTIN.len() >= 6);
-        assert!(BUILTIN.iter().all(|(en, zh)| !en.trim().is_empty() && !zh.trim().is_empty()));
+        assert!(BUILTIN
+            .iter()
+            .all(|(en, zh)| !en.trim().is_empty() && !zh.trim().is_empty()));
         let sample = t(BUILTIN[0].0, BUILTIN[0].1);
         assert!(!sample.trim().is_empty());
     }

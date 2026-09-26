@@ -170,11 +170,7 @@ pub(crate) fn format_token_usage_inline_with(
             percent(usage_ratio)
         )
     } else {
-        format!(
-            "{}/{}",
-            format_compact_count(meter.session_tokens),
-            context
-        )
+        format!("{}/{}", format_compact_count(meter.session_tokens), context)
     };
     let cumulative_shown = match meter.cumulative_tokens {
         Some(total) => Some(total.saturating_add(meter.live_extra_tokens)),

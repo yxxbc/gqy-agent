@@ -252,8 +252,13 @@ impl LiveReplTail {
                         self.editor.picker.view(&self.editor.input).is_some(),
                         input_cols,
                     );
-                    total_rows =
-                        tail_total_rows(banner_rows, queue_lines.len(), queue_gap, editor_rows, job_rows);
+                    total_rows = tail_total_rows(
+                        banner_rows,
+                        queue_lines.len(),
+                        queue_gap,
+                        editor_rows,
+                        job_rows,
+                    );
                     lobby = self.banner.as_ref().map(|banner| {
                         banner.lobby(
                             usize::from(cols),

@@ -163,7 +163,10 @@ fn renders_double_backtick_span_whose_content_contains_a_backtick() {
         "{output}"
     );
     // 单反引号的旧行为不能动：整行不该留下定界符。
-    assert_eq!(render_inline("`x` 与 `y`"), format!("{INLINE_CODE_STYLE}x{RESET} 与 {INLINE_CODE_STYLE}y{RESET}"));
+    assert_eq!(
+        render_inline("`x` 与 `y`"),
+        format!("{INLINE_CODE_STYLE}x{RESET} 与 {INLINE_CODE_STYLE}y{RESET}")
+    );
 }
 
 #[test]
@@ -171,7 +174,10 @@ fn keeps_unclosed_backtick_run_literal_without_eating_the_line() {
     // 这一行找不到等长的闭合串：那串反引号原样吐出来，后面真的 `x` 照样上色。
     let output = render_inline("``` 开头没闭合,后面 `x` 还在");
     assert!(output.starts_with("``` "), "{output}");
-    assert!(output.contains(&format!("{INLINE_CODE_STYLE}x{RESET}")), "{output}");
+    assert!(
+        output.contains(&format!("{INLINE_CODE_STYLE}x{RESET}")),
+        "{output}"
+    );
 }
 
 #[test]

@@ -1134,7 +1134,10 @@ impl super::LiveReplTail {
                         // 在输入框里原地点一下 = 把光标放到那个字上（拖动过的是
                         // 选区复制，不动光标）。09-24 验收问题 10：文字折行后点
                         // 第二行，光标看着跳到点击处又跳回句尾。
-                        let click = self.screen.as_mut().and_then(|screen| screen.take_input_click());
+                        let click = self
+                            .screen
+                            .as_mut()
+                            .and_then(|screen| screen.take_input_click());
                         if let Some((row, column)) = click {
                             self.place_input_caret(row, column);
                         }

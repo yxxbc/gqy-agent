@@ -796,11 +796,8 @@ impl LiveReplTail {
         if row >= rows {
             return Ok(());
         }
-        let line = crate::cli::footer::repl_footer_line(
-            self.editor.mode,
-            &self.footer,
-            self.footer_cols,
-        );
+        let line =
+            crate::cli::footer::repl_footer_line(self.editor.mode, &self.footer, self.footer_cols);
         let (left, input_cursor) = (self.footer_left, self.input_cursor);
         synchronized_terminal_update(CursorAfterUpdate::Preserve, || {
             let mut stdout = io::stdout();

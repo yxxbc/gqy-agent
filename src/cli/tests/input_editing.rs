@@ -537,7 +537,8 @@ fn wrapped_input_rows_keep_prefix_outside_content_width() {
 /// 估会少留行，多出来的那一行正好压在底栏上（09-24 验收问题 10：底栏变两行）。
 #[test]
 fn lobby_width_box_reserves_every_row_it_draws() {
-    let input = "字".repeat(40); // 显示宽度 80 列
+    // 显示宽度 80 列
+    let input = "字".repeat(40);
     // 30 列的窄框：去掉右框和 `│ ❯ ` 只剩 24 列，80 列折成 4 行，加上下框线与底栏 3 行。
     assert_eq!(repl_input_rendered_rows(&input, 0, false, false, 30), 7);
     // 同一句输入按终端全宽估，会少留两行——这就是原来错的地方。

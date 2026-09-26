@@ -230,7 +230,10 @@ fn murmur_line(info: &WelcomeInfo, theme: Theme, width: usize) -> Option<String>
     if murmur.is_empty() {
         return None;
     }
-    Some(clip(vec![Seg::new(format!("  {murmur}"), theme.fg(FAINT))], width))
+    Some(clip(
+        vec![Seg::new(format!("  {murmur}"), theme.fg(FAINT))],
+        width,
+    ))
 }
 
 fn clip(segs: Vec<Seg>, width: usize) -> String {
