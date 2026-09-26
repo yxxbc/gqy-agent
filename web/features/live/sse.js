@@ -265,6 +265,11 @@ export function handleSseEvent(name, event) {
     handleSessionEvent(name, data);
     return;
   }
+  // 聊天室的发言事件交给 features/room（它监听这个 window 事件，不必互相 import）。
+  if (name.startsWith("room.")) {
+    window.dispatchEvent(new CustomEvent("gqy:room-event", { detail: { name, data } }));
+    return;
+  }
   if (name === "queue.added") {
     const prompt = data?.prompt;
     if (queueEventTargetsView(data) && prompt && !state.queuedPrompts.some((item) => String(item?.id) === String(prompt?.id))) {

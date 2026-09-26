@@ -9,6 +9,7 @@ mod conversation_db;
 mod migrations;
 mod queue;
 mod reviews;
+mod rooms;
 mod sessions;
 mod turns;
 mod usage_ops;
@@ -40,12 +41,13 @@ pub use conversation_db::{
     NewSponsorRecord, PlatformAccessActor, PlatformAccessGrant, PlatformAccessGrantKey,
     PlatformMemeRefRecord, PlatformPluginScopeKey, PlatformSessionBinding,
     PlatformSessionBindingKey, QueuedPrompt, QueuedPromptAttachment, RedoCandidate, RedoInputKind,
-    RedoStart, ReplayEntry, SessionOverview, SessionRecord, SessionReviewRow, SponsorOrder,
-    SponsorRecord, SponsorSummary, SponsorTotal, ToolFlowCall, ToolFlowRound, ToolFootprint, Turn,
-    TurnFollowup, TurnInlineMedia, TurnJournalEvent, TurnRedoCheckpointPayload, TurnReplay,
-    TurnStatus, UserAttachment, UserAttachmentData, DEFAULT_MAX_GOAL_ROUNDS,
-    GLOBAL_PLATFORM_ACCOUNT_SCOPE, INLINE_MEDIA_KIND_IMAGE, INLINE_MEDIA_KIND_PDF,
-    INLINE_MEDIA_KIND_TEXT, INLINE_MEDIA_KIND_VIDEO, USER_ATTACHMENT_KIND_FILE,
+    RedoStart, ReplayEntry, RoomMessage, RoomParticipant, SessionOverview, SessionRecord,
+    SessionReviewRow, SponsorOrder, SponsorRecord, SponsorSummary, SponsorTotal, ToolFlowCall,
+    ToolFlowRound, ToolFootprint, Turn, TurnFollowup, TurnInlineMedia, TurnJournalEvent,
+    TurnRedoCheckpointPayload, TurnReplay, TurnStatus, UserAttachment, UserAttachmentData,
+    DEFAULT_MAX_GOAL_ROUNDS, GLOBAL_PLATFORM_ACCOUNT_SCOPE, INLINE_MEDIA_KIND_IMAGE,
+    INLINE_MEDIA_KIND_PDF, INLINE_MEDIA_KIND_TEXT, INLINE_MEDIA_KIND_VIDEO, ROOM_SPEAKER_NOTICE,
+    ROOM_SPEAKER_PARTICIPANT, ROOM_SPEAKER_USER, USER_ATTACHMENT_KIND_FILE,
     USER_ATTACHMENT_KIND_IMAGE, USER_ATTACHMENT_KIND_TEXT,
 };
 pub use usage::{
@@ -66,6 +68,9 @@ pub const ASK_SESSION_KIND: &str = "ask";
 /// 唤醒对话的专属会话:不进 WebUI 列表(列表只取 user),用 `gqy voice`
 /// 命令组管理(reset / history)。
 pub const VOICE_SESSION_KIND: &str = "voice";
+/// 聊天室参与者的后台会话:父会话是房间(可见的 user 会话),随房间级联删除,
+/// 不进任何列表。房间本身没有专属 kind,靠 `room_participants` 有没有行判定。
+pub const ROOM_MEMBER_SESSION_KIND: &str = "room-member";
 
 type PlatformAccessSubjects = HashSet<String>;
 type PlatformAccessKinds = HashMap<String, PlatformAccessSubjects>;

@@ -10,6 +10,8 @@ mod platform;
 mod queue;
 mod reviews;
 pub use reviews::SessionReviewRow;
+mod rooms;
+pub use rooms::*;
 mod rows;
 pub(crate) use rows::*;
 pub use rows::{interrupted_text, pending_placeholder};

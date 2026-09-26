@@ -157,6 +157,7 @@ export const elements = {
   retryBootstrapButton: document.getElementById("retryBootstrapButton"),
   timeline: document.getElementById("timeline"),
   conversationStage: document.getElementById("conversationStage"),
+  newRoomButton: document.getElementById("newRoomButton"),
   emptyState: document.getElementById("emptyState"),
   emptyVisual: document.getElementById("emptyVisual"),
   emptyBoardImage: document.getElementById("emptyBoardImage"),

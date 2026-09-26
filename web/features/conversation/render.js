@@ -477,6 +477,11 @@ export function renderPersistedTurn(turn) {
 }
 
 export function renderConversation({ forceScroll = false } = {}) {
+  if (state.viewRoom && state.roomRenderer && String(state.viewRoom.room_id) === String(state.viewSessionId)) {
+    state.roomRenderer();
+    updateConversationChrome();
+    return;
+  }
   elements.loadingState.hidden = true;
   elements.blockedState.hidden = true;
   clearQuestionDock();

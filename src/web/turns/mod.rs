@@ -329,6 +329,17 @@ pub(in crate::web) async fn create_turn(
     // A running turn in the *target* session gets the message as a queued
     // follow-up (composer tray UX); other sessions run in parallel.
     let target_store = state.stores.for_session(&session_id).pinned(&session_id);
+    // 聊天室的消息走 /api/rooms/{id}/messages：房间会话自己不跑回合，回合在
+    // 各参与者的后台会话里。
+    if target_store
+        .is_room(&session_id)
+        .map_err(ApiError::internal)?
+    {
+        return Err(ApiError::new(
+            StatusCode::CONFLICT,
+            "this conversation is a chat room; post to the room instead",
+        ));
+    }
     let prepared = prepare_web_attachments(&target_store, &display_content, &attachment_ids)?;
     if let Some(receipt) = queue_into_running_session(
         &state,

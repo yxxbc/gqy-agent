@@ -24,9 +24,17 @@ pub(in crate::web) async fn list_sessions_http(
     let sessions =
         sessions_with_dev(&store, &persona, identity.owner_key()).map_err(ApiError::internal)?;
     let current = current_session_for(&state, &identity, &sessions);
+    // 聊天室就是普通会话，靠 room_participants 有没有行判定（方案稿 §2）。
+    let rooms = store.room_ids().map_err(ApiError::internal)?;
     let sessions = sessions
         .iter()
-        .map(|overview| session_overview_json(overview, &current))
+        .map(|overview| {
+            let mut value = session_overview_json(overview, &current);
+            if rooms.contains(&overview.record.session_id) {
+                value["room"] = json!(true);
+            }
+            value
+        })
         .collect::<Vec<_>>();
     let data = json!({ "current": current, "sessions": sessions });
     Ok(Json(data).into_response())
@@ -338,8 +346,10 @@ pub(in crate::web) async fn session_turns_http(
     } else {
         None
     };
+    let room = room_view_json(&store, &session_id).map_err(ApiError::internal)?;
     let mut response = Json(json!({
         "session_id": session_id,
+        "room": room,
         "turns": turns,
         "queued_prompts": queued_prompts,
         "running_turn_id": running_target.as_ref().map(|target| target.turn_id.as_str()),

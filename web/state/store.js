@@ -27,6 +27,11 @@ export const state = {
   sessions: [],
   currentSessionId: null,
   viewSessionId: null,
+  // 打开的是聊天室时，这里是 /api/sessions/{id}/turns 带回的 `room`；否则 null。
+  viewRoom: null,
+  // 聊天室模块启动时登记的绘制/提交回调（renderConversation、submitTurn 只看它们在不在）。
+  roomRenderer: null,
+  roomSubmit: null,
   viewRunningTurnId: null,
   viewLoading: false,
   // 正在切往的会话:点击标签的瞬间就高亮它、并铺一层加载动画,等 turns 拉回来

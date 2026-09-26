@@ -25,6 +25,8 @@ const submitState = {
 
 export async function submitTurn() {
   if (state.adminBusy || state.submitting || state.blocked) return;
+  // 聊天室里的消息走房间接口，不当回合发，也不解析斜杠命令。
+  if (state.viewRoom && state.roomSubmit && (await state.roomSubmit())) return;
   if (hasPendingQuestion()) return;
   const content = elements.composerInput.value.trim();
   // 草稿页没有会话：先按当前模式建出来再发（命令也一样——空 id 的命令会打到

@@ -222,6 +222,10 @@ pub(crate) struct TurnProfile {
     /// Group overflow handling; `None` inherits the global `context` settings.
     pub(crate) group_context: Option<crate::config::PlatformGroupContextConfig>,
     pub(crate) followup: Option<Arc<PlatformFollowupRun>>,
+    /// 纯聊天回合：本回合一件工具都不给——顾清影 的工具注册表清空，四条
+    /// CLI 中转线的原生工具与工具桥作用域一律按 off 走。聊天室用（方案稿
+    /// docs/design/2026-09-27-chat-room.md §8）。
+    pub(crate) chat_only: bool,
 }
 
 impl Default for TurnProfile {
@@ -242,6 +246,7 @@ impl Default for TurnProfile {
             suppress_session_history: false,
             group_context: None,
             followup: None,
+            chat_only: false,
         }
     }
 }

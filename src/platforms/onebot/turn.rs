@@ -167,6 +167,7 @@ async fn wake_conversation(
             .then(|| context.config.platforms.qq.group_context.clone()),
         platform: Some(context.clone()),
         followup: None,
+        chat_only: false,
     };
     let dispatch =
         run_platform_turn(state, session_id, prepared.content, Vec::new(), profile).await?;
@@ -606,6 +607,7 @@ pub(in crate::platforms::onebot) async fn build_and_run_turn(
             .then(|| context.config.platforms.qq.group_context.clone()),
         platform: Some(context),
         followup: None,
+        chat_only: false,
     };
     let dispatch = run_platform_turn(state, session_id, content, images, profile).await?;
     Ok(Some(dispatch))

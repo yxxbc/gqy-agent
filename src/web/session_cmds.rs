@@ -460,12 +460,26 @@ pub(in crate::web) async fn handle_session_command(
                     return Err(error);
                 }
             }
+            // 聊天室：先停发言，再记下各参与者的后台会话。库里它们随房间级联
+            // 删除，但 CLI 那侧的续传映射与会话文件得逐个清。
+            stop_room(state, &record.session_id);
+            let room_members: Vec<String> = state
+                .stores
+                .for_session(&record.session_id)
+                .room_participants(&record.session_id)
+                .unwrap_or_default()
+                .into_iter()
+                .map(|participant| participant.backing_session_id)
+                .collect();
             let result = state
                 .stores
                 .for_session(&record.session_id)
                 .delete_session(&record.session_id)
                 .map_err(|error| safe_error_message(&error));
             crate::llm::forget_relay_sessions(&record.session_id);
+            for member in &room_members {
+                crate::llm::forget_relay_sessions(member);
+            }
             release_admin(&state.manager);
             result?;
             // 库里的目标行随会话级联删除；进程内的 goal 状态（armed 等）

@@ -254,6 +254,7 @@ pub(super) async fn handle_event(
         suppress_session_history: false,
         group_context: None,
         followup: None,
+        chat_only: false,
     };
     let dispatch = run_platform_turn(state, session_id, prepared.content, images, profile).await;
     if !lease.is_valid() {

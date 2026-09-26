@@ -150,6 +150,24 @@ async fn run_turn_task_inner(
             config.plugins.vision.vision_provider_id.clear();
             config.plugins.vision.vision_model.clear();
         }
+        // 纯聊天回合改的是这份私有配置：资源缓存键是整份配置的哈希，工具全关
+        // 的一份单独建、单独缓存，不影响同时在跑的其它会话。中转线的原生工具
+        // 只认插件作用域，光清 顾清影 的注册表关不掉它们。
+        if profile.chat_only {
+            config.tools.enabled = false;
+            for scope in [
+                &mut config.plugins.claude_code.native_tools,
+                &mut config.plugins.claude_code.gqy_tools,
+                &mut config.plugins.antigravity.native_tools,
+                &mut config.plugins.antigravity.gqy_tools,
+                &mut config.plugins.codex.native_tools,
+                &mut config.plugins.codex.gqy_tools,
+                &mut config.plugins.cline.native_tools,
+                &mut config.plugins.cline.gqy_tools,
+            ] {
+                *scope = "off".to_string();
+            }
+        }
     }
     // Local sessions (REPL/WebUI/shell hook) may pin their own model pool.
     // Platform turns were already routed through the platform pools above.

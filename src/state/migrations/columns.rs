@@ -347,3 +347,37 @@ pub(in crate::state) fn apply_v37_session_reviews(conn: &Connection) -> Result<(
     )?;
     Ok(())
 }
+
+/// 多方聊天室（09-27，docs/design/2026-09-27-chat-room.md）：房间本身是一个
+/// 普通 user 会话；参与者与发言记录各一张追加型子表（AGENTS §3.2）。
+/// 每位参与者另有一个隐藏的后台会话（kind = room-member，父会话 = 房间），
+/// 随房间级联删除。
+pub(in crate::state) fn apply_v38_chat_rooms(conn: &Connection) -> Result<()> {
+    conn.execute_batch(
+        "CREATE TABLE IF NOT EXISTS room_participants (
+            room_id            TEXT NOT NULL REFERENCES sessions(session_id) ON DELETE CASCADE,
+            participant_id     TEXT NOT NULL,
+            label              TEXT NOT NULL,
+            kind               TEXT NOT NULL,
+            provider_id        TEXT NOT NULL,
+            model              TEXT NOT NULL,
+            backing_session_id TEXT NOT NULL,
+            sort               INTEGER NOT NULL,
+            watermark          INTEGER NOT NULL DEFAULT 0,
+            memory             INTEGER NOT NULL DEFAULT 0,
+            PRIMARY KEY (room_id, participant_id)
+        );
+        CREATE TABLE IF NOT EXISTS room_messages (
+            message_id     INTEGER PRIMARY KEY AUTOINCREMENT,
+            room_id        TEXT NOT NULL REFERENCES sessions(session_id) ON DELETE CASCADE,
+            speaker_kind   TEXT NOT NULL,
+            participant_id TEXT NOT NULL DEFAULT '',
+            content        TEXT NOT NULL,
+            run_id         TEXT NOT NULL DEFAULT '',
+            created_at     TEXT NOT NULL
+        );
+        CREATE INDEX IF NOT EXISTS idx_room_messages_room
+            ON room_messages(room_id, message_id);",
+    )?;
+    Ok(())
+}

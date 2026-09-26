@@ -1,7 +1,7 @@
 import { apiRequest } from "../../core/api.js";
 import { BRAILLE_FRAMES } from "../../core/constants.js";
 import { firstLine, formatRelativeTime } from "../../core/format.js";
-import { makeIconSlot } from "../../core/icons.js";
+import { createIcon, makeIconSlot } from "../../core/icons.js";
 import { visualPixelsToLayout } from "../../core/ui-scale.js";
 import { showToast } from "../../core/toast.js";
 import { updateConversationChrome } from "../conversation/chrome.js";
@@ -229,6 +229,9 @@ export function buildSessionItem(session) {
   } else {
     const titleRow = document.createElement("span");
     titleRow.className = "session-title-row";
+    if (session?.room) {
+      titleRow.appendChild(createIcon("messages-square", "session-room-icon"));
+    }
     const title = document.createElement("strong");
     title.textContent = sessionDisplayName(session);
     titleRow.appendChild(title);

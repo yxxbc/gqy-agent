@@ -447,6 +447,27 @@
       "reason": "P2 拆分前 app.js 闭包内已有"
     },
     {
+      "from": "room",
+      "to": "conversation",
+      "reason": "房间时间线里的用户发言就是普通的气泡（conversation/user.js）"
+    },
+    {
+      "from": "room",
+      "to": "markdown",
+      "reason": "参与者的话按 Markdown 渲染，与普通回复同一套"
+    },
+    {
+      "from": "room",
+      "to": "persona",
+      "reason": "她的发言沿用取景框头像（makeAvatarFrame），中转线才用色块"
+    },
+    {
+      "from": "room",
+      "to": "sessions",
+      "reason": "建房后刷新会话列表并打开新房间"
+    },
+
+    {
       "from": "session-mode",
       "to": "boot",
       "reason": "P2 拆分前 app.js 闭包内已有"

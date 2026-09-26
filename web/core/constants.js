@@ -80,6 +80,10 @@ export const EVENT_NAMES = [
   "session.current_changed",
   "session.updated",
   "session.reordered",
+  "room.message",
+  "room.delta",
+  "room.delta_reset",
+  "room.status",
   "job.started",
   "job.finished",
   "job.acknowledged",
@@ -87,7 +91,7 @@ export const EVENT_NAMES = [
   "resync_required"
 ];
 
-export const RUN_EVENTS = new Set(EVENT_NAMES.filter((name) => !name.startsWith("session.") && !name.startsWith("job.") && !["conversation.reset", "conversation.pop", "resync_required", "queue.added", "queue.removed"].includes(name)));
+export const RUN_EVENTS = new Set(EVENT_NAMES.filter((name) => !name.startsWith("session.") && !name.startsWith("job.") && !name.startsWith("room.") && !["conversation.reset", "conversation.pop", "resync_required", "queue.added", "queue.removed"].includes(name)));
 
 // 和 REPL 的 `wait_spinner.rs::BRAILLE_FRAMES` 同一组帧。
 export const BRAILLE_FRAMES = ["⠋", "⠙", "⠹", "⠸", "⠼", "⠴", "⠦", "⠧", "⠇", "⠏"];

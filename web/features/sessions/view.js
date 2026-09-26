@@ -238,6 +238,8 @@ export function applySessionView(payload, { carryDraft = false } = {}) {
     : null;
   closeRevisionEditor();
   state.pendingSubmission = null;
+  // 聊天室：对话区与输入框改由 features/room 接管（renderConversation 里分流）。
+  state.viewRoom = payload?.room && typeof payload.room === "object" ? payload.room : null;
   const runs = (Array.isArray(payload?.runs) ? payload.runs : []).filter((run) => run?.run_id);
   if (runs.length) state.runsBySession.set(sessionId, new Set(runs.map((run) => String(run.run_id))));
   else state.runsBySession.delete(sessionId);
@@ -548,7 +550,8 @@ export function handleSessionEvent(name, data) {
         created_at: null,
         updated_at: new Date().toISOString(),
         turn_count: 0,
-        last_user_content: ""
+        last_user_content: "",
+        room: Boolean(data?.room)
       });
       renderSessionList();
     }

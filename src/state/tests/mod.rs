@@ -12,6 +12,7 @@ mod platform;
 mod queue;
 mod redo;
 mod reviews;
+mod rooms;
 mod sessions;
 mod shared;
 mod sponsors;

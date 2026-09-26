@@ -212,10 +212,15 @@ const MIGRATIONS: &[Migration] = &[
         name: "session_reviews",
         apply: apply_v37_session_reviews,
     },
+    Migration {
+        version: 38,
+        name: "chat_rooms",
+        apply: apply_v38_chat_rooms,
+    },
 ];
 
 /// Latest schema version this build produces.
-pub const LATEST_VERSION: i64 = 37;
+pub const LATEST_VERSION: i64 = 38;
 
 /// Returns the schema version currently recorded in the database.
 pub fn current_version(conn: &Connection) -> Result<i64> {

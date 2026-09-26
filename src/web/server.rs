@@ -700,6 +700,13 @@ pub(in crate::web) fn router(state: DaemonState) -> Router {
             "/api/sessions/{session_id}/turns/{turn_id}/redo",
             post(redo_turn),
         )
+        .route("/api/rooms", post(create_room_http))
+        .route("/api/rooms/candidates", get(room_candidates_http))
+        .route(
+            "/api/rooms/{room_id}/messages",
+            post(post_room_message_http),
+        )
+        .route("/api/rooms/{room_id}/stop", post(stop_room_http))
         .route("/api/turns", post(create_turn))
         .route("/api/queue", post(queue_prompt))
         .route(

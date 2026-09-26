@@ -32,6 +32,7 @@ import { loadSessionView, openSessionView, switchSessionMode } from "./features/
 import { bindSessionSwitcher, closeSessionSwitcher, openSessionSwitcher } from "./features/sessions/switcher.js";
 import { bindStatusBar } from "./features/sessions/statusbar.js";
 import { startHerRoomClock } from "./features/her-room.js";
+import { initRoom } from "./features/room/room.js";
 import { applyAdvancedConfig, clearProviderSecretChanges, configValue, loadConfigDraft, markConfigDirty, refreshProviderSecretStates, saveConfigDraft, setConfigValue, setSettingsView, updateAdvancedConfigEditor, updateSettingsControls } from "./features/settings/config.js";
 import { closeSidebar, openSidebar, setSidebarCollapsed } from "./features/sidebar.js";
 import { elements } from "./state/elements.js";
@@ -258,6 +259,7 @@ function bindEvents() {
   elements.composerInput.addEventListener("blur", () => window.GqyCommands?.hide());
   elements.attachButton.addEventListener("click", () => elements.attachmentInput.click());
   wireMicButton();
+  initRoom();
   elements.attachmentInput.addEventListener("change", () => {
     addComposerFiles(elements.attachmentInput.files);
     elements.attachmentInput.value = "";
