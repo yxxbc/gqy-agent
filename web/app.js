@@ -193,17 +193,25 @@ function bindEvents() {
   document.addEventListener("pointerdown", (event) => {
   });
   document.addEventListener("click", (event) => {
-    if (!elements.modelLevelMenu.hidden && !event.target.closest("#modelLevelMenu")) {
+    // 祖先链用事件派发那一刻定格的 composedPath:菜单里点「展开分组」会当场
+    // 重画列表(renderModelMenu → replaceChildren),被点的那颗节点随即脱离
+    // 文档——再用 event.target.closest 找祖先(它跟着节点走)就找不到了,这
+    // 一下会被误判成「点在外面」把浮窗秒关(展开箭头点不动、一按就关的根因)。
+    // 会话菜单、artifact 资源菜单同用这个模式,一起吃这一口。
+    const path = event.composedPath();
+    const clickedInside = (selector) =>
+      path.some((node) => node instanceof Element && node.matches(selector));
+    if (!elements.modelLevelMenu.hidden && !clickedInside("#modelLevelMenu")) {
       closeLevelMenu();
     }
     if (!elements.modelMenu.hidden
-      && !event.target.closest("#modelMenuWrap")
-      && !event.target.closest("#modelMenu")
-      && !event.target.closest("#modelLevelMenu")) {
+      && !clickedInside("#modelMenuWrap")
+      && !clickedInside("#modelMenu")
+      && !clickedInside("#modelLevelMenu")) {
       closeModelMenu();
     }
-    if (state.sessionMenuFor && !event.target.closest(".session-menu") && !event.target.closest(".session-menu-button")) closeSessionMenu();
-    if (!elements.artifactResourceMenu.hidden && !event.target.closest(".artifact-resource-wrap")) closeArtifactResourceMenu();
+    if (state.sessionMenuFor && !clickedInside(".session-menu") && !clickedInside(".session-menu-button")) closeSessionMenu();
+    if (!elements.artifactResourceMenu.hidden && !clickedInside(".artifact-resource-wrap")) closeArtifactResourceMenu();
   });
   elements.promptGrid.querySelectorAll("[data-prompt]").forEach((button) => {
     button.addEventListener("click", () => {
