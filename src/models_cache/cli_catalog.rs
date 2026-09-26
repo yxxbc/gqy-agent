@@ -511,7 +511,10 @@ mod tests {
         std::fs::create_dir_all(&bin_dir).unwrap();
         let binary = bin_dir.join("cline");
         std::fs::write(&binary, "#!/usr/bin/env node\n").unwrap();
-        assert_eq!(locate_cline_llms(&binary), Some(dist.join("index.js")));
+        // 被测函数先解掉二进制路径上的符号链接再往上走,期望值同样要解:
+        // macOS 的临时目录 /var 是指向 /private/var 的符号链接。
+        let expected = std::fs::canonicalize(dist.join("index.js")).unwrap();
+        assert_eq!(locate_cline_llms(&binary), Some(expected));
     }
 }
 
