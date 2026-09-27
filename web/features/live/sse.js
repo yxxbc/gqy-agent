@@ -13,7 +13,7 @@ import { renderJobsStrip } from "../jobs.js";
 import { handleContextEvent } from "./context.js";
 import { consumeLiveQueue, finishLiveRun, handleRoundUsage, refreshComposerCumulative } from "./run.js";
 import { commitRedoLive, ensureLiveUser, removeRunningStatus, renderQueueTray, showTypingIndicator } from "./state.js";
-import { appendAssistantDelta, handleReasoningEvent, resetSupersededGeneration } from "./stream.js";
+import { appendAssistantDelta, handleReasoningEvent, repairLiveTextBlocks, resetSupersededGeneration } from "./stream.js";
 import { createQuestion, markQuestionAnswered, markQuestionClosed } from "../questions.js";
 import { renderSessionList } from "../sessions/list.js";
 import { runSessionId, trackRun, untrackRun } from "../sessions/runs.js";
@@ -41,6 +41,14 @@ export function scheduleViewSync() {
     sseState.viewSyncTimer = null;
     refreshViewSnapshot();
   }, 1_000);
+}
+
+/// 切回标签页：后台期间浏览器暂停了渲染帧，先把没画完的流式正文补画，再立即拉一次
+/// 快照、按落库原文对账（09-27）。不等下一次定时同步。
+export function resyncOnVisible() {
+  if (document.hidden || state.blocked) return;
+  repairLiveTextBlocks(document);
+  if (state.viewSessionId) refreshViewSnapshot();
 }
 
 export async function refreshViewSnapshot() {

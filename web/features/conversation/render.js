@@ -12,6 +12,7 @@ import { appendUserMessage } from "./user.js";
 import { loadGoal, loadStageTodos } from "../goal.js";
 import { refreshComposerCumulative } from "../live/run.js";
 import { WIDE_BLOCK_SELECTOR, reattachLiveArticles } from "../live/state.js";
+import { liveTextOf, repairLiveTextBlocks } from "../live/stream.js";
 import { renderMarkdown } from "../markdown/render.js";
 import { makeAvatarFrame } from "../persona.js";
 import { clearQuestionDock } from "../questions.js";
@@ -355,6 +356,30 @@ export function createTurnStatus(turn) {
   return status;
 }
 
+/// 空白不参与对账：流式块之间的分隔与落库原文的换行写法可能不同。
+function compactText(value) {
+  return String(value || "").replace(/\s+/g, "");
+}
+
+/// 本页流式存档只有和落库原文对得上才复用，页面最终以落库为准（09-27）。
+/// 先把存档里没画完的缓冲补画掉（后台标签页暂停渲染帧留下的）；落库正文若不在
+/// 存档收到的原文里、且存档收到的比落库少（漏了流式事件），整个存档作废，按落库
+/// 重建。只在「少了」时作废：存档保留思考/工具的时序，别因写法差异白白丢掉。
+function trustedStash(turnId, turn) {
+  const stash = state.finishedTurnArticles.get(turnId);
+  if (!stash) return null;
+  for (const entry of stash) repairLiveTextBlocks(entry.article);
+  const persisted = [
+    ...(Array.isArray(turn?.followups) ? turn.followups.map((followup) => followup?.preceding_assistant_content) : []),
+    turn?.assistant_content
+  ].map(compactText).filter(Boolean);
+  const streamed = compactText(stash.map((entry) => liveTextOf(entry.article)).join(""));
+  if (persisted.every((text) => streamed.includes(text))) return stash;
+  if (streamed.length >= persisted.join("").length) return stash;
+  state.finishedTurnArticles.delete(turnId);
+  return null;
+}
+
 export function renderPersistedTurn(turn) {
   const turnId = String(turn?.id || "");
   const candidate = state.redoCandidate && String(state.redoCandidate.turn_id) === turnId
@@ -372,7 +397,7 @@ export function renderPersistedTurn(turn) {
    * 思考签 / 工具签 / 正文块),避免用扁平的「单 reasoning + 正文」重建而丢失时序。
    * 历史重载(后端快照没有 parts 顺序)才退回扁平重建。
    */
-  const stash = turnId && turn?.status !== "running" ? state.finishedTurnArticles.get(turnId) : null;
+  const stash = turnId && turn?.status !== "running" ? trustedStash(turnId, turn) : null;
   const claimed = turn?.status === "running" && liveClaimsTurn(turnId);
   let stashIndex = 0;
   const takeStash = (kind) => {

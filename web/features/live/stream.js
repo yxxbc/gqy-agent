@@ -60,6 +60,30 @@ export function rerenderLiveHtmlFences(live) {
   }
 }
 
+/// 把排着没画的缓冲立即画掉。后台标签页里浏览器暂停 requestAnimationFrame，
+/// 排着的那一帧要等切回来才跑；回合在后台收尾时这一帧还会被取消，正文就停在
+/// 切走那一刻、之后复用存档也补不回来（09-27）。所以收尾、切回都走这里补画。
+export function flushLiveText(block) {
+  if (!block?.element) return;
+  if (block.renderFrame) {
+    window.cancelAnimationFrame(block.renderFrame);
+    block.renderFrame = null;
+  }
+  if (block.element.__liveRaw !== block.raw) renderStreamingMarkdown(block);
+}
+
+/// 补画 root 下所有流式正文块（进行中的与已存档的都算）。
+export function repairLiveTextBlocks(root) {
+  for (const element of root?.querySelectorAll?.(".live-text-block") || []) flushLiveText(element.__liveBlock);
+}
+
+/// 流式正文块累计收到的原文（按块顺序拼接），用来和落库原文对账。
+export function liveTextOf(root) {
+  return [...(root?.querySelectorAll?.(".live-text-block") || [])]
+    .map((element) => String(element.__liveBlock?.raw ?? element.__liveRaw ?? ""))
+    .join("\n\n");
+}
+
 export function scheduleMarkdownRender(block) {
   if (block.renderFrame) return;
   block.renderFrame = window.requestAnimationFrame(() => {
@@ -79,6 +103,7 @@ export function appendAssistantDelta(live, delta) {
     const element = document.createElement("div");
     element.className = "markdown-body live-text-block";
     const block = { element, raw: "", renderFrame: null };
+    element.__liveBlock = block;
     procLineBreak(live.blocks);
     live.blocks.appendChild(element);
     syncBubbleWidth(live.article);

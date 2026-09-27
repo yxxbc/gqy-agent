@@ -23,6 +23,7 @@ import { start as start_features_conversation_subagent_js } from "./features/con
 import { refreshSessionContext } from "./features/goal.js";
 import { start as start_features_jobs_js } from "./features/jobs.js";
 import { handleGlobalKeydown } from "./features/keyboard.js";
+import { resyncOnVisible } from "./features/live/sse.js";
 import { renderMarkdown } from "./features/markdown/render.js";
 import { closeLevelMenu, closeModelMenu, openModelMenu, positionModelMenu, renderModelMenu } from "./features/model-menu/menu.js";
 import { bindOobeEvents, openOobe } from "./features/oobe.js";
@@ -472,6 +473,7 @@ function initialize() {
   const syncPaused = () => document.body.classList.toggle("gqy-paused", document.hidden);
   document.addEventListener("visibilitychange", syncPaused);
   syncPaused();
+  document.addEventListener("visibilitychange", resyncOnVisible);
   loadBootstrap();
 }
 

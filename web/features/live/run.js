@@ -10,7 +10,7 @@ import { contentAdded, scrollToBottom } from "../conversation/scroll.js";
 import { appendUserMessage } from "../conversation/user.js";
 import { refreshViewSnapshot } from "./sse.js";
 import { breakLiveText, clearTypingIndicator, disposeLiveState, ensureLiveArticle, ensureLiveUser, removeLiveStopButton, renderQueueTray, showInterruptedMarker, showTypingIndicator, stashLiveArticle, syncBubbleWidth } from "./state.js";
-import { finalizeLiveReasoning, rerenderLiveHtmlFences } from "./stream.js";
+import { finalizeLiveReasoning, repairLiveTextBlocks, rerenderLiveHtmlFences } from "./stream.js";
 import { endPendingQuestions } from "../questions.js";
 import { renderSessionList } from "../sessions/list.js";
 import { trackRun } from "../sessions/runs.js";
@@ -340,11 +340,8 @@ export function finishLiveRun(kind, data, live) {
   clearPreparingTool(live);
   clearTypingIndicator(live);
   finalizeLiveReasoning(live);
-  if (live.currentText?.renderFrame) {
-    window.cancelAnimationFrame(live.currentText.renderFrame);
-    live.currentText.renderFrame = null;
-    live.currentText.element.__liveRaw = live.currentText.raw;
-  }
+  // 收尾必须把缓冲画完：只取消排着的那一帧，后台标签页里的回复会停在切走那一刻。
+  if (live.blocks) repairLiveTextBlocks(live.blocks);
   rerenderLiveHtmlFences(live);
   procLineBreak(live.blocks);
   setLiveEndpoint(live, data?.provider_id, data?.model);
