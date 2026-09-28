@@ -1,5 +1,6 @@
 //! 回合作用域(09-11 成员,09-13 起管理员 `/sandbox`):工作区落在哪、子进程套不套
-//! Landlock。三处作用域化点(回合、重做、工具桥)都从 [`session_scope`] 拿,不各写一遍。
+//! 内核沙盒(Linux=Landlock,macOS=Seatbelt)。三处作用域化点(回合、重做、工具桥)
+//! 都从 [`session_scope`] 拿,不各写一遍。
 //!
 //! - 会话归成员(归属键非空、账号不是管理员)→ 工作区 = `home/<用户>/workspace`
 //!   (不看会话记录——成员改不了,也不该把 daemon 的 cwd 当工作区),成员策略
@@ -107,6 +108,17 @@ fn base_read_write(paths: &GqyPaths, root: &std::path::Path) -> Vec<PathBuf> {
     let runtime_dir = paths.runtime_dir();
     if runtime_dir.exists() {
         read_write.push(runtime_dir);
+    }
+    // 子进程用的临时目录也得能写:macOS 的 TMPDIR 是每个用户私有的
+    // `/var/folders/…/T/`(不是 `/tmp`),不放行的话 mktemp / cargo / node 这些
+    // 写临时文件第一步就撞墙。Linux 上通常就是 `/tmp`,提前覆盖了。
+    if let Some(temp) = std::env::var_os("TMPDIR")
+        .map(PathBuf::from)
+        .filter(|path| path.is_dir())
+    {
+        if !read_write.iter().any(|existing| temp.starts_with(existing)) {
+            read_write.push(temp);
+        }
     }
     read_write
 }

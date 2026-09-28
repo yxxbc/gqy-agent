@@ -76,6 +76,8 @@ agy 调用后的模型吞吐速度优化，实测下来通过顾清影的修复�
 ## 12. macOS 沙盒后端
 
 > 09-26 复核：**仍未做**。`src/tools/sandbox/` 只有 `backend.rs` / `linux.rs` / `unsupported.rs`，没有 `macos.rs`；非 Linux 一律走 `Unsupported`（直接返回 ENOTSUP，失败关闭）。全仓搜 `sandbox-exec` / Seatbelt 零命中。
+>
+> **09-27 已做完**。实际做法与下面那段设想有一处不同：走**进程内 libsandbox**（父进程 `sandbox_compile_string` 编译、子进程 `sandbox_apply` 应用），不是把 profile 交给 `sandbox-exec`；理由与实测语义（规则后写的赢、规则路径必须预解析、`(deny default)` 走不通、符号在 dyld 共享缓存里）写在 `docs/design/2026-09-27-macos-sandbox.md`。代码：`src/tools/sandbox/seatbelt.rs`（策略 → SBPL，纯函数）+ `macos.rs`（dlsym 胶水）。**本条可从 todolist 移除**。
 
 macOS 沙盒后端：`/sandbox` 目前只有 Linux 的 Landlock 后端（`src/tools/sandbox/linux.rs`），非 Linux 走 `unsupported.rs`——**失败关闭**：绑了沙盒的会话在 macOS 上命令一条都跑不了（不是直通裸奔）。补 `src/tools/sandbox/macos.rs`，把 `SandboxPolicy` 译成 Seatbelt profile 交给 `sandbox-exec`：放行工作区、临时目录与 npm/cargo/pip 编译缓存，挡掉 `~/.ssh`、`~/.gnupg`、`~/.aws` 等凭证目录；需要越权的命令走确认或降级直通。（miyu-agent#47）
 

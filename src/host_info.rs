@@ -194,7 +194,8 @@ pub(crate) fn host_environment_block_full(
     }
     if let Some(policy) = sandbox {
         block.push_str(&format!(
-            " sandbox=\"landlock\" root=\"{}\" writable=\"{}\" readable=\"{}\"",
+            " sandbox=\"{}\" root=\"{}\" writable=\"{}\" readable=\"{}\"",
+            crate::tools::sandbox::backend_label(),
             xml_attr_escape(&policy.root.display().to_string()),
             xml_attr_escape(&policy.writable_summary.join(", ")),
             xml_attr_escape(&policy.readable_summary.join(", ")),
@@ -281,9 +282,11 @@ mod tests {
         };
         let root = PathBuf::from("/home/tester/.gqy");
         let block = host_environment_block_full(&root, Some("stub/a"), None, Some(&policy));
-        assert!(block.contains(
-            " sandbox=\"landlock\" root=\"/home/tester/proj\" writable=\"root, /tmp, ~/.cargo\" readable=\"root, /tmp, system dirs\"/>"
-        ), "{block}");
+        let expected = format!(
+            " sandbox=\"{}\" root=\"/home/tester/proj\" writable=\"root, /tmp, ~/.cargo\" readable=\"root, /tmp, system dirs\"/>",
+            crate::tools::sandbox::backend_label()
+        );
+        assert!(block.contains(&expected), "{block}");
         assert_eq!(
             block,
             host_environment_block_full(&root, Some("stub/a"), None, Some(&policy))

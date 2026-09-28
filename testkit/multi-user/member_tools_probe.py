@@ -211,7 +211,7 @@ def main():
             status, created = admin.call("POST", "/api/sessions", {"name": "管理员走查"})
             asid = created["session"]["session_id"]
             run_actor(admin, asid, "admin", str(HOME), str(admin_ws), sandboxed=False)
-            check("admin: 环境块不带 sandbox", 'sandbox="landlock"' not in last_system())
+            check("admin: 环境块不带 sandbox", 'sandbox="' not in last_system())
 
             # 管理员 /sandbox(09-13):绑定 → 同一套调用锁在根下;解绑 → 同一会话恢复
             real_ws = os.path.realpath(admin_ws)
@@ -230,7 +230,7 @@ def main():
             system = last_system()
             at = system.find("sandbox=")
             check("admin-sandbox: 环境块带 sandbox 根与放行摘要",
-                  'sandbox="landlock"' in system and f'root="{real_ws}"' in system and 'writable="root, /tmp' in system and 'readable="root, /tmp, system dirs' in system,
+                  'sandbox="' in system and f'root="{real_ws}"' in system and 'writable="root, /tmp' in system and 'readable="root, /tmp, system dirs' in system,
                   system[max(at - 2, 0):at + 200] if at >= 0 else system[:120])
             status, body = admin.call("PATCH", f"/api/sessions/{ssid}", {"sandbox": str(HOME / "does-not-exist")})
             check("admin-sandbox: 绑不存在的目录被拒", status >= 400, f"{status} {json.dumps(body, ensure_ascii=False)[:100]}")
@@ -241,7 +241,7 @@ def main():
             for name in ("made.txt", "cmd.txt"):
                 (admin_ws / name).unlink(missing_ok=True)
             run_actor(admin, ssid, "admin-unbound", str(HOME), str(admin_ws), sandboxed=False)
-            check("admin-unbound: 环境块不再带 sandbox", 'sandbox="landlock"' not in last_system())
+            check("admin-unbound: 环境块不再带 sandbox", 'sandbox="' not in last_system())
         finally:
             stub2.terminate()
     finally:

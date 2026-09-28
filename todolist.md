@@ -19,7 +19,7 @@
 - 支持 QQ 官方机器人
 - 支持 Telegram（现在有了通用连接器协议，写个连接器即可，不用改 gqy）
 - 安全性、权限
-- macOS 沙盒后端（Seatbelt），现在 macOS 上绑了沙盒的会话命令一条都跑不了（§12）
+- macOS 沙盒后端（Seatbelt）：09-27 已做，见 `docs/design/2026-09-27-macos-sandbox.md`（§12 记录）
 
 ## 优化
 

@@ -325,7 +325,7 @@ pub enum SessionCommand {
         target: String,
         model: Option<String>,
     },
-    /// 查看/绑定会话沙盒根(Landlock);`--clear` 解绑
+    /// 查看/绑定会话沙盒根;`--clear` 解绑
     Sandbox {
         target: String,
         dir: Option<PathBuf>,

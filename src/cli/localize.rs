@@ -596,8 +596,8 @@ pub(in crate::cli) fn localize_session_command(command: clap::Command) -> clap::
         ),
         (
             "sandbox",
-            "Show or bind the session sandbox root (Landlock); --clear unbinds",
-            "查看/绑定会话沙盒根(Landlock);--clear 解绑",
+            "Show or bind the session sandbox root; --clear unbinds",
+            "查看/绑定会话沙盒根;--clear 解绑",
         ),
     ];
     let mut command = command;

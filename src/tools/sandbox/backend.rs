@@ -5,7 +5,9 @@ use super::SandboxPolicy;
 pub(super) enum Rules {
     #[cfg(target_os = "linux")]
     Linux(super::linux::Rules),
-    #[cfg(any(not(target_os = "linux"), test))]
+    #[cfg(target_os = "macos")]
+    Macos(super::macos::Rules),
+    #[cfg(any(not(any(target_os = "linux", target_os = "macos")), test))]
     Unsupported,
 }
 
@@ -29,7 +31,11 @@ impl Rules {
         {
             Self::Linux(super::linux::Rules::prepare(policy))
         }
-        #[cfg(not(target_os = "linux"))]
+        #[cfg(target_os = "macos")]
+        {
+            Self::Macos(super::macos::Rules::prepare(policy))
+        }
+        #[cfg(not(any(target_os = "linux", target_os = "macos")))]
         {
             let _ = policy;
             Self::Unsupported
@@ -40,7 +46,9 @@ impl Rules {
         match self {
             #[cfg(target_os = "linux")]
             Self::Linux(rules) => rules.apply(),
-            #[cfg(any(not(target_os = "linux"), test))]
+            #[cfg(target_os = "macos")]
+            Self::Macos(rules) => rules.apply(),
+            #[cfg(any(not(any(target_os = "linux", target_os = "macos")), test))]
             Self::Unsupported => super::unsupported::apply(),
         }
     }

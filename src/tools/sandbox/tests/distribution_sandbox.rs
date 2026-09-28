@@ -10,12 +10,14 @@ enum Entry {
 
 const ENTRIES: [Entry; 3] = [Entry::Async, Entry::Std, Entry::Relay];
 
+/// 让「后端不可用」这件事在两端都能造出来:Linux/macOS 用故障注入的钩子,
+/// 别的平台本来就没有后端。
 async fn unavailable_backend<F: std::future::Future>(future: F) -> F::Output {
-    #[cfg(target_os = "linux")]
+    #[cfg(any(target_os = "linux", target_os = "macos"))]
     {
         backend::FORCE_UNSUPPORTED.scope(true, future).await
     }
-    #[cfg(not(target_os = "linux"))]
+    #[cfg(not(any(target_os = "linux", target_os = "macos")))]
     {
         assert_eq!(probe(), None);
         future.await
@@ -104,11 +106,11 @@ async fn guards_follow_external_symlinks_and_nonexistent_leaves() {
     .await;
 }
 
-#[cfg(target_os = "linux")]
+#[cfg(any(target_os = "linux", target_os = "macos"))]
 #[tokio::test]
-async fn linux_all_entrypoints_enforce_policy_and_inherited_grants() {
-    let abi = probe().expect("BLOCKED: Linux kernel without Landlock");
-    eprintln!("distribution_sandbox Linux kernel Landlock ABI: {abi}");
+async fn all_entrypoints_enforce_policy_and_inherited_grants() {
+    let abi = probe().expect("BLOCKED: no filesystem sandbox backend");
+    eprintln!("distribution_sandbox backend {} abi {abi}", backend_label());
     let temp = tempfile::tempdir().unwrap();
     let allowed = temp.path().join("allowed");
     let readonly = temp.path().join("readonly");
@@ -150,11 +152,14 @@ async fn linux_all_entrypoints_enforce_policy_and_inherited_grants() {
     .await;
 }
 
-#[cfg(target_os = "linux")]
+#[cfg(any(target_os = "linux", target_os = "macos"))]
 #[tokio::test]
-async fn linux_relay_preserves_home_and_grants_only_explicit_config() {
-    let abi = probe().expect("BLOCKED: Linux kernel without Landlock");
-    eprintln!("distribution_sandbox Linux kernel Landlock ABI: {abi}");
+async fn relay_preserves_home_and_grants_only_explicit_config() {
+    let abi = probe().expect("BLOCKED: no filesystem sandbox backend");
+    eprintln!(
+        "distribution_sandbox relay backend {} abi {abi}",
+        backend_label()
+    );
     let temp = tempfile::tempdir().unwrap();
     let root = temp.path().join("root");
     let config = temp.path().join("config");

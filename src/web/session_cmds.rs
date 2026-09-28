@@ -526,12 +526,12 @@ pub(in crate::web) async fn handle_session_command(
                             root.display()
                         ));
                     }
-                    // 规则是 daemon 装的,在这里探测内核;没有 Landlock 就当场拒绝,
+                    // 规则是 daemon 装的,在这里探测后端;没有可用后端就当场拒绝,
                     // 别等到跑命令才失败关闭。
                     if crate::tools::sandbox::probe().is_none() {
                         return Err(t(
-                            "this kernel has no Landlock (Linux 5.13+ required); cannot sandbox",
-                            "这个内核没有 Landlock(需要 Linux 5.13+),无法沙盒",
+                            "no filesystem sandbox backend is available on this system; cannot sandbox",
+                            "这台机器上没有可用的沙盒后端,无法沙盒",
                         )
                         .to_string());
                     }

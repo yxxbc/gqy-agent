@@ -201,9 +201,14 @@ pub async fn run(paths: GqyPaths, args: WebArgs) -> Result<()> {
         );
     }
     match crate::tools::sandbox::probe() {
-        Some(abi) => tracing::info!(abi, "member sandbox: landlock available"),
+        Some(abi) => tracing::info!(
+            abi,
+            backend = crate::tools::sandbox::backend_label(),
+            "member sandbox backend available"
+        ),
         None => tracing::warn!(
-            "member sandbox: landlock unavailable on this kernel; member commands will be refused"
+            backend = crate::tools::sandbox::backend_label(),
+            "member sandbox backend unavailable; member commands will be refused"
         ),
     }
     std::io::stdout().flush().ok();

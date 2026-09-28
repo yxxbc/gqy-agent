@@ -1,40 +1,68 @@
-//! 子进程沙盒(09-11 成员,09-13 起管理员会话也可绑;Landlock)。
+//! 子进程沙盒(09-11 成员,09-13 起管理员会话也可绑;Linux=Landlock,macOS=Seatbelt)。
 //!
-//! 照搬 dsh 的 `landlock-run` 思路:fork 之后、exec 之前给**子进程自己**装一套
-//! Landlock 规则集(允许列表),规则随 `execve` 继承,命令和它再起的一切子进程
-//! 都受限,daemon 本身不受影响。没有任何依赖——三个裸 syscall 加一次 `prctl`,
-//! 内核 5.13+ 自带。
+//! 两个后端同一套形状:fork 之后、exec 之前给**子进程自己**装一套文件系统规则,
+//! 规则随 `execve` 继承,命令和它再起的一切子进程都受限,daemon 本身不受影响。
+//!
+//! - Linux(Landlock):照搬 dsh 的 `landlock-run` 思路,三个裸 syscall 加一次
+//!   `prctl`,内核 5.13+ 自带,零依赖。
+//! - macOS(Seatbelt):父进程把策略译成 SBPL 编译好,子进程里只调一次
+//!   `sandbox_apply`(libsandbox 私有 API,经 dyld 共享缓存取符号)。语义与写法
+//!   见 `seatbelt.rs` 的模块注释。
 //!
 //! 策略由调用方给(回合层按「会话归谁、绑没绑沙盒」算,见 `web::sandbox_scope`):
 //! 成员的回合与工具桥里,run_command、后台 job、脚本工具起的进程只能写自己家里
 //! 的工作区、`/tmp` 与脚本缓存,其余只读;管理员默认不套,`/sandbox <路径>` 绑定
-//! 后同样读写都锁在那个根下。内核不支持(没编 Landlock / 被禁)就**失败关闭**:
-//! 沙盒回合的命令一个都不跑,而不是裸奔。
+//! 后同样读写都锁在那个根下。两端都没有可用后端就**失败关闭**:沙盒回合的命令
+//! 一个都不跑,而不是裸奔。
 //!
-//! 只管文件系统。网络(ABI 4 的 TCP bind/connect)不在 handled 集合里,不受限。
-//! Linux 使用 Landlock。macOS 等尚无后端的平台在存在策略时拒绝创建子进程,
-//! 不执行任何 Linux syscall。没有策略的命令保持正常执行。
+//! 只管文件系统。网络(Landlock ABI 4 的 TCP bind/connect、Seatbelt 的 network*)
+//! 都不在限制里。没有策略的命令保持正常执行。
 
 use std::path::PathBuf;
 use std::sync::Arc;
 
 #[cfg(target_os = "linux")]
 mod linux;
-#[cfg(any(not(target_os = "linux"), test))]
+#[cfg(target_os = "macos")]
+mod macos;
+#[cfg(any(not(any(target_os = "linux", target_os = "macos")), test))]
 mod unsupported;
 
 mod backend;
+#[cfg(any(target_os = "macos", test))]
+mod seatbelt;
 use backend::Rules;
 
-/// Available filesystem sandbox ABI. None means no supported kernel backend.
+/// Available filesystem sandbox ABI. None means no supported backend.
 pub fn probe() -> Option<i64> {
     #[cfg(target_os = "linux")]
     {
         linux::probe()
     }
-    #[cfg(not(target_os = "linux"))]
+    #[cfg(target_os = "macos")]
+    {
+        macos::probe()
+    }
+    #[cfg(not(any(target_os = "linux", target_os = "macos")))]
     {
         unsupported::probe()
+    }
+}
+
+/// 后端的名字:进系统提示词的 `<host-environment sandbox=…>`,也是日志与拒绝
+/// 提示里说的那个词。每台机器上是常量(缓存前缀契约靠这一点)。
+pub fn backend_label() -> &'static str {
+    #[cfg(target_os = "linux")]
+    {
+        "landlock"
+    }
+    #[cfg(target_os = "macos")]
+    {
+        "seatbelt"
+    }
+    #[cfg(not(any(target_os = "linux", target_os = "macos")))]
+    {
+        "none"
     }
 }
 

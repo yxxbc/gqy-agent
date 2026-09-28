@@ -22,7 +22,7 @@
     },
     "src/agent/context_breakdown.rs": {
       "tests": 0,
-      "total": 299
+      "total": 165
     },
     "src/agent/context_meter.rs": {
       "tests": 0,
@@ -42,7 +42,7 @@
     },
     "src/agent/history.rs": {
       "tests": 0,
-      "total": 425
+      "total": 429
     },
     "src/agent/images.rs": {
       "tests": 0,
@@ -66,7 +66,7 @@
     },
     "src/agent/prompt.rs": {
       "tests": 0,
-      "total": 226
+      "total": 256
     },
     "src/agent/pruning.rs": {
       "tests": 0,
@@ -86,7 +86,7 @@
     },
     "src/agent/setup.rs": {
       "tests": 10,
-      "total": 659
+      "total": 677
     },
     "src/agent/tests/artifacts.rs": {
       "tests": 0,
@@ -102,7 +102,7 @@
     },
     "src/agent/tests/context.rs": {
       "tests": 0,
-      "total": 1362
+      "total": 1357
     },
     "src/agent/tests/input.rs": {
       "tests": 0,
@@ -114,7 +114,7 @@
     },
     "src/agent/tests/prompt.rs": {
       "tests": 0,
-      "total": 595
+      "total": 657
     },
     "src/agent/tests/queue_journal.rs": {
       "tests": 0,
@@ -146,11 +146,11 @@
     },
     "src/agent/turn_loop/mod.rs": {
       "tests": 0,
-      "total": 1376
+      "total": 1380
     },
     "src/agent/turn_loop/parallel.rs": {
       "tests": 0,
-      "total": 327
+      "total": 331
     },
     "src/agent/turn_loop/redo.rs": {
       "tests": 0,
@@ -321,8 +321,8 @@
       "total": 1055
     },
     "src/cli/repl/jobs.rs": {
-      "tests": 0,
-      "total": 337
+      "tests": 80,
+      "total": 457
     },
     "src/cli/repl/layout.rs": {
       "tests": 0,
@@ -334,11 +334,15 @@
     },
     "src/cli/repl/mod.rs": {
       "tests": 0,
-      "total": 22
+      "total": 23
     },
     "src/cli/repl/placeholder.rs": {
       "tests": 0,
       "total": 431
+    },
+    "src/cli/repl/question_flow.rs": {
+      "tests": 45,
+      "total": 248
     },
     "src/cli/repl/remote/interactive.rs": {
       "tests": 0,
@@ -350,7 +354,7 @@
     },
     "src/cli/repl/remote/one_shot.rs": {
       "tests": 0,
-      "total": 886
+      "total": 877
     },
     "src/cli/repl/session.rs": {
       "tests": 0,
@@ -402,7 +406,7 @@
     },
     "src/cli/repl/wake.rs": {
       "tests": 0,
-      "total": 466
+      "total": 560
     },
     "src/cli/repl/width.rs": {
       "tests": 0,
@@ -446,7 +450,7 @@
     },
     "src/cli/tests/footer_tail.rs": {
       "tests": 0,
-      "total": 874
+      "total": 876
     },
     "src/cli/tests/hangup.rs": {
       "tests": 0,
@@ -518,7 +522,7 @@
     },
     "src/config/defaults.rs": {
       "tests": 0,
-      "total": 528
+      "total": 523
     },
     "src/config/feature_catalog.rs": {
       "tests": 82,
@@ -614,19 +618,15 @@
     },
     "src/config/tool_plugins.rs": {
       "tests": 0,
-      "total": 921
+      "total": 917
     },
     "src/config_tui/antigravity_form.rs": {
       "tests": 0,
-      "total": 132
+      "total": 127
     },
     "src/config_tui/claude_code_form.rs": {
       "tests": 0,
       "total": 100
-    },
-    "src/models_cache/cli_catalog.rs": {
-      "tests": 130,
-      "total": 452
     },
     "src/config_tui/cline_form.rs": {
       "tests": 0,
@@ -642,7 +642,7 @@
     },
     "src/config_tui/mod.rs": {
       "tests": 4,
-      "total": 1113
+      "total": 1111
     },
     "src/config_tui/personas.rs": {
       "tests": 0,
@@ -678,7 +678,7 @@
     },
     "src/config_tui/providers.rs": {
       "tests": 0,
-      "total": 1244
+      "total": 1175
     },
     "src/config_tui/quota.rs": {
       "tests": 0,
@@ -841,8 +841,8 @@
       "total": 610
     },
     "src/host_info.rs": {
-      "tests": 95,
-      "total": 303
+      "tests": 97,
+      "total": 313
     },
     "src/i18n.rs": {
       "tests": 78,
@@ -854,7 +854,7 @@
     },
     "src/ipc/lifecycle.rs": {
       "tests": 0,
-      "total": 544
+      "total": 548
     },
     "src/ipc/mod.rs": {
       "tests": 517,
@@ -862,7 +862,7 @@
     },
     "src/ipc/protocol.rs": {
       "tests": 0,
-      "total": 466
+      "total": 471
     },
     "src/json_extract.rs": {
       "tests": 45,
@@ -946,7 +946,7 @@
     },
     "src/llm/openai_compatible/antigravity/mod.rs": {
       "tests": 50,
-      "total": 580
+      "total": 500
     },
     "src/llm/openai_compatible/antigravity/setup.rs": {
       "tests": 67,
@@ -954,11 +954,7 @@
     },
     "src/llm/openai_compatible/antigravity/stream.rs": {
       "tests": 96,
-      "total": 661
-    },
-    "src/llm/openai_compatible/antigravity/warm.rs": {
-      "tests": 36,
-      "total": 147
+      "total": 598
     },
     "src/llm/openai_compatible/builder.rs": {
       "tests": 0,
@@ -990,7 +986,7 @@
     },
     "src/llm/openai_compatible/cli_relay/process.rs": {
       "tests": 0,
-      "total": 242
+      "total": 248
     },
     "src/llm/openai_compatible/cli_relay/session.rs": {
       "tests": 253,
@@ -1006,7 +1002,7 @@
     },
     "src/llm/openai_compatible/cline/stream.rs": {
       "tests": 121,
-      "total": 668
+      "total": 667
     },
     "src/llm/openai_compatible/codex/mod.rs": {
       "tests": 130,
@@ -1026,7 +1022,7 @@
     },
     "src/llm/openai_compatible/errors.rs": {
       "tests": 59,
-      "total": 422
+      "total": 443
     },
     "src/llm/openai_compatible/lower.rs": {
       "tests": 0,
@@ -1034,7 +1030,7 @@
     },
     "src/llm/openai_compatible/mod.rs": {
       "tests": 4,
-      "total": 137
+      "total": 138
     },
     "src/llm/openai_compatible/protocol.rs": {
       "tests": 0,
@@ -1062,7 +1058,7 @@
     },
     "src/llm/openai_compatible/tests/antigravity.rs": {
       "tests": 0,
-      "total": 503
+      "total": 502
     },
     "src/llm/openai_compatible/tests/chat_stream.rs": {
       "tests": 0,
@@ -1078,7 +1074,7 @@
     },
     "src/llm/openai_compatible/tests/endpoint_retry.rs": {
       "tests": 0,
-      "total": 475
+      "total": 504
     },
     "src/llm/openai_compatible/tests/extra_body.rs": {
       "tests": 0,
@@ -1086,7 +1082,7 @@
     },
     "src/llm/openai_compatible/tests/failover.rs": {
       "tests": 0,
-      "total": 746
+      "total": 749
     },
     "src/llm/openai_compatible/tests/mod.rs": {
       "tests": 0,
@@ -1094,15 +1090,15 @@
     },
     "src/llm/openai_compatible/tests/responses.rs": {
       "tests": 0,
-      "total": 720
+      "total": 722
     },
     "src/llm/openai_compatible/tests/shared.rs": {
       "tests": 0,
-      "total": 247
+      "total": 249
     },
     "src/llm/openai_compatible/tests/thinking.rs": {
       "tests": 0,
-      "total": 410
+      "total": 411
     },
     "src/llm/openai_compatible/tests/tier_pool.rs": {
       "tests": 0,
@@ -1240,17 +1236,21 @@
       "tests": 0,
       "total": 246
     },
+    "src/models_cache/cli_catalog.rs": {
+      "tests": 147,
+      "total": 548
+    },
     "src/models_cache/lookup.rs": {
       "tests": 0,
       "total": 351
     },
     "src/models_cache/mod.rs": {
       "tests": 79,
-      "total": 777
+      "total": 779
     },
     "src/models_cache/provider_api.rs": {
       "tests": 0,
-      "total": 116
+      "total": 177
     },
     "src/notify.rs": {
       "tests": 24,
@@ -1398,7 +1398,7 @@
     },
     "src/platforms/common/scheduling.rs": {
       "tests": 0,
-      "total": 444
+      "total": 449
     },
     "src/platforms/common/tool.rs": {
       "tests": 48,
@@ -1430,7 +1430,7 @@
     },
     "src/platforms/connector/inbound.rs": {
       "tests": 106,
-      "total": 557
+      "total": 558
     },
     "src/platforms/connector/legacy.rs": {
       "tests": 0,
@@ -1594,7 +1594,7 @@
     },
     "src/platforms/onebot/turn.rs": {
       "tests": 0,
-      "total": 648
+      "total": 650
     },
     "src/platforms/onebot/voice_inbound.rs": {
       "tests": 0,
@@ -1950,7 +1950,7 @@
     },
     "src/question.rs": {
       "tests": 98,
-      "total": 424
+      "total": 437
     },
     "src/question_tui/draw.rs": {
       "tests": 0,
@@ -1962,7 +1962,7 @@
     },
     "src/question_tui/mod.rs": {
       "tests": 276,
-      "total": 827
+      "total": 900
     },
     "src/render/blocks.rs": {
       "tests": 22,
@@ -2018,7 +2018,7 @@
     },
     "src/render/stream/tool_summary.rs": {
       "tests": 0,
-      "total": 931
+      "total": 935
     },
     "src/render/style.rs": {
       "tests": 42,
@@ -2105,8 +2105,8 @@
       "total": 123
     },
     "src/runtime/questions.rs": {
-      "tests": 0,
-      "total": 161
+      "tests": 81,
+      "total": 324
     },
     "src/runtime/run.rs": {
       "tests": 0,
@@ -2198,7 +2198,7 @@
     },
     "src/state/conversation_db/mod.rs": {
       "tests": 215,
-      "total": 1108
+      "total": 1112
     },
     "src/state/conversation_db/platform.rs": {
       "tests": 16,
@@ -2220,6 +2220,10 @@
       "tests": 0,
       "total": 101
     },
+    "src/state/conversation_db/rooms.rs": {
+      "tests": 0,
+      "total": 254
+    },
     "src/state/conversation_db/rows.rs": {
       "tests": 0,
       "total": 676
@@ -2236,9 +2240,13 @@
       "tests": 0,
       "total": 343
     },
+    "src/state/conversation_db/subagent_trace.rs": {
+      "tests": 0,
+      "total": 96
+    },
     "src/state/conversation_db/turns.rs": {
       "tests": 0,
-      "total": 729
+      "total": 755
     },
     "src/state/conversation_db/types.rs": {
       "tests": 0,
@@ -2254,15 +2262,15 @@
     },
     "src/state/migrations/columns.rs": {
       "tests": 0,
-      "total": 350
+      "total": 399
     },
     "src/state/migrations/mod.rs": {
       "tests": 469,
-      "total": 794
+      "total": 804
     },
     "src/state/mod.rs": {
       "tests": 4,
-      "total": 486
+      "total": 492
     },
     "src/state/queue.rs": {
       "tests": 19,
@@ -2272,6 +2280,10 @@
       "tests": 0,
       "total": 42
     },
+    "src/state/rooms.rs": {
+      "tests": 0,
+      "total": 66
+    },
     "src/state/sessions.rs": {
       "tests": 0,
       "total": 570
@@ -2279,6 +2291,10 @@
     "src/state/shared_files.rs": {
       "tests": 139,
       "total": 404
+    },
+    "src/state/subagent_trace.rs": {
+      "tests": 0,
+      "total": 19
     },
     "src/state/tests/accounts.rs": {
       "tests": 0,
@@ -2302,7 +2318,7 @@
     },
     "src/state/tests/mod.rs": {
       "tests": 0,
-      "total": 19
+      "total": 20
     },
     "src/state/tests/platform.rs": {
       "tests": 0,
@@ -2319,6 +2335,10 @@
     "src/state/tests/reviews.rs": {
       "tests": 0,
       "total": 66
+    },
+    "src/state/tests/rooms.rs": {
+      "tests": 0,
+      "total": 167
     },
     "src/state/tests/sessions.rs": {
       "tests": 0,
@@ -2338,7 +2358,7 @@
     },
     "src/state/turns.rs": {
       "tests": 0,
-      "total": 311
+      "total": 318
     },
     "src/state/usage.rs": {
       "tests": 453,
@@ -2506,7 +2526,7 @@
     },
     "src/tools/jobs/mod.rs": {
       "tests": 30,
-      "total": 884
+      "total": 894
     },
     "src/tools/jobs/output.rs": {
       "tests": 135,
@@ -2514,7 +2534,7 @@
     },
     "src/tools/jobs/tests/lifecycle.rs": {
       "tests": 0,
-      "total": 200
+      "total": 201
     },
     "src/tools/jobs/tests/mod.rs": {
       "tests": 0,
@@ -2572,6 +2592,10 @@
       "tests": 0,
       "total": 448
     },
+    "src/tools/letter.rs": {
+      "tests": 36,
+      "total": 120
+    },
     "src/tools/load_tools.rs": {
       "tests": 261,
       "total": 441
@@ -2614,7 +2638,7 @@
     },
     "src/tools/mod.rs": {
       "tests": 672,
-      "total": 1227
+      "total": 1236
     },
     "src/tools/net_guard.rs": {
       "tests": 0,
@@ -2633,8 +2657,8 @@
       "total": 231
     },
     "src/tools/registry/mod.rs": {
-      "tests": 493,
-      "total": 1187
+      "tests": 580,
+      "total": 1349
     },
     "src/tools/registry/spec.rs": {
       "tests": 26,
@@ -2646,23 +2670,31 @@
     },
     "src/tools/sandbox/backend.rs": {
       "tests": 13,
-      "total": 48
+      "total": 56
     },
     "src/tools/sandbox/linux.rs": {
       "tests": 0,
       "total": 166
     },
+    "src/tools/sandbox/macos.rs": {
+      "tests": 18,
+      "total": 154
+    },
     "src/tools/sandbox/mod.rs": {
       "tests": 4,
-      "total": 227
+      "total": 255
+    },
+    "src/tools/sandbox/seatbelt.rs": {
+      "tests": 129,
+      "total": 285
     },
     "src/tools/sandbox/tests.rs": {
       "tests": 0,
-      "total": 118
+      "total": 119
     },
     "src/tools/sandbox/tests/distribution_sandbox.rs": {
       "tests": 0,
-      "total": 188
+      "total": 193
     },
     "src/tools/sandbox/unsupported.rs": {
       "tests": 0,
@@ -2734,11 +2766,15 @@
     },
     "src/tools/subagent.rs": {
       "tests": 201,
-      "total": 1364
+      "total": 1417
     },
     "src/tools/subagent_runner.rs": {
       "tests": 79,
-      "total": 904
+      "total": 939
+    },
+    "src/tools/subagent_trace.rs": {
+      "tests": 139,
+      "total": 267
     },
     "src/tools/todowrite.rs": {
       "tests": 121,
@@ -2876,9 +2912,13 @@
       "tests": 0,
       "total": 487
     },
+    "src/web/account_avatar.rs": {
+      "tests": 81,
+      "total": 340
+    },
     "src/web/accounts_api.rs": {
       "tests": 0,
-      "total": 885
+      "total": 888
     },
     "src/web/actor/job_wake.rs": {
       "tests": 0,
@@ -2906,7 +2946,7 @@
     },
     "src/web/bridge_question.rs": {
       "tests": 0,
-      "total": 93
+      "total": 95
     },
     "src/web/commands_api.rs": {
       "tests": 0,
@@ -2922,7 +2962,7 @@
     },
     "src/web/context_panel.rs": {
       "tests": 0,
-      "total": 84
+      "total": 83
     },
     "src/web/dashboards/affection.rs": {
       "tests": 0,
@@ -2978,7 +3018,7 @@
     },
     "src/web/dto.rs": {
       "tests": 0,
-      "total": 594
+      "total": 625
     },
     "src/web/embedded.rs": {
       "tests": 11,
@@ -2998,7 +3038,7 @@
     },
     "src/web/ipc_server.rs": {
       "tests": 0,
-      "total": 1023
+      "total": 1043
     },
     "src/web/job_access.rs": {
       "tests": 21,
@@ -3025,8 +3065,8 @@
       "total": 381
     },
     "src/web/mod.rs": {
-      "tests": 46,
-      "total": 369
+      "tests": 48,
+      "total": 377
     },
     "src/web/ownership.rs": {
       "tests": 0,
@@ -3042,15 +3082,31 @@
     },
     "src/web/providers_api.rs": {
       "tests": 0,
-      "total": 107
+      "total": 139
     },
     "src/web/qq_history.rs": {
       "tests": 0,
       "total": 139
     },
+    "src/web/rooms/driver.rs": {
+      "tests": 45,
+      "total": 563
+    },
+    "src/web/rooms/mod.rs": {
+      "tests": 0,
+      "total": 363
+    },
+    "src/web/rooms/participants.rs": {
+      "tests": 0,
+      "total": 204
+    },
+    "src/web/rooms/prompt.rs": {
+      "tests": 90,
+      "total": 227
+    },
     "src/web/sandbox_scope.rs": {
       "tests": 0,
-      "total": 262
+      "total": 279
     },
     "src/web/security.rs": {
       "tests": 0,
@@ -3062,19 +3118,23 @@
     },
     "src/web/server.rs": {
       "tests": 0,
-      "total": 1101
+      "total": 1132
     },
     "src/web/session_cmds.rs": {
       "tests": 0,
-      "total": 708
+      "total": 726
     },
     "src/web/sessions.rs": {
       "tests": 0,
-      "total": 1201
+      "total": 1206
     },
     "src/web/shared_files.rs": {
       "tests": 0,
       "total": 222
+    },
+    "src/web/subagent_api.rs": {
+      "tests": 38,
+      "total": 157
     },
     "src/web/tests/auth_secrets.rs": {
       "tests": 0,
@@ -3128,17 +3188,21 @@
       "tests": 0,
       "total": 133
     },
+    "src/web/today.rs": {
+      "tests": 29,
+      "total": 230
+    },
     "src/web/tty.rs": {
       "tests": 0,
       "total": 96
     },
     "src/web/turns/mod.rs": {
       "tests": 0,
-      "total": 752
+      "total": 763
     },
     "src/web/turns/task.rs": {
       "tests": 0,
-      "total": 974
+      "total": 998
     },
     "src/web/ui_prefs.rs": {
       "tests": 0,
@@ -3158,7 +3222,7 @@
     },
     "web/app.js": {
       "tests": 0,
-      "total": 428
+      "total": 484
     },
     "web/artifactchips.js": {
       "tests": 0,
@@ -3170,7 +3234,7 @@
     },
     "web/contextpanel.js": {
       "tests": 0,
-      "total": 453
+      "total": 574
     },
     "web/core/api.js": {
       "tests": 0,
@@ -3178,7 +3242,7 @@
     },
     "web/core/constants.js": {
       "tests": 0,
-      "total": 92
+      "total": 99
     },
     "web/core/dom.js": {
       "tests": 0,
@@ -3214,7 +3278,7 @@
     },
     "web/css/00-tokens.css": {
       "tests": 0,
-      "total": 262
+      "total": 304
     },
     "web/css/05-base.css": {
       "tests": 0,
@@ -3222,19 +3286,23 @@
     },
     "web/css/10-sidebar.css": {
       "tests": 0,
-      "total": 443
+      "total": 440
+    },
+    "web/css/11-sidebar-modes.css": {
+      "tests": 0,
+      "total": 562
     },
     "web/css/12-stage-controls.css": {
       "tests": 0,
-      "total": 443
+      "total": 365
     },
     "web/css/14-goal-and-jobs.css": {
       "tests": 0,
-      "total": 532
+      "total": 537
     },
     "web/css/20-messages.css": {
       "tests": 0,
-      "total": 604
+      "total": 665
     },
     "web/css/22-markdown.css": {
       "tests": 0,
@@ -3258,11 +3326,15 @@
     },
     "web/css/31-subagent-panel.css": {
       "tests": 0,
-      "total": 605
+      "total": 626
     },
     "web/css/32-indicators.css": {
       "tests": 0,
       "total": 128
+    },
+    "web/css/33-subagent-drawer.css": {
+      "tests": 0,
+      "total": 240
     },
     "web/css/34-artifacts.css": {
       "tests": 0,
@@ -3270,15 +3342,19 @@
     },
     "web/css/36-stage-states.css": {
       "tests": 0,
-      "total": 345
+      "total": 432
+    },
+    "web/css/38-today.css": {
+      "tests": 0,
+      "total": 348
     },
     "web/css/40-composer.css": {
       "tests": 0,
-      "total": 247
+      "total": 300
     },
     "web/css/42-context-panel.css": {
       "tests": 0,
-      "total": 248
+      "total": 251
     },
     "web/css/44-selection-menu.css": {
       "tests": 0,
@@ -3286,7 +3362,7 @@
     },
     "web/css/46-attachments-voice.css": {
       "tests": 0,
-      "total": 344
+      "total": 346
     },
     "web/css/48-composer-controls.css": {
       "tests": 0,
@@ -3302,11 +3378,15 @@
     },
     "web/css/54-dialogs.css": {
       "tests": 0,
-      "total": 474
+      "total": 485
     },
     "web/css/60-console.css": {
       "tests": 0,
       "total": 237
+    },
+    "web/css/62-avatar-card.css": {
+      "tests": 0,
+      "total": 248
     },
     "web/css/62-inline-content.css": {
       "tests": 0,
@@ -3320,6 +3400,10 @@
       "tests": 0,
       "total": 303
     },
+    "web/css/66-letter.css": {
+      "tests": 0,
+      "total": 230
+    },
     "web/css/70-dashboard-kit.css": {
       "tests": 0,
       "total": 316
@@ -3330,7 +3414,7 @@
     },
     "web/css/74-settings-kit.css": {
       "tests": 0,
-      "total": 391
+      "total": 393
     },
     "web/css/76-dashboard-extras.css": {
       "tests": 0,
@@ -3355,6 +3439,22 @@
     "web/css/86-expresscard.css": {
       "tests": 0,
       "total": 105
+    },
+    "web/css/90-mode-dev.css": {
+      "tests": 0,
+      "total": 252
+    },
+    "web/css/92-dev-hud.css": {
+      "tests": 0,
+      "total": 242
+    },
+    "web/css/94-dev-statusbar.css": {
+      "tests": 0,
+      "total": 250
+    },
+    "web/css/96-room.css": {
+      "tests": 0,
+      "total": 241
     },
     "web/dash-affection.js": {
       "tests": 0,
@@ -3414,7 +3514,7 @@
     },
     "web/features/accounts.js": {
       "tests": 0,
-      "total": 217
+      "total": 219
     },
     "web/features/appearance.js": {
       "tests": 0,
@@ -3440,21 +3540,29 @@
       "tests": 0,
       "total": 250
     },
+    "web/features/avatar-settings.js": {
+      "tests": 0,
+      "total": 319
+    },
     "web/features/boot.js": {
       "tests": 0,
-      "total": 181
+      "total": 191
     },
     "web/features/composer/attachments.js": {
       "tests": 0,
-      "total": 229
+      "total": 237
+    },
+    "web/features/composer/drafts.js": {
+      "tests": 0,
+      "total": 75
     },
     "web/features/composer/input.js": {
       "tests": 0,
-      "total": 94
+      "total": 99
     },
     "web/features/composer/submit.js": {
       "tests": 0,
-      "total": 224
+      "total": 231
     },
     "web/features/composer/voice.js": {
       "tests": 0,
@@ -3494,19 +3602,23 @@
     },
     "web/features/conversation/render.js": {
       "tests": 0,
-      "total": 595
+      "total": 597
     },
     "web/features/conversation/scroll.js": {
       "tests": 0,
       "total": 100
     },
+    "web/features/conversation/subagent-drawer.js": {
+      "tests": 0,
+      "total": 343
+    },
     "web/features/conversation/subagent.js": {
       "tests": 0,
-      "total": 376
+      "total": 504
     },
     "web/features/conversation/user.js": {
       "tests": 0,
-      "total": 344
+      "total": 346
     },
     "web/features/goal.js": {
       "tests": 0,
@@ -3514,11 +3626,11 @@
     },
     "web/features/jobs.js": {
       "tests": 0,
-      "total": 382
+      "total": 408
     },
     "web/features/keyboard.js": {
       "tests": 0,
-      "total": 86
+      "total": 91
     },
     "web/features/live/context.js": {
       "tests": 0,
@@ -3526,15 +3638,15 @@
     },
     "web/features/live/run.js": {
       "tests": 0,
-      "total": 380
+      "total": 469
     },
     "web/features/live/sse.js": {
       "tests": 0,
-      "total": 401
+      "total": 408
     },
     "web/features/live/state.js": {
       "tests": 0,
-      "total": 500
+      "total": 497
     },
     "web/features/live/stream.js": {
       "tests": 0,
@@ -3574,27 +3686,43 @@
     },
     "web/features/persona.js": {
       "tests": 0,
-      "total": 90
+      "total": 188
     },
     "web/features/questions.js": {
       "tests": 0,
       "total": 526
     },
+    "web/features/room/room.js": {
+      "tests": 0,
+      "total": 518
+    },
     "web/features/session-mode.js": {
       "tests": 0,
-      "total": 156
+      "total": 112
     },
     "web/features/sessions/list.js": {
       "tests": 0,
-      "total": 391
+      "total": 482
+    },
+    "web/features/sessions/mode.js": {
+      "tests": 0,
+      "total": 89
     },
     "web/features/sessions/runs.js": {
       "tests": 0,
       "total": 81
     },
+    "web/features/sessions/statusbar.js": {
+      "tests": 0,
+      "total": 139
+    },
+    "web/features/sessions/switcher.js": {
+      "tests": 0,
+      "total": 120
+    },
     "web/features/sessions/view.js": {
       "tests": 0,
-      "total": 513
+      "total": 585
     },
     "web/features/settings/config.js": {
       "tests": 0,
@@ -3610,15 +3738,19 @@
     },
     "web/features/status.js": {
       "tests": 0,
-      "total": 87
+      "total": 88
+    },
+    "web/features/today.js": {
+      "tests": 0,
+      "total": 306
     },
     "web/features/tools/cards.js": {
       "tests": 0,
-      "total": 337
+      "total": 358
     },
     "web/features/tools/events.js": {
       "tests": 0,
-      "total": 565
+      "total": 588
     },
     "web/features/tools/format.js": {
       "tests": 0,
@@ -3638,7 +3770,11 @@
     },
     "web/index.html": {
       "tests": 0,
-      "total": 815
+      "total": 888
+    },
+    "web/lettercard.js": {
+      "tests": 0,
+      "total": 284
     },
     "web/lightbox.js": {
       "tests": 0,
@@ -3682,7 +3818,7 @@
     },
     "web/settings-schema/20-tool-plugins.js": {
       "tests": 0,
-      "total": 818
+      "total": 811
     },
     "web/settings-schema/30-qq.js": {
       "tests": 0,
@@ -3706,19 +3842,31 @@
     },
     "web/state/elements.js": {
       "tests": 0,
-      "total": 193
+      "total": 209
     },
     "web/state/store.js": {
       "tests": 0,
-      "total": 108
+      "total": 118
     },
     "web/todos.js": {
       "tests": 0,
       "total": 118
     },
+    "web/widgets/hud-boot.js": {
+      "tests": 0,
+      "total": 82
+    },
     "web/widgets/inline-error.js": {
       "tests": 0,
       "total": 13
+    },
+    "web/widgets/particle-veil.js": {
+      "tests": 0,
+      "total": 232
+    },
+    "web/widgets/petals.js": {
+      "tests": 0,
+      "total": 134
     }
   }
 }

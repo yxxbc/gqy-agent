@@ -214,11 +214,12 @@ state/cache/models。目录名用用户名，账号 id 另存账号表，princip
 
 ---
 
-## 七、沙盒（已落地，Landlock）
+## 七、沙盒（已落地；Linux=Landlock，macOS=Seatbelt）
 
-> **与计划的出入**：计划明确「不做沙盒，只留三个钩子」；as-built **把沙盒做了**。
+> **与计划的出入**：计划明确「不做沙盒，只留三个钩子」；as-built **把沙盒做了**。09-27 补上 macOS 后端
+> （`src/tools/sandbox/seatbelt.rs` + `macos.rs`，方案稿 `docs/design/2026-09-27-macos-sandbox.md`）。
 
-- **成员回合**：Landlock 限制。可读写 `home/<user>/workspace`、`/tmp`、`/dev/null`、cache 目录；
+- **成员回合**：内核文件系统规则限制。可读写 `home/<user>/workspace`、`/tmp`、`/dev/null`、cache 目录；
   只读 `/usr /bin /sbin /lib /lib64 /etc /proc /sys /dev /run /opt /var` + 脚本目录 +
   当前可执行文件。**沙盒外的读取也禁**——成员只能读工作区和系统目录。
 - **管理员**：默认不套。`/sandbox <root>`（REPL / WebUI / `gqy session sandbox`，IPC `SetSandbox`）
@@ -226,9 +227,10 @@ state/cache/models。目录名用用户名，账号 id 另存账号表，princip
   documents / pictures 产出目录 + 配置 `tools.sandbox.writable`（默认 `~/.cargo ~/.npm`）；只读
   系统目录 + 脚本目录 + 可执行文件 + `tools.sandbox.readable`（默认 `~/.rustup ~/.local ~/.gitconfig`）。
   HOME 换成 root，清单里放行了的工具链目录经 `CARGO_HOME / RUSTUP_HOME / npm_config_cache /
-  GIT_CONFIG_GLOBAL` 指回真家，`~/.cargo/bin ~/.local/bin` 补进 PATH。绑定时探测内核，成员会话拒绝。
-  环境块 `<host-environment sandbox="landlock" root=… writable=… readable=…>` 由策略摘要生成
-  （成员回合同一条路径），绑定/解绑各一次缓存冷启动；没有 on/off。
+  GIT_CONFIG_GLOBAL` 指回真家，`~/.cargo/bin ~/.local/bin` 补进 PATH。绑定时探测后端，成员会话拒绝。
+  环境块 `<host-environment sandbox="landlock|seatbelt" root=… writable=… readable=…>` 由策略摘要生成
+  （成员回合同一条路径），绑定/解绑各一次缓存冷启动；没有 on/off。macOS 侧后端是 Seatbelt
+  （`src/tools/sandbox/macos.rs` + `seatbelt.rs`），语义与差异见 `docs/design/2026-09-27-macos-sandbox.md`。
 - **进程内守卫**：read / edit / glob / grep / trash / apply_patch / print_image / vision /
   artifact / memes 都在进程内查一遍路径；`rg` 子进程也套沙盒。
 - **中转线 CLI 关进沙盒**：成员用 claude-code / codex / antigravity 时，整个 CLI 进程套同一套

@@ -14,7 +14,7 @@
 | 尺度 | **读写都锁**，与成员同款；网络不管 |
 | 开关 | 没有 on/off。会话只有两态：没绑 / 绑在某目录。换目录=重绑 |
 | 缓存 | 沙盒属性进 `<host-environment>`，绑定/解绑各掰一次前缀缓存，明说；不做会掰缓存的每会话微调 |
-| macOS | 不支持（Landlock 是 Linux 内核功能），绑定时直接拒绝 |
+| macOS | 09-27 已补后端（Seatbelt，`src/tools/sandbox/macos.rs` + `seatbelt.rs`，方案稿 `docs/design/2026-09-27-macos-sandbox.md`）；此前绑定时直接拒绝 |
 
 基线提交：`cdf820f9`。
 
@@ -157,7 +157,7 @@ IPC：`SetWorkspace` → `SetSandbox { target, root: Option<PathBuf> }`；校验
 - 每会话 `/sandbox allow <路径>`：会动环境块。
 - on/off 开关：同上。
 - 网络限制（Landlock ABI 4 有 TCP 钩子）：另案。
-- macOS `sandbox-exec` 后端：另案。
+- ~~macOS `sandbox-exec` 后端：另案~~ → 09-27 已做（走进程内 libsandbox，不是 `sandbox-exec` 包装；见 `docs/design/2026-09-27-macos-sandbox.md`）。
 
 ## 三、决策点（09-13 已拍板）
 

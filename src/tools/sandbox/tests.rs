@@ -1,11 +1,11 @@
 use super::*;
 
 /// 只读根 + 可写 /tmp 目录:目录里能写,别处不能;规则随 exec 继承到 sh。
-#[cfg(target_os = "linux")]
+#[cfg(any(target_os = "linux", target_os = "macos"))]
 #[tokio::test]
 async fn member_policy_confines_shell_writes() {
-    let abi = probe().expect("BLOCKED: kernel without Landlock");
-    eprintln!("Landlock ABI: {abi}");
+    let abi = probe().expect("BLOCKED: no filesystem sandbox backend");
+    eprintln!("sandbox backend {} abi {abi}", backend_label());
     let temp = tempfile::tempdir().unwrap();
     let allowed = temp.path().join("allowed");
     std::fs::create_dir_all(&allowed).unwrap();
@@ -18,8 +18,9 @@ async fn member_policy_confines_shell_writes() {
         home: Some(allowed.clone()),
         ..Default::default()
     });
+    // 系统文件的读用 `/etc/hosts`(两个平台都有;`/etc/hostname` 只有 Linux 有)。
     let script = format!(
-        "echo ok > {}/a.txt && ! (echo no > {}/b.txt) 2>/dev/null && cat /etc/hostname >/dev/null",
+        "echo ok > {}/a.txt && ! (echo no > {}/b.txt) 2>/dev/null && cat /etc/hosts >/dev/null",
         allowed.display(),
         denied.display()
     );

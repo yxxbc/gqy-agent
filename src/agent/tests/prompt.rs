@@ -200,7 +200,11 @@ async fn host_environment_reads_the_sandbox_policy_from_the_turn_scope() {
     });
     let (first, second) =
         crate::tools::sandbox::with_sandbox(Some(policy), async { (build(), build()) }).await;
-    assert!(first.contains(" sandbox=\"landlock\" root=\""), "{first}");
+    let label = crate::tools::sandbox::backend_label();
+    assert!(
+        first.contains(&format!(" sandbox=\"{label}\" root=\"")),
+        "{first}"
+    );
     assert!(first.contains(" writable=\"root, /tmp\" readable=\"root, /tmp, system dirs\""));
     assert_eq!(first, second, "same policy must render byte-identically");
     let outside = build();
