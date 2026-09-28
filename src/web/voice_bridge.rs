@@ -302,6 +302,14 @@ fn handle_worker_event(state: &DaemonState, kind: &str, data: Value) {
         "voice.ready" => {
             *DEVICE.lock().unwrap() = Some(text_field(&data, "device"));
         }
+        "voice.envelope" => {
+            // 播报的音量包络(10 帧/秒,见 src/voice/speaker.rs):桌面悬浮窗拿它
+            // 驱动嘴型。只在这些秒里有这类事件,而且一帧几十字节。
+            let value = data.get("value").and_then(Value::as_f64).unwrap_or(0.0);
+            state
+                .events
+                .publish("voice.envelope", json!({ "value": value }));
+        }
         "voice.wake" => {
             // 唤醒只是「我要开口了」,指令还没到:掐嘴不掐活。真要换指令,下面
             // voice.command 那条自会取消上一轮。

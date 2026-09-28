@@ -159,9 +159,20 @@ pub fn run_worker() -> Result<()> {
     };
     let speaker = {
         let event_tx = event_tx.clone();
-        Speaker::start(Box::new(move |on| {
-            let _ = event_tx.send(WorkerEvent::Speaking(on));
-        }))?
+        // 包络回调要被包络推送线程跨线程调用,而且要求 Sync——mpsc 的 Sender 自己
+        // 不是 Sync,所以套一层 Mutex。
+        let envelope_tx = std::sync::Arc::new(std::sync::Mutex::new(outbound_tx.clone()));
+        let on_envelope = std::sync::Arc::new(move |value: f32| {
+            if let Ok(tx) = envelope_tx.lock() {
+                let _ = tx.send(("voice.envelope".to_string(), json!({ "value": value })));
+            }
+        });
+        Speaker::start(
+            Box::new(move |on| {
+                let _ = event_tx.send(WorkerEvent::Speaking(on));
+            }),
+            on_envelope,
+        )?
     };
 
     let device = service

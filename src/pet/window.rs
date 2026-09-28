@@ -70,8 +70,8 @@ enum Command {
 /// 送进事件循环的意图。IPC 回调与事件循环不在同一处,消息走代理回传。
 enum UserEvent {
     Command(Command),
-    /// daemon 报来的宠物状态(订阅线程转发进来,见 `pet::ipc`)。
-    PetState(PetState),
+    /// daemon 推来的信号(状态 / 嘴型 / 情绪),见 `pet::ipc`。
+    Signal(ipc::PetSignal),
 }
 
 pub(in crate::pet) fn run(paths: &GqyPaths) -> Result<()> {
@@ -192,8 +192,8 @@ pub(in crate::pet) fn run(paths: &GqyPaths) -> Result<()> {
     // daemon 的状态订阅:她在想 / 在说话 / 闲着。断开它自己重连,这里只接线。
     {
         let state_proxy = proxy.clone();
-        ipc::spawn(&paths, move |state| {
-            let _ = state_proxy.send_event(UserEvent::PetState(state));
+        ipc::spawn(&paths, move |signal| {
+            let _ = state_proxy.send_event(UserEvent::Signal(signal));
         });
     }
     // 把落点写进日志:窗口跑到屏幕外时,这一行是唯一能对上的线索。
@@ -266,13 +266,27 @@ pub(in crate::pet) fn run(paths: &GqyPaths) -> Result<()> {
             Event::UserEvent(UserEvent::Command(Command::ModelNote { message })) => {
                 tracing::info!(message, "pet: 页面提示");
             }
-            Event::UserEvent(UserEvent::PetState(state)) => {
+            Event::UserEvent(UserEvent::Signal(ipc::PetSignal::State(state))) => {
                 // 表现交给页面(状态点颜色,以后还有表情与口型);这里只转一道。
                 let name = pet_state_name(state);
                 tracing::info!(state = name, "pet: 状态变化");
                 let script = format!("window.gqyPet?.setState(\"{name}\")");
                 if let Err(error) = webview.evaluate_script(&script) {
                     tracing::debug!(%error, "pet: 状态没送进页面");
+                }
+            }
+            Event::UserEvent(UserEvent::Signal(ipc::PetSignal::Mouth(value))) => {
+                // 10 帧/秒,不写日志(写就把日志刷爆了)。
+                let script = format!("window.gqyPet?.setMouth({value})");
+                if let Err(error) = webview.evaluate_script(&script) {
+                    tracing::debug!(%error, "pet: 嘴型没送进页面");
+                }
+            }
+            Event::UserEvent(UserEvent::Signal(ipc::PetSignal::Mood { valence, arousal })) => {
+                tracing::info!(valence, arousal, "pet: 情绪更新");
+                let script = format!("window.gqyPet?.setMood({valence}, {arousal})");
+                if let Err(error) = webview.evaluate_script(&script) {
+                    tracing::debug!(%error, "pet: 情绪没送进页面");
                 }
             }
             Event::UserEvent(UserEvent::Command(Command::Close)) => {

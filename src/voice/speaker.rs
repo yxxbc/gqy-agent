@@ -11,10 +11,17 @@
 //! 打断。`more` 标记说明「后面还有」,播完这段会留一个宽限期等下一段。
 
 use anyhow::{Context, Result};
+use rodio::Source;
 use std::collections::VecDeque;
 use std::io::Cursor;
+use std::sync::atomic::{AtomicU64, Ordering};
 use std::sync::mpsc;
+use std::sync::Arc;
 use std::time::Duration;
+
+/// 包络帧长(毫秒)。100ms(10 帧/秒)够嘴型跟得上音量,又不至于把 IPC 灌满——
+/// 原始音频一帧都不推(见 `voice_envelope`)。
+const ENVELOPE_FRAME_MS: u64 = 100;
 
 pub enum SpeakerCommand {
     /// 播一段完整 wav。`more` = daemon 说后面还有一段,别急着收状态。
@@ -28,11 +35,16 @@ pub struct Speaker {
 }
 
 impl Speaker {
-    pub fn start(on_state: Box<dyn Fn(bool) + Send>) -> Result<Self> {
+    /// `on_state` 报播报起止;`on_envelope` 报音量包络(0–1,每 100ms 一帧),
+    /// 给桌面悬浮窗驱动嘴型用。两个回调都在播报线程上被调用。
+    pub fn start(
+        on_state: Box<dyn Fn(bool) + Send>,
+        on_envelope: Arc<dyn Fn(f32) + Send + Sync>,
+    ) -> Result<Self> {
         let (tx, rx) = mpsc::channel::<SpeakerCommand>();
         std::thread::Builder::new()
             .name("gqy-voice-speaker".into())
-            .spawn(move || run(rx, on_state))
+            .spawn(move || run(rx, on_state, on_envelope))
             .context("启动播报线程失败")?;
         Ok(Self { tx })
     }
@@ -54,10 +66,16 @@ const OUTPUT_IDLE: Duration = Duration::from_secs(30);
 /// 掉线时不能把 speaking 永久钉在 true,那会让麦克风一直被丢帧。
 const NEXT_SEGMENT_GRACE: Duration = Duration::from_secs(3);
 
-fn run(rx: mpsc::Receiver<SpeakerCommand>, on_state: Box<dyn Fn(bool) + Send>) {
+fn run(
+    rx: mpsc::Receiver<SpeakerCommand>,
+    on_state: Box<dyn Fn(bool) + Send>,
+    on_envelope: Arc<dyn Fn(f32) + Send + Sync>,
+) {
     let mut output: Option<(rodio::OutputStream, rodio::OutputStreamHandle)> = None;
     let mut queue: VecDeque<(Vec<u8>, bool)> = VecDeque::new();
     let mut speaking = false;
+    // 包络线程的代际:新的一段 / 被打断都 +1,老线程看到自己的号过期就闭嘴退出。
+    let generation = Arc::new(AtomicU64::new(0));
     loop {
         let (wav, more) = match queue.pop_front() {
             Some(segment) => segment,
@@ -103,6 +121,10 @@ fn run(rx: mpsc::Receiver<SpeakerCommand>, on_state: Box<dyn Fn(bool) + Send>) {
         let Ok(sink) = rodio::Sink::try_new(handle) else {
             continue;
         };
+        // 这一段自己的包络:换代 → 上一段的推送线程作废,免得两段一起动嘴。
+        // 包络要在 wav 被 move 进解码器之前算。
+        let mine = generation.fetch_add(1, Ordering::Relaxed) + 1;
+        let envelope = voice_envelope(&wav);
         let Ok(source) = rodio::Decoder::new(Cursor::new(wav)) else {
             tracing::warn!("播报音频解码失败");
             continue;
@@ -112,8 +134,31 @@ fn run(rx: mpsc::Receiver<SpeakerCommand>, on_state: Box<dyn Fn(bool) + Send>) {
             speaking = true;
         }
         sink.append(source);
+        if !envelope.is_empty() {
+            let emit = Arc::clone(&on_envelope);
+            let generation = Arc::clone(&generation);
+            let spawned = std::thread::Builder::new()
+                .name("gqy-voice-envelope".into())
+                .spawn(move || {
+                    for value in envelope {
+                        std::thread::sleep(Duration::from_millis(ENVELOPE_FRAME_MS));
+                        if generation.load(Ordering::Relaxed) != mine {
+                            return;
+                        }
+                        emit(value);
+                    }
+                    // 收尾:这一段播完把嘴闭上。
+                    if generation.load(Ordering::Relaxed) == mine {
+                        emit(0.0);
+                    }
+                });
+            if let Err(error) = spawned {
+                tracing::warn!(%error, "包络推送线程起不来,嘴型不会动");
+            }
+        }
         if wait_for_sink(&rx, &sink, &mut queue) {
-            // 被打断:连同还没播的段一起作废。
+            // 被打断:连同还没播的段一起作废,脸也收回去。
+            generation.fetch_add(1, Ordering::Relaxed);
             queue.clear();
             if speaking {
                 on_state(false);
@@ -165,4 +210,99 @@ fn wait_for_sink(
     }
     sink.sleep_until_end();
     false
+}
+
+/// 把一段播报音频压成音量包络:每 100ms 一个 RMS,按峰值归一到 0–1。
+///
+/// 桌面悬浮窗拿它驱动嘴型(见 `docs/design/2026-09-28-desktop-pet.md` §6)。
+/// **不推原始音频**:数据量小、不重复解码,也不会让宠物变成第二个播放器。
+/// 不同 TTS 引擎的响度差很多,所以按峰值归一——不归一的话有的引擎嘴上几乎没动静。
+fn voice_envelope(wav: &[u8]) -> Vec<f32> {
+    let Ok(decoder) = rodio::Decoder::new(Cursor::new(wav.to_vec())) else {
+        return Vec::new();
+    };
+    let rate = decoder.sample_rate() as usize;
+    let channels = usize::from(decoder.channels()).max(1);
+    let per_frame = (rate * ENVELOPE_FRAME_MS as usize / 1000).max(1);
+    let frame_samples = per_frame * channels;
+
+    let mut frames = Vec::new();
+    let mut sum = 0.0f64;
+    let mut count = 0usize;
+    for sample in decoder {
+        sum += f64::from(sample) * f64::from(sample);
+        count += 1;
+        if count >= frame_samples {
+            frames.push((sum / count as f64).sqrt() as f32);
+            sum = 0.0;
+            count = 0;
+        }
+    }
+    if count > 0 {
+        frames.push((sum / count as f64).sqrt() as f32);
+    }
+
+    let peak = frames.iter().copied().fold(0.0f32, f32::max).max(0.01);
+    for value in &mut frames {
+        *value = (*value / peak).clamp(0.0, 1.0);
+    }
+    frames
+}
+
+#[cfg(test)]
+mod tests {
+    use super::voice_envelope;
+
+    /// 造一段 wav:前半静音、后半正弦。包络该是「先 0、后有值」,而且峰值归一。
+    #[test]
+    fn the_envelope_follows_loudness() {
+        let rate = 44100u32;
+        let half = rate / 2;
+        let mut samples = Vec::with_capacity((half * 2) as usize);
+        for index in 0..half * 2 {
+            let value = if index < half {
+                0.0
+            } else {
+                (index as f32 * 440.0 * std::f32::consts::TAU / rate as f32).sin() * 0.8
+            };
+            samples.push((value * f32::from(i16::MAX)) as i16);
+        }
+
+        let frames = voice_envelope(&pcm_wav(&samples, rate));
+        assert!(frames.len() >= 8, "包络帧太少: {}", frames.len());
+        assert!(frames[0] < 0.05, "开头是静音,不该有值: {}", frames[0]);
+        assert!(
+            frames.iter().copied().fold(0.0f32, f32::max) > 0.9,
+            "响亮的那半段应当归一"
+        );
+    }
+
+    /// 坏数据不给包络,也不许 panic——播报路径上任何 panic 都是事故。
+    #[test]
+    fn garbage_input_yields_no_envelope() {
+        assert!(voice_envelope(b"").is_empty());
+        assert!(voice_envelope(b"not a wav").is_empty());
+    }
+
+    /// 44 字节头 + i16 PCM,单声道。
+    fn pcm_wav(samples: &[i16], rate: u32) -> Vec<u8> {
+        let data_len = (samples.len() * 2) as u32;
+        let mut out = Vec::with_capacity(44 + data_len as usize);
+        out.extend_from_slice(b"RIFF");
+        out.extend_from_slice(&(36 + data_len).to_le_bytes());
+        out.extend_from_slice(b"WAVEfmt ");
+        out.extend_from_slice(&16u32.to_le_bytes());
+        out.extend_from_slice(&1u16.to_le_bytes());
+        out.extend_from_slice(&1u16.to_le_bytes());
+        out.extend_from_slice(&rate.to_le_bytes());
+        out.extend_from_slice(&(rate * 2).to_le_bytes());
+        out.extend_from_slice(&2u16.to_le_bytes());
+        out.extend_from_slice(&16u16.to_le_bytes());
+        out.extend_from_slice(b"data");
+        out.extend_from_slice(&data_len.to_le_bytes());
+        for sample in samples {
+            out.extend_from_slice(&sample.to_le_bytes());
+        }
+        out
+    }
 }

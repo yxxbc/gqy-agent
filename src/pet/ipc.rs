@@ -18,9 +18,20 @@ use std::time::Duration;
 /// 空窗太久,也不至于每秒敲一次门。
 const RETRY: Duration = Duration::from_secs(3);
 
-/// 起一个订阅线程。`on_state` 在**那条线程**上被调用,宿主自己负责把状态挪到
+/// daemon 推过来的东西。
+#[derive(Debug, Clone, Copy)]
+pub(in crate::pet) enum PetSignal {
+    /// 她在想 / 在说话 / 闲着。
+    State(PetState),
+    /// 播报音量(0–1),驱动嘴型。只在播报的那几秒里有。
+    Mouth(f32),
+    /// 情绪(主人在 QQ 上那一份),驱动表情。慢变量,变了才来。
+    Mood { valence: f64, arousal: f64 },
+}
+
+/// 起一个订阅线程。`on_signal` 在**那条线程**上被调用,宿主自己负责把信号挪到
 /// 该去的地方(我们的宿主是 GUI 事件循环,所以它只往事件代理里塞一条)。
-pub(in crate::pet) fn spawn(paths: &GqyPaths, on_state: impl Fn(PetState) + Send + 'static) {
+pub(in crate::pet) fn spawn(paths: &GqyPaths, on_signal: impl Fn(PetSignal) + Send + 'static) {
     let paths = paths.clone();
     let spawned = std::thread::Builder::new()
         .name("gqy-pet-state".into())
@@ -37,7 +48,7 @@ pub(in crate::pet) fn spawn(paths: &GqyPaths, on_state: impl Fn(PetState) + Send
             };
             runtime.block_on(async move {
                 loop {
-                    match subscribe(&paths, &on_state).await {
+                    match subscribe(&paths, &on_signal).await {
                         Ok(()) => tracing::debug!("pet: daemon 那边断了,准备重连"),
                         Err(error) => tracing::debug!(%error, "pet: 订阅没接上,准备重试"),
                     }
@@ -50,8 +61,8 @@ pub(in crate::pet) fn spawn(paths: &GqyPaths, on_state: impl Fn(PetState) + Send
     }
 }
 
-/// 连上、订阅、把状态推到断开为止(断开返回 `Ok`,连不上返回 `Err`)。
-async fn subscribe(paths: &GqyPaths, on_state: &impl Fn(PetState)) -> Result<()> {
+/// 连上、订阅、把信号推到断开为止(断开返回 `Ok`,连不上返回 `Err`)。
+async fn subscribe(paths: &GqyPaths, on_signal: &impl Fn(PetSignal)) -> Result<()> {
     let mut stream = ipc::connect(&paths.ipc_socket())
         .await
         .context("daemon 没在跑")?;
@@ -65,16 +76,24 @@ async fn subscribe(paths: &GqyPaths, on_state: &impl Fn(PetState)) -> Result<()>
         let IpcFrame::Event { kind, data, .. } = frame else {
             continue;
         };
-        if kind != "pet.state" {
-            continue;
-        }
-        // 状态名走 serde 的 snake_case,与 `PetState` 同一套口径。
-        if let Some(state) = data
-            .get("state")
-            .and_then(|value| serde_json::from_value::<PetState>(value.clone()).ok())
-        {
-            on_state(state);
+        if let Some(signal) = parse_signal(&kind, &data) {
+            on_signal(signal);
         }
     }
     Ok(())
+}
+
+/// 帧 → 信号。认不出的 kind 直接丢:daemon 以后加别的东西不该让老宠物报错。
+pub(in crate::pet) fn parse_signal(kind: &str, data: &serde_json::Value) -> Option<PetSignal> {
+    match kind {
+        "pet.state" => Some(PetSignal::State(
+            serde_json::from_value::<PetState>(data.get("state")?.clone()).ok()?,
+        )),
+        "pet.mouth" => Some(PetSignal::Mouth(data.get("value")?.as_f64()? as f32)),
+        "pet.mood" => Some(PetSignal::Mood {
+            valence: data.get("valence")?.as_f64()?,
+            arousal: data.get("arousal")?.as_f64()?,
+        }),
+        _ => None,
+    }
 }

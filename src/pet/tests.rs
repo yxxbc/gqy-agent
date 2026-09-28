@@ -102,6 +102,31 @@ fn a_broken_state_file_falls_back_to_defaults() {
     assert_eq!(state::load(dir.path()).position(), None);
 }
 
+/// 帧 → 信号:三条链路各认一种帧,认不出的安静丢掉。
+#[test]
+fn pet_frames_map_to_signals() {
+    use crate::ipc::PetState;
+    use crate::pet::ipc::{parse_signal, PetSignal};
+    use serde_json::json;
+
+    assert!(matches!(
+        parse_signal("pet.state", &json!({ "state": "thinking" })),
+        Some(PetSignal::State(PetState::Thinking))
+    ));
+    assert!(matches!(
+        parse_signal("pet.mouth", &json!({ "value": 0.42 })),
+        Some(PetSignal::Mouth(value)) if (value - 0.42).abs() < 0.001
+    ));
+    assert!(matches!(
+        parse_signal("pet.mood", &json!({ "valence": 0.6, "arousal": 0.7 })),
+        Some(PetSignal::Mood { valence, arousal }) if (valence - 0.6).abs() < 0.001 && (arousal - 0.7).abs() < 0.001
+    ));
+    // daemon 以后加别的帧 / 帧里缺字段,都不该让宠物报错。
+    assert!(parse_signal("something.else", &json!({})).is_none());
+    assert!(parse_signal("pet.mouth", &json!({})).is_none());
+    assert!(parse_signal("pet.state", &json!({ "state": "never-heard-of-it" })).is_none());
+}
+
 fn write(root: &std::path::Path, relative: &str, contents: &str) {
     let path = root.join(relative);
     if let Some(parent) = path.parent() {

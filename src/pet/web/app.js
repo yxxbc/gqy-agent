@@ -125,9 +125,28 @@ document.addEventListener(
   true
 );
 
-// ---------------- 状态表现 ----------------
+// ---------------- 状态与表现 ----------------
 
 const STATE_CLASS = { idle: "", thinking: "is-thinking", speaking: "is-speaking" };
+
+/* 嘴型:播报时 daemon 每 100ms 报一次音量(`setMouth`),用它;没配语音的人也得
+   看见嘴动,所以没有包络时就按说话状态自己晃。包络有 800ms 保鲜期——播报停了
+   嘴要闭上,不能停在最后那一帧。 */
+let mouth = { value: 0, at: 0 };
+
+/* 情绪 → 表情。表按「越浓越先匹配」排,都没中就不戴表情。表里的名字就是磁盘上的
+   文件名(见 src/pet/model.rs 的清单补全),换模型时对不上的会自动跳过。 */
+const MOOD_EXPRESSIONS = [
+  { name: "爱心眼", test: (v, a) => v >= 0.6 && a >= 0.3 },
+  { name: "哭", test: (v, a) => v <= -0.5 },
+  { name: "黑脸", test: (v, a) => v <= -0.3 && a >= 0.45 },
+  { name: "眼高光消失", test: (v, a) => v <= -0.3 },
+  { name: "脸红", test: (v, a) => v >= 0.4 },
+];
+
+let mood = null;
+let wornExpression = null;
+let mouthParam = CONFIG.model_url ? "ParamMouthOpenY" : null;
 
 window.gqyPet = {
   setState(name) {
@@ -135,17 +154,42 @@ window.gqyPet = {
     document.body.dataset.state = name;
     dot.className = STATE_CLASS[name] ?? "";
   },
+  setMouth(value) {
+    mouth = { value, at: performance.now() };
+  },
+  setMood(valence, arousal) {
+    mood = { valence, arousal };
+    wearExpression();
+  },
 };
 
-/* 说话时让嘴动。**只认 Cubism 的标准参数名**:用户模型的自定义参数名(这份模型是
+/* 按情绪换表情。同一张脸不重复切:切一次要走一遍 SDK 的淡入淡出。 */
+function wearExpression() {
+  if (!live2d || !mood) return;
+  const hit = MOOD_EXPRESSIONS.find((rule) => rule.test(mood.valence, mood.arousal));
+  const name = hit ? hit.name : null;
+  if (name === wornExpression) return;
+  wornExpression = name;
+  try {
+    const manager = live2d.model.internalModel.motionManager.expressionManager;
+    if (name) live2d.model.expression(name);
+    else manager?.resetExpression?.();
+  } catch (error) {
+    send({ cmd: "model_note", message: `换表情没成(${name || "收表情"}): ${error}` });
+  }
+}
+
+/* 逐帧驱动嘴。**只认 Cubism 的标准参数名**:用户模型的自定义参数名(这份模型是
    中文标注的)猜不出来,猜错的代价是人物乱动,不如不动。模型没绑这个参数时
    `setParameterValueById` 会抛,这里吞掉并把它关掉。 */
-let mouthParam = CONFIG.model_url ? "ParamMouthOpenY" : null;
-
 function driveMouth(core) {
   if (!mouthParam) return;
-  const open =
-    petState === "speaking" ? 0.3 + 0.5 * Math.abs(Math.sin(performance.now() / 85)) : 0;
+  const fresh = performance.now() - mouth.at < 800;
+  const open = fresh
+    ? mouth.value
+    : petState === "speaking"
+      ? 0.3 + 0.5 * Math.abs(Math.sin(performance.now() / 85))
+      : 0;
   try {
     core.setParameterValueById(mouthParam, open);
   } catch (_) {
@@ -222,6 +266,8 @@ async function startLive2d() {
 
   live2d = { app, model, mouth: true };
   document.body.classList.add("has-model");
+  // 情绪可能比模型先到(daemon 那边 20 秒报一次),补穿一次。
+  wearExpression();
   return { app, model };
 }
 

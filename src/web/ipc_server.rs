@@ -827,43 +827,121 @@ pub(in crate::web) async fn switch_session_via_actor_reserved(
 
 /// 等到回合流连接的对端挂断(EOF 或读错误)才返回。回合流上客户端在
 /// StartTurn 之后不再发东西(取消/排队都走新连接),读到的字节只丢弃。
-/// 宠物订阅:只推**状态迁移**,不推原始事件流。
+/// 宠物订阅:只推**状态迁移**与表现帧,不推原始事件流。
 ///
 /// 宠物要的是「她在想 / 她在说话 / 她闲着」,不是每个 token。原始 delta 一路
 /// 推过去会把这条 socket 灌满,宠物那点逻辑也用不上——所以状态在这里就折好,
-/// 变化才发一帧(帧 kind 固定 `pet.state`,data 是 `{"state":"…"}`)。
+/// 变化才发一帧(`pet.state`);播报嘴型(`pet.mouth`)逐帧转发;情绪(`pet.mood`)
+/// 20 秒问一次、变了才发。
 async fn stream_pet_events(state: &DaemonState, stream: &mut tokio::net::UnixStream) -> Result<()> {
     let mut subscription = state.events.subscribe_live();
     let mut current = ipc::PetState::Idle;
+    // 情绪是慢变量(半衰期几十分钟),不值得为它挂事件;20 秒问一次足够。
+    let mut mood = tokio::time::interval(Duration::from_secs(20));
+    mood.set_missed_tick_behavior(tokio::time::MissedTickBehavior::Delay);
+    let mut last_mood: Option<(i64, i64)> = None;
     loop {
-        let record = tokio::select! {
+        tokio::select! {
             biased;
-            received = subscription.recv() => match received {
-                Ok(record) => record,
+            received = subscription.recv() => {
                 // 广播通道断了(daemon 正在收摊):退出去,让宠物那边重连。
-                Err(_) => break,
-            },
+                let Ok(record) = received else { break };
+                if let Some(next) = pet_state_of(&record.kind) {
+                    if next != current {
+                        current = next;
+                        ipc::send(
+                            stream,
+                            &IpcFrame::Event {
+                                id: record.id,
+                                kind: "pet.state".to_string(),
+                                data: json!({ "state": next }),
+                            },
+                        )
+                        .await?;
+                    }
+                } else if let Some((kind, data)) = pet_extra_frame(&record) {
+                    ipc::send(
+                        stream,
+                        &IpcFrame::Event {
+                            id: record.id,
+                            kind: kind.to_string(),
+                            data,
+                        },
+                    )
+                    .await?;
+                }
+            }
+            _ = mood.tick() => {
+                let snapshot = state.clone();
+                let read = tokio::task::spawn_blocking(move || pet_mood(&snapshot)).await;
+                let Ok(Some((valence, arousal))) = read else { continue };
+                // 量化到一位小数:情绪是连续衰减的,不量化就每 20 秒都算「变了」。
+                let quantized = (
+                    (valence * 10.0).round() as i64,
+                    (arousal * 10.0).round() as i64,
+                );
+                if last_mood == Some(quantized) {
+                    continue;
+                }
+                last_mood = Some(quantized);
+                ipc::send(
+                    stream,
+                    &IpcFrame::Event {
+                        id: 0,
+                        kind: "pet.mood".to_string(),
+                        data: json!({ "valence": valence, "arousal": arousal }),
+                    },
+                )
+                .await?;
+            }
             // 宠物窗口关掉时连接断开,这里得跟着退,否则这条任务永远挂着。
             _ = client_hung_up(stream) => break,
-        };
-        let Some(next) = pet_state_of(&record.kind) else {
-            continue;
-        };
-        if next == current {
-            continue;
         }
-        current = next;
-        ipc::send(
-            stream,
-            &IpcFrame::Event {
-                id: record.id,
-                kind: "pet.state".to_string(),
-                data: json!({ "state": next }),
-            },
-        )
-        .await?;
     }
     Ok(())
+}
+
+/// 宠物要的情绪:**主人在 QQ 上**那一份。
+///
+/// 情绪按 (账号, 人格) 分键,而桌面上没有对话对象——取主人最讲得通。没配主人号、
+/// 情绪功能关着、或读不出来,都给 `None`:那就不推,页面只按状态表现,不瞎猜表情。
+fn pet_mood(state: &DaemonState) -> Option<(f64, f64)> {
+    use crate::platforms::plugins::real_context::affection::dashboard::settings_from_config;
+    use crate::platforms::plugins::real_context::emotion;
+    let (settings, scope, owner) = {
+        let manager = state.manager.lock().unwrap();
+        let config = manager.config.clone();
+        let settings = settings_from_config(&config).ok()?;
+        if !settings.emotion_enable {
+            return None;
+        }
+        let owner = config.platforms.qq.owner_users.first()?.to_string();
+        (settings, config.active_persona_scope(), owner)
+    };
+    let value =
+        emotion::dashboard_state(&state.state_store, &state.paths, &settings, &owner, &scope)
+            .ok()?;
+    Some((
+        value.get("valence")?.as_f64()?,
+        value.get("arousal")?.as_f64()?,
+    ))
+}
+
+/// 事件 → 宠物的「表现」帧:嘴型(播报音量包络)。
+///
+/// 与状态分开:状态只在**变化**时发(`pet_state_of`),这个每帧都发(10 帧/秒),
+/// 而它只在播报的那几秒里存在。
+fn pet_extra_frame(record: &EventRecord) -> Option<(&'static str, Value)> {
+    match record.kind.as_str() {
+        "voice.envelope" => {
+            let value = serde_json::from_str::<Value>(&record.data)
+                .ok()?
+                .get("value")?
+                .as_f64()?;
+            Some(("pet.mouth", json!({ "value": value })))
+        }
+        _ => None,
+    }
 }
 
 /// 事件 kind → 宠物状态;`None` = 这条与宠物无关。

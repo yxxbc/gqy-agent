@@ -213,6 +213,8 @@
 | **步 3：Live2D 渲染层**。三个 JS 运行时**运行时下载**到 `state/pet/vendor/`（Cubism Core 是专有运行时，不进仓库）；自定义协议 `gqy-pet://app/…` 供给页面（内嵌页面/脚本/立绘、vendor、模型同 origin，省掉 CORS）；模型清单**在内存里补全**（VTS 导出的 `Motions`/`Expressions` 是空的）；加载失败退回静态立绘 | `src/pet/vendor.rs`、`src/pet/assets.rs`、`src/pet/model.rs`、`src/pet/web/app.js`、`src/pet/window.rs` |
 | 状态表现：状态点（蓝=在想、暖金=在说）+ 人物外的光晕；**说话时驱动嘴型**（只认 Cubism 标准参数名 `ParamMouthOpenY`，模型没绑就不动，猜错参数名比不动难看） | `src/pet/web/app.js`、`src/pet/web/index.html` |
 | 配置加 `display.pet.model`（模型目录，留空 = 静态立绘） | `src/config/mod.rs` |
+| **情绪表情**：daemon 每 20 秒读一次**主人在 QQ 上**那一份情绪（情绪按 (账号, 人格) 分键，桌面上没有对话对象），量化到一位小数、变了才推 `pet.mood`；页面按 valence/arousal 的表选表情（脸红 / 爱心眼 / 黑脸 / 眼高光消失 / 哭），都没中就收表情 | `src/web/ipc_server.rs`（`pet_mood`）、`src/pet/web/app.js`（`MOOD_EXPRESSIONS`） |
+| **口型跟音量**：播报进程把每段 wav 压成 100ms 一帧的 RMS（按峰值归一，只传包络不传音频），经 `voice.envelope` → 事件总线 → `pet.mouth` 到页面；打断/换段靠代际号让老线程闭嘴 | `src/voice/speaker.rs`（`voice_envelope`）、`src/voice/worker.rs`、`src/web/voice_bridge.rs`、`src/web/ipc_server.rs`（`pet_extra_frame`）、`src/pet/web/app.js`（`driveMouth`） |
 | 层序登记与文档 | `test_scripts/arch_dep_check.py`、`docs/architecture.md`、`docs/wiki/03-使用方式.md` §9、`docs/wiki/05-配置指南.md` |
 
 **实测（本机 macOS，debug 构建，GQY_HOME 沙箱）**
@@ -239,6 +241,8 @@ INFO pet: Live2D 已加载 motions=1 expressions=5 width=3024 height=6264       
 **偏差与没做的**
 
 - **pixi v7 没有 `transparent` 这个选项**（那是 v6 的，传了会被静默忽略），画布底默认不透明黑——透明窗里就是一块黑板（用户 09-28 报「背景不透明」）。改成 `backgroundAlpha: 0`，并让「模型已加载」那条日志同时报画布 alpha 与页面底色，下回一眼能指认是谁的错。
+- **情绪只在 QQ 群聊里更新**（`ConversationKind::Group` 那条路），所以桌面上的表情变化来自「你在群里聊天」那段时间——终端 / WebUI 的单聊不写情绪，那边她永远是最平静的一张脸。把情绪更新扩到所有会话是产品决定，没做。
+- **口型包络的端到端没在本机验**：沙箱里没有 TTS。`voice_envelope` 两个用例（音量跟随、坏数据不崩）在 `--features voice` 下过，链路靠编译与帧解析用例保证；真效果要在开了语音的机器上看。
 - **点击穿透没做**：人物轮廓之外仍占鼠标（窗口 256×301 一块）。方案里说要形状级穿透，
   实际做要全局取鼠标位置（窗口忽略事件之后自己也收不到 `pointermove`，会死循环），
   v1 先整窗可点。`display.pet` 里没放 `click_through` 开关，别放空开关。
