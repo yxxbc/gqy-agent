@@ -98,7 +98,7 @@ ratex-render = { version = "0.1.12", features = ["embed-fonts"] }
 sherpa-onnx = { version = "1.13.7", optional = true }
 cpal = { version = "0.15", optional = true }
 pinyin = { version = "0.11", optional = true }
-bzip2 = { version = "0.4", optional = true }
+bzip2 = { version = "0.5", optional = true }
 # 桌面悬浮窗(可选 feature `pet`):wry 起 WebView,tao 起窗口。
 wry = { version = "0.57", optional = true }
 tao = { version = "0.37", optional = true, default-features = false, features = ["rwh_06"] }
