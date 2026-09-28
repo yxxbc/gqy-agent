@@ -88,5 +88,7 @@ pub(in crate::web) async fn bridge_ask_question(
             unavailable_tool_output("the question was cancelled before an answer arrived")
         }
         QuestionResponse::Unavailable(reason) => unavailable_tool_output(&reason),
+        // 客户端内部态（面板在本地收场），到不了 broker 这一侧；兜底当「关闭」。
+        QuestionResponse::ResolvedElsewhere(_) => closed_tool_output(),
     }
 }

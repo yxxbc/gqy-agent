@@ -104,17 +104,21 @@ pub(in crate::web) async fn handle_ipc_connection(
             let _ = state.shutdown_tx.send(());
         }
         IpcCommand::JobsOverview => {
-            let wake_runs = {
+            // 全部活跃回合，不只 job_wake：终端 REPL 靠它发现「同一条会话上
+            // 别人（WebUI / 另一个终端）发起的回合」并挂上实时渲染。客户端
+            // 自己按会话过滤（见 cli/repl/jobs.rs 的 claim_live_run）。
+            let live_runs = {
                 let manager = state.manager.lock().unwrap();
                 manager
                     .active_runs
                     .iter()
-                    .filter(|(_, info)| info.job_wake)
                     .map(|(run_id, info)| {
                         json!({
                             "run_id": run_id,
                             "session_id": &*info.session_id,
                             "label": info.job_wake_label,
+                            "turn_id": info.turn_id,
+                            "job_wake": info.job_wake,
                         })
                     })
                     .collect::<Vec<_>>()
@@ -123,7 +127,7 @@ pub(in crate::web) async fn handle_ipc_connection(
                 &mut stream,
                 &IpcFrame::AdminResult {
                     state: session_state(&state.manager, &state.state_store)?,
-                    data: json!({ "jobs": tools::jobs::overview(), "wake_runs": wake_runs }),
+                    data: json!({ "jobs": tools::jobs::overview(), "live_runs": live_runs }),
                 },
             )
             .await?;
@@ -732,6 +736,22 @@ pub(in crate::web) async fn handle_ipc_connection(
                 ipc::send(&mut stream, &IpcFrame::error(message)).await?;
             }
         },
+        IpcCommand::QuestionState { question_id } => {
+            // 面板一侧按它轮询「这个问题还在不在等」：答完即从 pending 删，
+            // 只有留档能说明「刚被别处答过」（见 runtime/questions.rs）。
+            let view = state.questions.state(&question_id);
+            ipc::send(
+                &mut stream,
+                &IpcFrame::AdminResult {
+                    state: session_state(&state.manager, &state.state_store)?,
+                    data: json!({
+                        "state": view.state_name(),
+                        "answers": view.answers(),
+                    }),
+                },
+            )
+            .await?
+        }
         session_command => match handle_session_command(&state, session_command).await {
             Ok(data) => {
                 ipc::send(

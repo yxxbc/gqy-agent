@@ -122,7 +122,7 @@ pub(in crate::cli) fn read_live_repl_input(
                 continue;
             }
             if let Some(session) = repl_session {
-                if let Some((run_id, label)) = jobs_feed.claim_wake_run(session) {
+                if let Some((run_id, label)) = jobs_feed.claim_live_run(session) {
                     return Ok(LiveReplOutcome::FollowWake { run_id, label });
                 }
             }

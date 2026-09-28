@@ -4,6 +4,7 @@
 //! 就退，不进 REPL 循环，也就不需要活动区与输入编辑那一整套。
 
 use crate::cli::repl::editor::*;
+use crate::cli::repl::question_flow::{finish_remote_question, QuestionWatch};
 use crate::cli::repl::tail::*;
 use crate::cli::*;
 
@@ -74,6 +75,11 @@ pub(in crate::cli) async fn try_run_remote_chat(
         IpcFrame::Error { message, .. } => bail!("{message}"),
         _ => bail!("GQY core returned an invalid response"),
     };
+    // 这是本客户端自己发起的回合：先记名，免得回合结束与轮询快照之间的窗口
+    // 把它当成「别人的回合」跟播一次空壳（见 claim_live_run）。
+    if let Some(jobs_feed) = jobs_feed {
+        jobs_feed.mark_own_run(&run_id);
+    }
     let mut turn_id: Option<String> = None;
 
     let config = AppConfig::load_or_default(paths)?;
@@ -592,6 +598,22 @@ pub(in crate::cli) async fn try_run_remote_chat(
                 // 受限区滚动本身(见 tail/frame.rs 的 queue_lifted_frame),此后的
                 // 帧都会改走整屏滚,活动区 resume 时自己会把光标下方的溢出滚掉。
             }
+            "tool.artifact" => {
+                // 工件本体落在 WebUI 的预览区；终端这边留一行回执，别让它在
+                // 「只有 WebUI 处理」的缝里静默消失。
+                let name = data
+                    .get("artifact")
+                    .and_then(|artifact| artifact.get("name"))
+                    .and_then(serde_json::Value::as_str)
+                    .unwrap_or_else(|| ipc_text(&data, "name"));
+                renderer.write_system_message(&format!(
+                    "{}: {name}",
+                    t(
+                        "artifact added to the WebUI preview",
+                        "工件已加入 WebUI 预览"
+                    )
+                ))?;
+            }
             "question.requested" => {
                 // 只让屏、不切线：这一步得等答案到手才补得进去。
                 renderer.prepare_for_panel()?;
@@ -626,62 +648,31 @@ pub(in crate::cli) async fn try_run_remote_chat(
                     };
                     // 静态时间线自己把一问一答写成那一步的正文，面板退场别留东西。
                     let leave_summary = !renderer.timeline_static();
-                    crate::question_tui::ask_with(&request, Some(&mut scroll), leave_summary)
-                        .unwrap_or_else(|err| {
-                            crate::question::QuestionResponse::Unavailable(err.to_string())
-                        })
+                    // 面板开着时盯着 daemon：这个问题在别的客户端被答了/关了，
+                    // 面板自己收场，不等用户点一个已经不存在的问题。
+                    let watch =
+                        QuestionWatch::start(paths, ipc_text(&data, "question_id").to_string());
+                    crate::question_tui::ask_with_watch(
+                        &request,
+                        Some(&mut scroll),
+                        leave_summary,
+                        Some(&watch),
+                    )
+                    .unwrap_or_else(|err| {
+                        crate::question::QuestionResponse::Unavailable(err.to_string())
+                    })
                 };
-                // 全屏下面板是**盖在**画面上的，退场之后下一帧就按缓冲重画，
-                // 问了什么、答了什么会一起消失（用户原话「回答完问题也没输出」）。
-                // 写进缓冲它才算进了历史、回翻找得到。
-                renderer.timeline_push_question(&request, &asked)?;
-                // 这一步补进去了，现在才切：屏幕上的顺序就成了
-                // 「…询问用户 → Worked for… → 问答块」，和实际发生的顺序一致。
-                //
-                // 静态时间线不切：一问一答已经是那一步的正文了，切了这一段就断
-                // 成两截（问答块底下空一行、下一步没有连线接上来）。
-                if !renderer.timeline_static() {
-                    renderer.prepare_for_external_output()?;
-                    renderer.write_question_exchange(&request, &asked)?;
-                }
-                match asked {
-                    crate::question::QuestionResponse::Answered(answers) => {
-                        send_ipc_command(
-                            paths,
-                            IpcCommand::AnswerQuestion {
-                                question_id: ipc_text(&data, "question_id").to_string(),
-                                answers,
-                            },
-                        )
-                        .await?;
-                        renderer.start_waiting()?;
-                    }
-                    // Nobody could be shown the panel — no tty, or it failed to
-                    // open. That is not the user calling the turn off, so the
-                    // question is resolved and the turn carries on; the tool
-                    // that asked finds out that nobody answered and can say so.
-                    crate::question::QuestionResponse::Unavailable(_) => {
-                        let _ = send_ipc_command(
-                            paths,
-                            IpcCommand::CloseQuestion {
-                                question_id: ipc_text(&data, "question_id").to_string(),
-                            },
-                        )
-                        .await;
-                    }
-                    // The terminal question UI maps its close gestures to
-                    // Cancelled; that one really is "stop this turn".
-                    crate::question::QuestionResponse::Closed
-                    | crate::question::QuestionResponse::Cancelled => {
-                        let _ = send_ipc_command(
-                            paths,
-                            IpcCommand::Cancel {
-                                run_id: run_id.clone(),
-                            },
-                        )
-                        .await;
-                    }
-                }
+                // 收尾统一走 question_flow：记进时间线、把结果回发给 daemon，
+                // 并把「已被别处处理」的竞态降级成一行提示。
+                finish_remote_question(
+                    paths,
+                    &mut renderer,
+                    &request,
+                    ipc_text(&data, "question_id"),
+                    &run_id,
+                    &asked,
+                )
+                .await?;
                 if let Some(live) = live.as_deref_mut() {
                     live.external_output_active = false;
                     live.output_cursor = cursor_position_or(live.output_cursor);

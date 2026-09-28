@@ -47,6 +47,10 @@ pub enum QuestionResponse {
     Closed,
     Cancelled,
     Unavailable(String),
+    /// 面板开着的时候，这个问题已经在**另一个客户端**被回答或关闭了。
+    /// `Some(answers)` 是那边给出的答案，`None` 表示被关闭/取消、没有答案。
+    /// 只在本端面板收场时产生，永远不发给 daemon。
+    ResolvedElsewhere(Option<QuestionAnswers>),
 }
 
 #[derive(Debug)]
@@ -62,6 +66,15 @@ impl Error for QuestionCancelled {}
 
 pub fn is_question_cancelled(error: &anyhow::Error) -> bool {
     error.downcast_ref::<QuestionCancelled>().is_some()
+}
+
+/// daemon 对「答一个已经不在的提问」回的两句固定报错（见 `web/ipc_server.rs`
+/// 的 `AnswerFailure` 分支）。提交答案时撞上它就是「已被别的客户端先处理了」，
+/// 不是回合失败——面板侧把它降级成一行提示继续收流。
+pub fn is_question_resolved_elsewhere(error: &anyhow::Error) -> bool {
+    let message = format!("{error:#}");
+    message.contains("pending question not found")
+        || message.contains("pending question is no longer active")
 }
 
 #[derive(Debug, Clone, Deserialize, Serialize, PartialEq, Eq)]

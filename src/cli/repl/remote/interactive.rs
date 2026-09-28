@@ -1254,13 +1254,13 @@ pub(in crate::cli) async fn run_remote_repl(
                 );
                 // Refresh the job strip right away — a background command
                 // spawned this turn must show up without waiting a poll.
-                if let Ok((mut jobs, _, wake_runs)) = fetch_jobs_overview(paths).await {
+                if let Ok((mut jobs, _, live_runs)) = fetch_jobs_overview(paths).await {
                     retain_session_jobs(
                         &mut jobs,
                         jobs_shared.repl_session.lock().unwrap().as_deref(),
                     );
                     *jobs_shared.jobs.lock().unwrap() = jobs.clone();
-                    *jobs_shared.wake_runs.lock().unwrap() = wake_runs;
+                    *jobs_shared.live_runs.lock().unwrap() = live_runs;
                     live_repl.set_jobs(jobs);
                 }
                 live_repl.refresh_footer(footer.clone())?;

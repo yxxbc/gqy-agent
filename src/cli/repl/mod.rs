@@ -9,6 +9,7 @@ pub(in crate::cli) mod dictation;
 pub(in crate::cli) mod jobs;
 pub(in crate::cli) mod layout;
 pub(in crate::cli) mod placeholder;
+pub(in crate::cli) mod question_flow;
 pub(in crate::cli) mod session;
 
 pub(super) mod direct;

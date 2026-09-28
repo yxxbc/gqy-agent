@@ -122,16 +122,29 @@ pub(in crate::cli) struct SharedJobsFeed {
     /// turn that spawned them published its totals — without this the footer
     /// sat on a stale Σ until the user happened to send another prompt.
     pub(in crate::cli) cumulative: std::sync::Mutex<Option<TurnTokens>>,
-    /// Active daemon-initiated wake runs: (run_id, session_id, label).
-    pub(in crate::cli) wake_runs: std::sync::Mutex<Vec<(String, String, String)>>,
-    /// Wake runs already attached to (never re-follow), and turn ids that
+    /// 全部活跃回合（不只后台唤醒）：客户端按自己的会话过滤后跟播。
+    pub(in crate::cli) live_runs: std::sync::Mutex<Vec<LiveRun>>,
+    /// Runs already attached to (never re-follow), and turn ids that
     /// were rendered live (their DB report must not print again).
     pub(in crate::cli) followed_runs: std::sync::Mutex<std::collections::HashSet<String>>,
     pub(in crate::cli) rendered_turns: std::sync::Mutex<std::collections::HashSet<String>>,
 }
 
+/// 一条 daemon 侧正在跑的回合。`label` 只有后台唤醒有（"<job_id> · <title>"）；
+/// 其余来源（WebUI / 另一个终端）在终端侧显示成通用标签。
+#[derive(Debug, Clone, serde::Deserialize)]
+pub(in crate::cli) struct LiveRun {
+    pub(in crate::cli) run_id: String,
+    #[serde(default)]
+    pub(in crate::cli) session_id: String,
+    #[serde(default)]
+    pub(in crate::cli) label: Option<String>,
+    #[serde(default)]
+    pub(in crate::cli) turn_id: Option<String>,
+}
+
 /// 两个去重集合的容量兜底。常开 REPL 的后台唤醒一直发生,集合只增不减;
-/// 死掉的 id 不会再被查到(run 不再出现在 wake_runs、turn 已过水位线),
+/// 死掉的 id 不会再被查到(run 不再出现在 live_runs、turn 已过水位线),
 /// 超限时清掉无副作用。
 pub(in crate::cli) const JOBS_FEED_MARK_LIMIT: usize = 4_096;
 
@@ -199,24 +212,59 @@ impl JobsFeed {
         }
     }
 
-    /// Next wake run in `session` that has not been followed yet; marks it
+    /// Next live run in `session` that has not been followed yet; marks it
     /// followed so the caller attaches exactly once.
-    pub(in crate::cli) fn claim_wake_run(&self, session: &str) -> Option<(String, String)> {
+    ///
+    /// 后台任务唤醒的回合和「同一条会话上别人（WebUI / 另一个终端）发起的
+    /// 回合」走同一条通道：FollowRun + 同一个渲染器。自己发起的回合在发起时
+    /// 就记进 `followed_runs`（见 [`Self::mark_own_run`]），不会被自己跟播。
+    pub(in crate::cli) fn claim_live_run(&self, session: &str) -> Option<(String, String)> {
         let JobsFeed::Shared(shared) = self else {
             return None;
         };
-        let wake_runs = shared.wake_runs.lock().unwrap();
+        let live_runs = shared.live_runs.lock().unwrap();
         let mut followed = shared.followed_runs.lock().unwrap();
-        for (run_id, run_session, label) in wake_runs.iter() {
-            if run_session == session && !followed.contains(run_id) {
-                if followed.len() >= JOBS_FEED_MARK_LIMIT {
-                    followed.retain(|id| wake_runs.iter().any(|(r, _, _)| r == id));
-                }
-                followed.insert(run_id.clone());
-                return Some((run_id.clone(), label.clone()));
+        for run in live_runs.iter() {
+            if run.session_id != session || followed.contains(&run.run_id) {
+                continue;
             }
+            // turn 级去重：这个回合已经在别处（唤醒跟播）渲染过，run 可能还在
+            // 收尾，不必再跟一遍。
+            if run
+                .turn_id
+                .as_deref()
+                .is_some_and(|turn_id| shared.rendered_turns.lock().unwrap().contains(turn_id))
+            {
+                followed.insert(run.run_id.clone());
+                continue;
+            }
+            if followed.len() >= JOBS_FEED_MARK_LIMIT {
+                followed.retain(|id| live_runs.iter().any(|run| &run.run_id == id));
+            }
+            followed.insert(run.run_id.clone());
+            // 后台唤醒带自己的 label（"<job_id> · <title>"）；别的来源给通用
+            // 标签——终端不外泄是谁发的（TurnOrigin 不分客户端）。
+            let label = run
+                .label
+                .clone()
+                .unwrap_or_else(|| crate::i18n::text("another client", "另一端").to_string());
+            return Some((run.run_id.clone(), label));
         }
         None
+    }
+
+    /// 记下「这个 run 是本客户端自己发起的」：回合结束与轮询快照之间有秒级
+    /// 窗口，不记的话刚跑完的回合会被自己当成「别人的回合」跟播一次空壳。
+    pub(in crate::cli) fn mark_own_run(&self, run_id: &str) {
+        let JobsFeed::Shared(shared) = self else {
+            return;
+        };
+        let live_runs = shared.live_runs.lock().unwrap();
+        let mut followed = shared.followed_runs.lock().unwrap();
+        if followed.len() >= JOBS_FEED_MARK_LIMIT {
+            followed.retain(|id| live_runs.iter().any(|run| &run.run_id == id));
+        }
+        followed.insert(run_id.to_string());
     }
 }
 
@@ -243,7 +291,7 @@ pub(in crate::cli) fn spawn_jobs_poll_thread(paths: GqyPaths) -> std::sync::Arc<
             if store.is_none() {
                 store = StateStore::new(&paths).ok();
             }
-            let (jobs, session_id, wake_runs) = runtime
+            let (jobs, session_id, live_runs) = runtime
                 .block_on(async {
                     tokio::time::timeout(
                         std::time::Duration::from_millis(500),
@@ -257,7 +305,7 @@ pub(in crate::cli) fn spawn_jobs_poll_thread(paths: GqyPaths) -> std::sync::Arc<
             let repl_session = { feed.repl_session.lock().unwrap().clone() };
             retain_session_jobs(&mut jobs, repl_session.as_deref());
             *feed.jobs.lock().unwrap() = jobs;
-            *feed.wake_runs.lock().unwrap() = wake_runs;
+            *feed.live_runs.lock().unwrap() = live_runs;
             if let (Some(store), Some(session)) = (store.as_ref(), repl_session.as_deref()) {
                 if let Ok(totals) = store.pinned(session).session_cumulative_token_totals() {
                     *feed.cumulative.lock().unwrap() = Some(totals);
@@ -294,7 +342,7 @@ pub(in crate::cli) fn spawn_jobs_poll_thread(paths: GqyPaths) -> std::sync::Arc<
 pub(in crate::cli) type JobsOverviewSnapshot = (
     Vec<crate::tools::jobs::JobOverview>,
     Option<String>,
-    Vec<(String, String, String)>,
+    Vec<LiveRun>,
 );
 
 pub(in crate::cli) async fn fetch_jobs_overview(paths: &GqyPaths) -> Result<JobsOverviewSnapshot> {
@@ -302,23 +350,14 @@ pub(in crate::cli) async fn fetch_jobs_overview(paths: &GqyPaths) -> Result<Jobs
     ipc::send(&mut stream, &IpcRequest::new(IpcCommand::JobsOverview)).await?;
     match ipc::receive::<IpcFrame>(&mut stream).await? {
         Some(IpcFrame::AdminResult { state, data }) => {
-            let wake_runs = data
-                .get("wake_runs")
-                .and_then(serde_json::Value::as_array)
-                .map(|rows| {
-                    rows.iter()
-                        .filter_map(|row| {
-                            Some((
-                                row.get("run_id")?.as_str()?.to_string(),
-                                row.get("session_id")?.as_str()?.to_string(),
-                                row.get("label")
-                                    .and_then(serde_json::Value::as_str)
-                                    .unwrap_or_default()
-                                    .to_string(),
-                            ))
-                        })
-                        .collect::<Vec<_>>()
-                })
+            // 老 daemon 只会给 wake_runs：解析不出来就是空表，退化成不跟播，
+            // 不是错误。
+            let live_runs = data
+                .get("live_runs")
+                .cloned()
+                .map(serde_json::from_value::<Vec<LiveRun>>)
+                .transpose()
+                .unwrap_or_default()
                 .unwrap_or_default();
             Ok((
                 data.get("jobs")
@@ -328,9 +367,90 @@ pub(in crate::cli) async fn fetch_jobs_overview(paths: &GqyPaths) -> Result<Jobs
                     .unwrap_or_default()
                     .unwrap_or_default(),
                 Some(state.session_id),
-                wake_runs,
+                live_runs,
             ))
         }
         _ => Ok((Vec::new(), None, Vec::new())),
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn run(run_id: &str, session: &str, turn: &str, label: Option<&str>) -> LiveRun {
+        LiveRun {
+            run_id: run_id.to_string(),
+            session_id: session.to_string(),
+            label: label.map(str::to_string),
+            turn_id: Some(turn.to_string()),
+        }
+    }
+
+    fn feed_with(runs: Vec<LiveRun>) -> JobsFeed {
+        let shared = SharedJobsFeed::default();
+        *shared.live_runs.lock().unwrap() = runs;
+        JobsFeed::Shared(std::sync::Arc::new(shared))
+    }
+
+    /// 跟播只看自己的会话：认领按会话取，已经跟过的 run 不再重复认领。
+    #[test]
+    fn claim_live_run_is_scoped_to_the_repl_session_and_never_refollows() {
+        let feed = feed_with(vec![
+            run("run-other", "session-b", "turn-1", None),
+            run("run-mine", "session-a", "turn-2", None),
+        ]);
+        let foreign = crate::i18n::text("another client", "另一端").to_string();
+        assert_eq!(
+            feed.claim_live_run("session-a"),
+            Some(("run-mine".to_string(), foreign.clone()))
+        );
+        // 第二次是「已经跟过」，不该再发给调用方。
+        assert_eq!(feed.claim_live_run("session-a"), None);
+        // 别人的会话有自己的活跃回合；没有活跃回合的会话才什么都没有。
+        assert_eq!(
+            feed.claim_live_run("session-b"),
+            Some(("run-other".to_string(), foreign))
+        );
+        assert_eq!(feed.claim_live_run("session-c"), None);
+    }
+
+    /// 后台唤醒保留自己的 label；别的来源（WebUI / 另一个终端）用通用标签。
+    #[test]
+    fn wake_runs_keep_their_label_and_foreign_runs_get_a_generic_one() {
+        let feed = feed_with(vec![run(
+            "run-wake",
+            "session-a",
+            "turn-1",
+            Some("82bea3 · 跑测试"),
+        )]);
+        assert_eq!(
+            feed.claim_live_run("session-a"),
+            Some(("run-wake".to_string(), "82bea3 · 跑测试".to_string()))
+        );
+    }
+
+    /// 已经在本客户端渲染过的回合不再跟播：run 可能还在收尾，跟了就只剩一个
+    /// 空壳表头。
+    #[test]
+    fn claim_live_run_skips_turns_rendered_here() {
+        let feed = feed_with(vec![run("run-1", "session-a", "turn-1", None)]);
+        let JobsFeed::Shared(shared) = &feed else {
+            unreachable!()
+        };
+        shared
+            .rendered_turns
+            .lock()
+            .unwrap()
+            .insert("turn-1".to_string());
+        assert_eq!(feed.claim_live_run("session-a"), None);
+    }
+
+    /// 自己发起的回合先记名，免得回合结束与轮询快照之间的窗口把它当别人的。
+    #[test]
+    fn mark_own_run_keeps_the_repl_from_following_itself() {
+        let feed = feed_with(vec![run("run-self", "session-a", "turn-1", None)]);
+        feed.mark_own_run("run-self");
+        assert_eq!(feed.claim_live_run("session-a"), None);
     }
 }

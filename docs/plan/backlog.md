@@ -32,6 +32,8 @@ webui再safari上的移动端适配和界面固定，其次是移动端点击输
 
 > 09-26 复核：**半条已做**。网页端已经有了：SSE 的 `question.answered` / `question.closed` 会标记卡片（`web/features/live/sse.js`），碰到 404 / 409 会重载会话视图（`web/features/questions.js`）；shellhook 与一次性 CLI 车道也能回发 `AnswerQuestion` / `CloseQuestion`（`src/cli/ipc_event.rs`、`src/cli/output/turn_client.rs`、`src/cli/repl/remote/one_shot.rs`）。**没做的是全屏 TUI 车道**：`interactive.rs` 里只处理取消，`PublicEvent::Question` 全仓没有消费者，`pending question not found` 的文案仍在（`src/web/turns/mod.rs`、`src/web/ipc_server.rs`）。
 
+> 09-28 已修（09-28 用户验收通过）：daemon 新增 `QuestionState` 查询 + `QuestionBroker` 已解决留档（`src/runtime/questions.rs`，128 条有界）；终端三条远端车道共用 `src/cli/repl/question_flow.rs` 的哨兵（面板开着时 400ms 轮询），发现被别处答 / 关就自己收场（`QuestionResponse::ResolvedElsewhere`），提交撞车降级成一行提示。顺带补了 `wake.rs` 缺失的 `question.requested`（唤醒回合里提问原本挂到超时）与 `context.compact_*` / `context.pop_*` / `context.notice` / `tool.artifact` 分支。`interactive.rs` 的注释（「事件分发表在这里维护」）仍是过期的，不动它——分发表事实上在 `one_shot.rs` / `wake.rs`。同批还加了终端跟播他人回合（`JobsOverview` 扩成 `live_runs` + `claim_live_run`，见 CHANGELOG Added）
+
 webui的提问和终端同步，不会再出现`错误: pending question not found`这种情况，复现：一个会话提出问题，终端的不点用webui点击会导致tui不同步【因为部分webui功能在tui中没有，但是项目没有对其进行处理的专属逻辑】。完成修复后看看其他的有没有此类相同问题（大部分是webui到tui的信息不同步。
 
 ## 6. 长命令超时丢任务，后台任务完成后通知

@@ -826,6 +826,8 @@ impl Agent {
                         QuestionResponse::Closed => closed_tool_output(),
                         QuestionResponse::Cancelled => return Err(QuestionCancelled.into()),
                         QuestionResponse::Unavailable(reason) => unavailable_tool_output(&reason),
+                        // 客户端内部态（面板在本地收场），正常到不了这里；兜底当「关闭」。
+                        QuestionResponse::ResolvedElsewhere(_) => closed_tool_output(),
                     };
                     messages.push(ChatMessage::tool(call.id, output.clone()));
                     on_event(AgentEvent::ToolResult {

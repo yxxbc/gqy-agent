@@ -56,8 +56,37 @@ pub fn ask(request: &QuestionRequest) -> Result<QuestionResponse> {
 /// 面板得整个擦干净、光标放回面板顶上，那一步才落在原位。
 pub fn ask_with(
     request: &QuestionRequest,
+    scroll: Option<&mut dyn FnMut(isize, u16)>,
+    leave_summary: bool,
+) -> Result<QuestionResponse> {
+    ask_with_watch(request, scroll, leave_summary, None)
+}
+
+/// 面板开着期间「这个问题是不是已经在别处被处理了」的信号。
+///
+/// 提问的唯一持有者是 daemon 的 `QuestionBroker`（答完即删），面板只在本地
+/// 等键——别的客户端先答了它并不知道。直连模式没有别的客户端，传 `None`。
+#[derive(Clone)]
+pub enum ExternalResolution {
+    /// 那边给出了答案。
+    Answered(QuestionAnswers),
+    /// 被关闭/取消，没有答案。
+    ResolvedWithoutAnswer,
+}
+
+/// 跨端哨兵接口。`resolution()` 返回 `None` 表示还没有结果。
+pub trait QuestionWatchSignal {
+    fn resolution(&self) -> Option<ExternalResolution>;
+}
+
+/// 同 [`ask_with`]，另带一个跨端哨兵：等键的空档里问它一次，一旦这个问题
+/// 在别处被处理就按那边的结果收场（[`QuestionResponse::ResolvedElsewhere`]），
+/// 不再干等一个本地提交——那一下只会吃一个「问题已不在」的错。
+pub fn ask_with_watch(
+    request: &QuestionRequest,
     mut scroll: Option<&mut dyn FnMut(isize, u16)>,
     leave_summary: bool,
+    watch: Option<&dyn QuestionWatchSignal>,
 ) -> Result<QuestionResponse> {
     request.validate()?;
     if !available(false) {
@@ -81,6 +110,11 @@ pub fn ask_with(
         draw(&mut session, request, &mut state)?;
 
         if !event::poll(Duration::from_millis(100))? {
+            // 等键的空档里看一眼哨兵：问题已被别的客户端处理就按那边的结果
+            // 收场（有答案按已回答记，没有就留一行说明）。
+            if let Some(resolution) = watch.and_then(|watch| watch.resolution()) {
+                return finish_elsewhere(&mut session, request, resolution, leave_summary);
+            }
             continue;
         }
         let event = event::read()?;
@@ -188,6 +222,25 @@ pub fn ask_with(
                 }
             }
             _ => {}
+        }
+    }
+}
+
+/// 面板没等到本地回车，问题已在别处解决：按那边的结果收场。
+fn finish_elsewhere(
+    session: &mut QuestionSession,
+    request: &QuestionRequest,
+    resolution: ExternalResolution,
+    leave_summary: bool,
+) -> Result<QuestionResponse> {
+    match resolution {
+        ExternalResolution::Answered(answers) => {
+            session.finish_answered(request, &answers, leave_summary)?;
+            Ok(QuestionResponse::ResolvedElsewhere(Some(answers)))
+        }
+        ExternalResolution::ResolvedWithoutAnswer => {
+            session.finish_external()?;
+            Ok(QuestionResponse::ResolvedElsewhere(None))
         }
     }
 }
@@ -491,6 +544,26 @@ impl QuestionSession {
                 "{} \x1b[2m{}\x1b[0m",
                 bar(),
                 t("Question cancelled", "已取消提问")
+            )),
+            MoveTo(0, self.anchor_y.saturating_add(1)),
+            Clear(ClearType::CurrentLine),
+            Show
+        )?;
+        self.stdout.flush()?;
+        Ok(())
+    }
+
+    /// 面板没等到本地回车，问题在别的客户端被处理了：擦掉面板，留一行说明。
+    /// 「已回答」那档不走这里（有答案就直接按 `finish_answered` 记档）。
+    fn finish_external(&mut self) -> Result<()> {
+        self.clear()?;
+        queue!(
+            self.stdout,
+            MoveTo(0, self.anchor_y),
+            crossterm::style::Print(format!(
+                "{} \x1b[2m{}\x1b[0m",
+                bar(),
+                t("Question resolved in another client", "提问已在其它端处理")
             )),
             MoveTo(0, self.anchor_y.saturating_add(1)),
             Clear(ClearType::CurrentLine),

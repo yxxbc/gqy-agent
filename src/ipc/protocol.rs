@@ -243,6 +243,11 @@ pub enum Command {
     CloseQuestion {
         question_id: String,
     },
+    /// 问一个待答提问现在的状态：终端面板用它发现「已在别的客户端被回答/关闭」，
+    /// 好在本地收场，而不是等用户提交时吃一个「问题已不在」的回合错误。
+    QuestionState {
+        question_id: String,
+    },
     ListSessions {
         /// `dev` 列开发模式会话(保留人格 "dev" 名下),`all` 普通+dev
         /// 合并(管理面);缺省=当前人格。

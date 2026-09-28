@@ -5,6 +5,7 @@
 //! 中途 footer 不刷新」就是因为只有一个泵接了 `chat.round_usage`，另一个漏了。
 
 use crate::cli::repl::editor::*;
+use crate::cli::repl::question_flow::{finish_remote_question, QuestionWatch};
 use crate::cli::repl::tail::*;
 use crate::cli::*;
 
@@ -362,6 +363,56 @@ pub(in crate::cli) async fn follow_wake_run(
                     output: ipc_text(&data, "output").to_string(),
                 },
             )?,
+            // 唤醒形态此前没有这条分支:模型在后台任务/目标/语音唤醒的回合里
+            // 提问时,谁也不会应答,回合一直挂到超时。和 one_shot 同一条处理。
+            "question.requested" => {
+                let request = crate::question::QuestionRequest {
+                    questions: serde_json::from_value(
+                        data.get("questions").cloned().unwrap_or_default(),
+                    )?,
+                };
+                notify_if_unfocused(
+                    &config,
+                    Some(live.editor.focused),
+                    t("Selene is waiting on you", "顾清影 在等你回答"),
+                    t("waiting for you", "正在等待处理"),
+                );
+                renderer.prepare_for_panel()?;
+                live.apply_renderer_frame(&mut renderer)?;
+                synchronized_terminal_update(CursorAfterUpdate::Hidden, || live.suspend())?;
+                let watch = QuestionWatch::start(paths, ipc_text(&data, "question_id").to_string());
+                let asked = {
+                    let mut scroll = |delta: isize, panel_rows: u16| {
+                        if let Some(screen) = live.screen.as_mut() {
+                            let _ = screen.scroll_above_panel(delta, panel_rows);
+                        }
+                    };
+                    // 静态时间线自己把一问一答写成那一步的正文，面板退场别留东西。
+                    let leave_summary = !renderer.timeline_static();
+                    crate::question_tui::ask_with_watch(
+                        &request,
+                        Some(&mut scroll),
+                        leave_summary,
+                        Some(&watch),
+                    )
+                    .unwrap_or_else(|err| {
+                        crate::question::QuestionResponse::Unavailable(err.to_string())
+                    })
+                };
+                finish_remote_question(
+                    paths,
+                    &mut renderer,
+                    &request,
+                    ipc_text(&data, "question_id"),
+                    run_id,
+                    &asked,
+                )
+                .await?;
+                live.external_output_active = false;
+                live.output_cursor = cursor_position_or(live.output_cursor);
+                live.resume_at(live.output_cursor)?;
+                live.apply_renderer_frame(&mut renderer)?;
+            }
             // shellhook/唤醒形态此前没有这个分支,工具图片(表情包/生图/
             // print_image)在客户端被静默丢弃——REPL 形态(one_shot 事件循环)
             // 一直有,唯独这条流漏了。
@@ -439,6 +490,49 @@ pub(in crate::cli) async fn follow_wake_run(
                     received_at: Instant::now(),
                 },
             )?,
+            // 唤醒路径此前漏了这一组:压缩/归档/通知事件不显示,长跑的目标轮
+            // 里「正在压缩上下文」这类状态整段是空的(one_shot 一直有)。
+            "context.compact_start" => {
+                handle_live_agent_event(live, &mut renderer, AgentEvent::CompactStart)?
+            }
+            "context.compact_delta" => handle_live_agent_event(
+                live,
+                &mut renderer,
+                AgentEvent::CompactChunk(ChatStreamChunk {
+                    kind: crate::llm::ChatStreamKind::Content,
+                    text: ipc_text(&data, "delta").to_string(),
+                }),
+            )?,
+            "context.compact_end" => {
+                handle_live_agent_event(live, &mut renderer, AgentEvent::CompactEnd)?
+            }
+            "context.pop_start" => {
+                handle_live_agent_event(live, &mut renderer, AgentEvent::PopStart)?
+            }
+            "context.pop_end" => handle_live_agent_event(live, &mut renderer, AgentEvent::PopEnd)?,
+            "context.notice" => handle_live_agent_event(
+                live,
+                &mut renderer,
+                AgentEvent::Notice {
+                    text: ipc_text(&data, "text").to_string(),
+                },
+            )?,
+            "tool.artifact" => {
+                // 工件本体在 WebUI 的预览区；这边留一行回执。
+                let name = data
+                    .get("artifact")
+                    .and_then(|artifact| artifact.get("name"))
+                    .and_then(serde_json::Value::as_str)
+                    .unwrap_or_else(|| ipc_text(&data, "name"));
+                renderer.write_system_message(&format!(
+                    "{}: {name}",
+                    t(
+                        "artifact added to the WebUI preview",
+                        "工件已加入 WebUI 预览"
+                    )
+                ))?;
+                live.apply_renderer_frame(&mut renderer)?;
+            }
             "run.completed" | "run.failed" | "run.cancelled" => {
                 break;
             }
