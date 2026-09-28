@@ -43,7 +43,7 @@
 - WebUI 供应商显示彩色品牌图标：`docs/plan/2026-09-24-webui-provider-icons.md`（09-26 已实现、待验收：24 个品牌图标内嵌，设置页卡片/模型池 + 模型菜单分节都在用）
 - WebUI 模型切换与模型菜单改造（09-26 已实现、待验收）：模型切换从框内底栏搬到输入框下方信息行左端；菜单按供应商分节、节头带品牌图标、可展开收起，顶部加了过滤框
 - 内置 Cline 中转供应商：`docs/design/2026-09-26-cline-relay-provider.md`（09-26 已实现、待验收：第四条 CLI 中转线；模型目录读 cline 自带的 `@cline/llms`，上下文窗口自动回填；续传核对不过自动退化全量重放）
-- Live2D
+- Live2D 桌面悬浮窗：方案稿 `docs/design/2026-09-28-desktop-pet.md`（09-28 画定：独立进程 `gqy-pet` + 独立 feature、wry 透明窗、先静态立绘（D 案）再换 Cubism 渲染层；通道走 IPC 不走 HTTP；**先 macOS**）。待拍板：平台范围、模型来源、是否允许 wry/tao 依赖、口型精度、发布包带不带 pet
 - 支持 QQ 官方机器人
 - 支持 Telegram（现在有了通用连接器协议，写个连接器即可，不用改 gqy）
 - 安全性、权限
