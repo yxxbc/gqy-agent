@@ -85,6 +85,67 @@ impl ConversationDb {
         Ok(())
     }
 
+    /// Replace a room roster only while it is still empty and unchanged.
+    pub fn replace_room_participants_if_empty(
+        &self,
+        room_id: &str,
+        expected_ids: &[String],
+        participants: &[RoomParticipant],
+    ) -> Result<bool> {
+        if participants.is_empty() {
+            return Ok(false);
+        }
+        let mut conn = self.conn.lock().unwrap();
+        let tx = conn.transaction()?;
+        let message_count: i64 = tx.query_row(
+            "SELECT COUNT(*) FROM room_messages WHERE room_id = ?1",
+            params![room_id],
+            |row| row.get(0),
+        )?;
+        if message_count != 0 {
+            return Ok(false);
+        }
+        let current_ids = {
+            let mut stmt = tx.prepare(
+                "SELECT participant_id FROM room_participants
+                 WHERE room_id = ?1 ORDER BY sort, participant_id",
+            )?;
+            let rows = stmt
+                .query_map(params![room_id], |row| row.get::<_, String>(0))?
+                .collect::<std::result::Result<Vec<_>, _>>()?;
+            rows
+        };
+        if current_ids.is_empty() || current_ids != expected_ids {
+            return Ok(false);
+        }
+        tx.execute(
+            "DELETE FROM room_participants WHERE room_id = ?1",
+            params![room_id],
+        )?;
+        for participant in participants {
+            tx.execute(
+                "INSERT INTO room_participants (
+                     room_id, participant_id, label, kind, provider_id, model,
+                     backing_session_id, sort, watermark, memory
+                 ) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10)",
+                params![
+                    room_id,
+                    participant.participant_id,
+                    participant.label,
+                    participant.kind,
+                    participant.provider_id,
+                    participant.model,
+                    participant.backing_session_id,
+                    participant.sort,
+                    participant.watermark,
+                    participant.memory,
+                ],
+            )?;
+        }
+        tx.commit()?;
+        Ok(true)
+    }
+
     /// 按发言顺序排好的参与者。不是房间时返回空表。
     pub fn room_participants(&self, room_id: &str) -> Result<Vec<RoomParticipant>> {
         let conn = self.conn.lock().unwrap();

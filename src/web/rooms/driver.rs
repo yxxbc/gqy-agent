@@ -7,6 +7,9 @@
 //! 每位参与者的回合跑在它自己的后台会话里：登记 run → 发 `StartTurn` →
 //! 按 run_id 收事件（与 `run_platform_turn`、goal 驱动器同一套）。流式增量
 //! 转发成 `room.delta`，收尾写进房间记录并发 `room.message`。
+//!
+//! 「停止」清整轮：当前这位取消，排着的轮全丢；「跳过」只取消当前这位，队列
+//! 不动，被跳过的那次回复不写进房间（竞争处理见 `finish_speaker_run`）。
 
 use super::prompt;
 use crate::state::{RoomParticipant, ROOM_SPEAKER_NOTICE, ROOM_SPEAKER_PARTICIPANT};
@@ -22,6 +25,7 @@ struct RoomRuntime {
     pending_rounds: usize,
     /// (participant_id, run_id)
     speaking: Option<(String, String)>,
+    skipping_run_id: Option<String>,
     stopped: bool,
 }
 
@@ -35,8 +39,11 @@ pub(super) fn room_status(room_id: &str) -> Value {
             "pending_rounds": runtime.pending_rounds,
             "speaking": runtime.speaking.as_ref().map(|(participant, _)| participant),
             "run_id": runtime.speaking.as_ref().map(|(_, run_id)| run_id),
+            "skipping": runtime.skipping_run_id.is_some(),
         }),
-        None => json!({ "running": false, "pending_rounds": 0, "speaking": null, "run_id": null }),
+        None => {
+            json!({ "running": false, "pending_rounds": 0, "speaking": null, "run_id": null, "skipping": false })
+        }
     }
 }
 
@@ -84,6 +91,51 @@ pub(in crate::web) fn stop_room(state: &DaemonState, room_id: &str) {
     publish_status(state, room_id);
 }
 
+/// 跳过当前这位发言人：只取消他这一轮，不清排着的轮、也不停整轮。返回 false
+/// 表示此刻没有正在回复的发言人（回合一结束 `speaking` 就清了，跳过自然落空）。
+pub(in crate::web) fn skip_room_speaker(state: &DaemonState, room_id: &str) -> bool {
+    let run_id = {
+        let mut rooms = ROOMS.lock().unwrap();
+        let Some(runtime) = rooms.get_mut(room_id) else {
+            return false;
+        };
+        if runtime.stopped || runtime.skipping_run_id.is_some() {
+            return false;
+        }
+        let Some((_, run_id)) = runtime.speaking.as_ref() else {
+            return false;
+        };
+        let run_id = run_id.clone();
+        runtime.skipping_run_id = Some(run_id.clone());
+        run_id
+    };
+    cancel_room_run(state, &run_id);
+    publish_status(state, room_id);
+    true
+}
+
+/// 一位发言人的回合收尾：清掉 `speaking`，并回报这次是不是被跳过的。
+///
+/// 跳过请求与回合收尾在同一把锁下判，所以「回复刚好完成、跳过请求同时到达」只有
+/// 两种结局：跳过先到（`skipping_run_id` 已经记下这个 run_id）→ 返回 true，调用
+/// 方把这条已经生成完的回复直接丢掉，不写进房间；收尾先到 → `speaking` 已经清空，
+/// 跳过请求拿不到 run_id，只会回一个 409。撤销标记时认 run_id，别顺手清掉下一位
+/// 发言人的收尾状态。
+fn finish_speaker_run(runtime: &mut RoomRuntime, run_id: &str) -> bool {
+    let skipped = runtime.skipping_run_id.as_deref() == Some(run_id);
+    if skipped {
+        runtime.skipping_run_id = None;
+    }
+    if runtime
+        .speaking
+        .as_ref()
+        .is_some_and(|(_, speaking_run_id)| speaking_run_id == run_id)
+    {
+        runtime.speaking = None;
+    }
+    skipped
+}
+
 fn cancel_room_run(state: &DaemonState, run_id: &str) {
     if let Some(info) = state.manager.lock().unwrap().active_runs.get(run_id) {
         let _ = info.cancel.send(true);
@@ -96,6 +148,16 @@ fn stopped(room_id: &str) -> bool {
         .unwrap()
         .get(room_id)
         .is_none_or(|runtime| runtime.stopped)
+}
+
+/// 房间是否空闲：没有在跑的发言，也没有排着的轮。改成员这类操作拿它做前置闸；
+/// 权威判定在落库那一层（`replace_room_participants_if_empty`）。
+pub(in crate::web) fn room_idle(room_id: &str) -> bool {
+    ROOMS
+        .lock()
+        .unwrap()
+        .get(room_id)
+        .is_none_or(|runtime| !runtime.running && runtime.pending_rounds == 0)
 }
 
 /// 取下一轮；没有了就把房间标成空闲。
@@ -308,8 +370,14 @@ async fn speak(
         .await
     };
 
-    if let Some(runtime) = ROOMS.lock().unwrap().get_mut(room_id) {
-        runtime.speaking = None;
+    let skipped = ROOMS
+        .lock()
+        .unwrap()
+        .get_mut(room_id)
+        .is_some_and(|runtime| finish_speaker_run(runtime, &run_id));
+    if skipped {
+        publish_status(state, room_id);
+        return;
     }
     match spoken {
         Spoken::Reply(text) => {
@@ -351,6 +419,52 @@ async fn speak(
         Spoken::Cancelled => {}
     }
     publish_status(state, room_id);
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn runtime(speaking_run: Option<&str>, skipping_run: Option<&str>) -> RoomRuntime {
+        RoomRuntime {
+            speaking: speaking_run.map(|run_id| ("a".to_string(), run_id.to_string())),
+            skipping_run_id: skipping_run.map(str::to_string),
+            ..RoomRuntime::default()
+        }
+    }
+
+    /// 回复刚好生成完、跳过请求同时到达（跳过先落锁）：这条回复要丢掉，不写进
+    /// 房间，房间接着走下一位。
+    #[test]
+    fn a_finished_run_that_was_skipped_first_is_dropped() {
+        let mut state = runtime(Some("run_a"), Some("run_a"));
+
+        assert!(finish_speaker_run(&mut state, "run_a"));
+        assert!(state.speaking.is_none());
+        assert!(state.skipping_run_id.is_none(), "跳过标记要被消费掉");
+    }
+
+    /// 收尾先落锁：没被跳过，回复照写。
+    #[test]
+    fn a_finished_run_with_no_skip_keeps_its_reply() {
+        let mut state = runtime(Some("run_a"), None);
+
+        assert!(!finish_speaker_run(&mut state, "run_a"));
+        assert!(state.speaking.is_none());
+    }
+
+    /// 撤销跳过标记只认自己的 run_id：下一位发言人的收尾状态不能跟着被清掉。
+    #[test]
+    fn consuming_one_skip_leaves_the_next_speaker_alone() {
+        let mut state = runtime(Some("run_b"), Some("run_a"));
+
+        assert!(finish_speaker_run(&mut state, "run_a"));
+        assert_eq!(
+            state.speaking.as_ref().map(|(_, run_id)| run_id.as_str()),
+            Some("run_b")
+        );
+        assert!(state.skipping_run_id.is_none());
+    }
 }
 
 /// 收这一回合的事件，直到它结束。

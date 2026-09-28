@@ -20,7 +20,7 @@ const roomState = {
   live: new Map()
 };
 
-/// 以自身名义出场的中转线用各自的色块做头像（首字母），不借用任何品牌图形。
+/// 人格参与者用自己的头像；中转线优先显示供应商品牌图标，未知供应商回退到首字母。
 const RELAY_COLORS = {
   Claude: "#d97757",
   Codex: "#3e8e7e",
@@ -45,7 +45,12 @@ function makeRoomAvatar(participant) {
   frame.setAttribute("aria-hidden", "true");
   const label = String(participant?.label || "?");
   frame.style.setProperty("--room-avatar-color", RELAY_COLORS[label] || "var(--md-sys-color-secondary)");
-  frame.textContent = Array.from(label)[0] || "?";
+  const brand = window.GqyProviderIcons?.providerMark(
+    { id: participant?.provider_id, display_name: label },
+    "room-avatar-brand"
+  );
+  if (brand) frame.appendChild(brand);
+  else frame.textContent = Array.from(label)[0] || "?";
   return frame;
 }
 
@@ -113,6 +118,21 @@ async function stopRoom() {
   }
 }
 
+async function skipRoomSpeaker() {
+  const room = currentRoom();
+  if (!room) return;
+  try {
+    await apiRequest(`/api/rooms/${encodeURIComponent(room.room_id)}/skip`, { method: "POST" });
+  } catch (error) {
+    showToast(error.message || "跳过失败", "error");
+  }
+}
+
+function manageRoomParticipants(room) {
+  if (!room || room.messages?.length || room.status?.running) return;
+  openRoomDialog(room);
+}
+
 function buildStatusBar(room) {
   const status = room.status || {};
   const bar = document.createElement("div");
@@ -124,17 +144,34 @@ function buildStatusBar(room) {
     const speaking = participantOf(room, status.speaking);
     const pending = Number(status.pending_rounds) || 0;
     text.textContent = speaking
-      ? `${speaking.label} 正在说${pending ? `，后面还排着 ${pending} 轮` : ""}`
+      ? `${speaking.label} ${status.skipping ? "正在跳过" : "正在说"}${pending ? `，后面还排着 ${pending} 轮` : ""}`
       : "准备开始这一轮…";
+    if (speaking && !status.skipping) {
+      const skip = document.createElement("button");
+      skip.type = "button";
+      skip.className = "secondary-button room-skip";
+      skip.textContent = "跳过";
+      skip.addEventListener("click", skipRoomSpeaker);
+      bar.appendChild(skip);
+    }
     const stop = document.createElement("button");
     stop.type = "button";
     stop.className = "secondary-button room-stop";
     stop.textContent = "停止";
     stop.addEventListener("click", stopRoom);
-    bar.append(text, stop);
+    bar.prepend(text);
+    bar.appendChild(stop);
   } else {
     text.textContent = `聊天室：${names}。你说一句，大家按顺序各回一次。`;
-    bar.append(text);
+    bar.appendChild(text);
+    if (!room.messages?.length) {
+      const manage = document.createElement("button");
+      manage.type = "button";
+      manage.className = "secondary-button room-manage-participants";
+      manage.textContent = "管理发言人";
+      manage.addEventListener("click", () => manageRoomParticipants(room));
+      bar.appendChild(manage);
+    }
   }
   return bar;
 }
@@ -217,6 +254,9 @@ function handleRoomEvent(name, data) {
     }
     if (pruned) renderRoom();
     else refreshStatusBar();
+  } else if (name === "room.participants") {
+    if (Array.isArray(data.participants)) room.participants = data.participants;
+    renderRoom();
   }
 }
 
@@ -247,12 +287,12 @@ export async function submitRoom() {
 
 // —— 建房对话框 ——
 
-function buildCandidateRow(candidate, index) {
+function buildCandidateRow(candidate, index, selectedIds, managing) {
   const row = document.createElement("label");
   row.className = "pop-dialog-row room-candidate";
   const check = document.createElement("input");
   check.type = "checkbox";
-  check.checked = true;
+  check.checked = selectedIds ? selectedIds.has(candidate.participant_id) : true;
   check.dataset.index = String(index);
   const copy = document.createElement("span");
   copy.className = "room-candidate-copy";
@@ -272,6 +312,9 @@ function buildCandidateRow(candidate, index) {
       option.selected = model === candidate.model;
       select.appendChild(option);
     }
+    select.disabled = Boolean(managing && candidate.isCurrent);
+    if (candidate.unavailable) select.title = "供应商已停用；可以移除该发言人";
+    else if (select.disabled) select.title = "已有成员的模型保持不变";
     select.addEventListener("click", (event) => event.stopPropagation());
     row.appendChild(select);
   } else {
@@ -298,6 +341,7 @@ function ensureDialog() {
   title.id = "roomDialogTitle";
   title.textContent = "新建聊天室";
   const intro = document.createElement("p");
+  intro.id = "roomDialogIntro";
   intro.textContent = "勾选谁进来。你每说一句，大家按这里的顺序各回一次。房间里只聊天，不开工具。";
   headerCopy.append(title, intro);
   header.appendChild(headerCopy);
@@ -328,7 +372,7 @@ function ensureDialog() {
   return dialog;
 }
 
-export async function openCreateRoomDialog() {
+async function openRoomDialog(room = null) {
   let candidates = [];
   try {
     const response = await apiRequest("/api/rooms/candidates");
@@ -338,45 +382,130 @@ export async function openCreateRoomDialog() {
     return;
   }
   const dialog = ensureDialog();
+  const managing = Boolean(room);
+  const selectedIds = managing
+    ? new Set((room.participants || []).map((participant) => String(participant.participant_id)))
+    : null;
+  if (managing) {
+    const existing = new Map((room.participants || []).map((participant) => [
+      String(participant.participant_id),
+      participant
+    ]));
+    for (const candidate of candidates) {
+      const participant = existing.get(String(candidate.participant_id));
+      if (participant) {
+        candidate.model = participant.model;
+        candidate.isCurrent = true;
+        if (participant.model && !candidate.models.includes(participant.model)) {
+          candidate.models.push(participant.model);
+        }
+      }
+    }
+    const availableIds = new Set(candidates.map((candidate) => String(candidate.participant_id)));
+    for (const participant of room.participants || []) {
+      if (availableIds.has(String(participant.participant_id))) continue;
+      candidates.push({
+        kind: participant.kind,
+        participant_id: participant.participant_id,
+        provider_id: participant.provider_id,
+        label: participant.label,
+        model: participant.model,
+        models: participant.model ? [participant.model] : [],
+        isCurrent: true,
+        unavailable: true
+      });
+    }
+  }
+  dialog.querySelector("#roomDialogTitle").textContent = managing ? "管理发言人" : "新建聊天室";
+  dialog.querySelector("#roomDialogIntro").textContent = managing
+    ? "首条消息发出前可以增删发言人，已有成员的模型保持不变。"
+    : "勾选谁进来。你每说一句，大家按这里的顺序各回一次。房间里只聊天，不开工具。";
+  dialog.querySelector("#roomDialogName").hidden = managing;
   const list = dialog.querySelector("#roomDialogList");
-  list.replaceChildren(...candidates.map(buildCandidateRow));
-  if (candidates.length < 2) {
+  list.replaceChildren(...candidates.map((candidate, index) => buildCandidateRow(candidate, index, selectedIds, managing)));
+  if (!managing && candidates.length < 2) {
     const hint = document.createElement("p");
     hint.className = "pop-dialog-empty";
     hint.textContent = "还没有启用的 CLI 中转线。先在「供应商和模型」里启用 Claude Code、Codex、Antigravity 或 Cline，再来拉它们进群。";
     list.appendChild(hint);
   }
   const confirm = dialog.querySelector("#roomDialogConfirm");
+  confirm.textContent = managing ? "保存成员" : "进入聊天室";
   confirm.onclick = async () => {
-    const participants = candidates
-      .map((candidate, index) => ({ candidate, index }))
-      .filter(({ index }) => list.querySelector(`input[data-index="${index}"]`)?.checked)
-      .map(({ candidate, index }) => ({
+    const selectedCandidates = candidates.filter((candidate, index) =>
+      list.querySelector(`input[data-index="${index}"]`)?.checked
+    );
+    const orderedCandidates = managing
+      ? (() => {
+          const selectedById = new Map(selectedCandidates.map((candidate) => [
+            String(candidate.participant_id),
+            candidate
+          ]));
+          const currentIds = new Set((room.participants || []).map((participant) =>
+            String(participant.participant_id)
+          ));
+          return [
+            ...(room.participants || [])
+              .map((participant) => selectedById.get(String(participant.participant_id)))
+              .filter(Boolean),
+            ...selectedCandidates.filter((candidate) => !currentIds.has(String(candidate.participant_id)))
+          ];
+        })()
+      : selectedCandidates;
+    const participants = orderedCandidates.map((candidate) => {
+      const index = candidates.indexOf(candidate);
+      return {
         kind: candidate.kind,
         provider_id: candidate.provider_id,
         model: list.querySelector(`select[data-index="${index}"]`)?.value || candidate.model
-      }));
+      };
+    });
     if (!participants.length) {
-      showToast("至少选一位", "error");
+      showToast("至少保留一位发言人", "error");
+      return;
+    }
+    if (participants.length > 6) {
+      showToast("最多选择 6 位发言人", "error");
       return;
     }
     confirm.disabled = true;
     try {
-      const response = await apiRequest("/api/rooms", {
-        method: "POST",
-        body: JSON.stringify({ name: dialog.querySelector("#roomDialogName").value, participants })
-      });
-      const payload = await response.json();
+      if (managing) {
+        const response = await apiRequest(`/api/rooms/${encodeURIComponent(room.room_id)}/participants`, {
+          method: "PUT",
+          body: JSON.stringify({
+            expected_participant_ids: (room.participants || []).map((participant) => participant.participant_id),
+            participants
+          })
+        });
+        const payload = await response.json();
+        if (payload?.room) {
+          room.participants = payload.room.participants || room.participants;
+          room.messages = payload.room.messages || room.messages;
+          room.status = payload.room.status || room.status;
+          renderRoom();
+        }
+      } else {
+        const response = await apiRequest("/api/rooms", {
+          method: "POST",
+          body: JSON.stringify({ name: dialog.querySelector("#roomDialogName").value, participants })
+        });
+        const payload = await response.json();
+        await refreshSessions();
+        await openSessionView(String(payload?.session?.session_id || ""));
+      }
       dialog.close();
-      await refreshSessions();
-      await openSessionView(String(payload?.session?.session_id || ""));
     } catch (error) {
-      showToast(error.message || "建房失败", "error");
+      showToast(error.message || (managing ? "更新发言人失败" : "建房失败"), "error");
     } finally {
       confirm.disabled = false;
     }
   };
   dialog.showModal();
+}
+
+export async function openCreateRoomDialog() {
+  await openRoomDialog();
 }
 
 export function initRoom() {

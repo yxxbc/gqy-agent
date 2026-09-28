@@ -3,9 +3,9 @@
    会话列表里的房间标记。颜色全部从 token 派生,中转线的品牌色只经
    --room-avatar-color 进来(room.js 按参与者写在头像上)。 */
 
-/* —— 发言人色块头像 ——
-   人格参与者用她自己的头像(makeAvatarFrame),这里只管中转线:一块以
-   --room-avatar-color 为底的圆,中间是名字首字。 */
+/* —— 发言人头像 ——
+  人格参与者用她自己的头像(makeAvatarFrame);中转线显示品牌图标,未匹配时以
+  --room-avatar-color 为底并回退到名字首字。 */
 .avatar-frame.room-avatar {
   --room-avatar-color: var(--md-sys-color-secondary);
   display: grid;
@@ -15,6 +15,16 @@
   font-weight: 600;
   line-height: 1;
   user-select: none;
+}
+.avatar-frame.room-avatar .room-avatar-brand {
+  width: 100%;
+  height: 100%;
+  flex: 1 1 auto;
+  border-radius: 50%;
+}
+.avatar-frame.room-avatar .room-avatar-brand svg {
+  width: 72%;
+  height: 72%;
 }
 /* 消息里的头像:尺寸与定位沿用 .assistant-label .avatar-frame,描边换成它自己的色,
    不借她的金圈(金圈是「这是她」的记号)。 */
@@ -112,11 +122,17 @@
   color: var(--accent);
   animation: status-pulse 2.4s ease-in-out infinite;
 }
-.room-status .room-stop {
+.room-status .room-stop,
+.room-status .room-skip,
+.room-status .room-manage-participants {
   min-height: 28px;
   padding: 0 12px;
   border-radius: var(--radius-pill);
   font-size: var(--fs-meta);
+}
+.room-status .room-skip:hover,
+.room-status .room-manage-participants:hover {
+  color: var(--accent);
 }
 .room-status .room-stop:hover {
   color: var(--danger);

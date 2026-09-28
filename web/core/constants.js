@@ -84,6 +84,7 @@ export const EVENT_NAMES = [
   "room.delta",
   "room.delta_reset",
   "room.status",
+  "room.participants",
   "job.started",
   "job.finished",
   "job.acknowledged",

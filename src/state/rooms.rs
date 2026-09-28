@@ -11,6 +11,16 @@ impl StateStore {
         self.conv_db.insert_room_participants(room_id, participants)
     }
 
+    pub fn replace_room_participants_if_empty(
+        &self,
+        room_id: &str,
+        expected_ids: &[String],
+        participants: &[RoomParticipant],
+    ) -> Result<bool> {
+        self.conv_db
+            .replace_room_participants_if_empty(room_id, expected_ids, participants)
+    }
+
     pub fn room_participants(&self, room_id: &str) -> Result<Vec<RoomParticipant>> {
         self.conv_db.room_participants(room_id)
     }

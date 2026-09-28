@@ -116,3 +116,51 @@ fn deleting_a_room_takes_participants_messages_and_backing_sessions_with_it() {
         "后台会话要随房间一起删掉"
     );
 }
+
+#[test]
+fn replacing_room_participants_is_limited_to_empty_unchanged_rooms() {
+    let temp = tempfile::tempdir().unwrap();
+    let store = StateStore::new(&test_paths(temp.path())).unwrap();
+    let room = store
+        .create_session("gqy", "聊天室", USER_SESSION_KIND, None)
+        .unwrap();
+    let backing_a = store
+        .create_session("gqy", "a", ROOM_MEMBER_SESSION_KIND, Some(&room.session_id))
+        .unwrap();
+    let backing_b = store
+        .create_session("gqy", "b", ROOM_MEMBER_SESSION_KIND, Some(&room.session_id))
+        .unwrap();
+    store
+        .insert_room_participants(
+            &room.session_id,
+            &[participant("a", &backing_a.session_id, 1)],
+        )
+        .unwrap();
+
+    assert!(store
+        .replace_room_participants_if_empty(
+            &room.session_id,
+            &["a".to_string()],
+            &[participant("b", &backing_b.session_id, 1)],
+        )
+        .unwrap());
+    assert_eq!(
+        store.room_participants(&room.session_id).unwrap()[0].participant_id,
+        "b"
+    );
+
+    store
+        .append_room_message(&room.session_id, ROOM_SPEAKER_USER, "", "开始", "")
+        .unwrap();
+    assert!(!store
+        .replace_room_participants_if_empty(
+            &room.session_id,
+            &["b".to_string()],
+            &[participant("a", &backing_a.session_id, 1)],
+        )
+        .unwrap());
+    assert_eq!(
+        store.room_participants(&room.session_id).unwrap()[0].participant_id,
+        "b"
+    );
+}

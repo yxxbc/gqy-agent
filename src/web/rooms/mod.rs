@@ -6,9 +6,11 @@
 //! 发言驱动见 `driver`，提示词拼装见 `prompt`。
 
 mod driver;
+mod participants;
 mod prompt;
 
-pub(in crate::web) use driver::stop_room;
+pub(in crate::web) use driver::{room_idle, skip_room_speaker, stop_room};
+pub(in crate::web) use participants::update_room_participants_http;
 
 use crate::state::{RoomParticipant, ROOM_MEMBER_SESSION_KIND, ROOM_SPEAKER_USER};
 use crate::web::*;
@@ -100,7 +102,7 @@ pub(in crate::web) async fn room_candidates_http(
     Ok(Json(json!({ "candidates": candidates })).into_response())
 }
 
-#[derive(Deserialize)]
+#[derive(Clone, Deserialize)]
 pub(in crate::web) struct CreateRoomParticipant {
     kind: String,
     #[serde(default)]
@@ -118,6 +120,10 @@ pub(in crate::web) struct CreateRoomRequest {
 
 fn bad_request(message: &str) -> ApiError {
     ApiError::new(StatusCode::BAD_REQUEST, message)
+}
+
+fn conflict(message: &str) -> ApiError {
+    ApiError::new(StatusCode::CONFLICT, message)
 }
 
 /// 把请求里的参与者核对成落库用的行（还没有后台会话 id）。
@@ -339,5 +345,18 @@ pub(in crate::web) async fn stop_room_http(
     require_mutation(&headers, &state)?;
     require_local_web_session(&state, &headers, &room_id)?;
     stop_room(&state, &room_id);
+    Ok(Json(json!({})).into_response())
+}
+
+pub(in crate::web) async fn skip_room_http(
+    State(state): State<DaemonState>,
+    headers: HeaderMap,
+    Path(room_id): Path<String>,
+) -> std::result::Result<Response, ApiError> {
+    require_mutation(&headers, &state)?;
+    require_local_web_session(&state, &headers, &room_id)?;
+    if !skip_room_speaker(&state, &room_id) {
+        return Err(conflict("当前没有正在回复的发言人"));
+    }
     Ok(Json(json!({})).into_response())
 }
