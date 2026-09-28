@@ -54,7 +54,7 @@ LAYERS = [
     ("配置", {"config", "default_models", "models_cache"}),
     ("基础设施", {
         "llm", "state", "embedding", "ipc", "question", "alarm", "skills", "pm",
-        "transfer", "voice", "terminal", "persona_hint", "args",
+        "transfer", "voice", "terminal", "persona_hint", "args", "pet",
     }),
     ("能力", {"tools", "memory", "render", "ledger", "clipboard", "host_info", "default_kb"}),
     ("回合引擎", {"agent", "runtime"}),

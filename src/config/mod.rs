@@ -583,9 +583,42 @@ pub struct DisplayConfig {
     /// 自动换成黑猫。
     #[serde(default = "default_display_mascot")]
     pub mascot: String,
+    /// 桌面悬浮窗(`gqy pet`)。v1 是「静态立绘 + 待机动效」那一步,
+    /// 模型(换皮)与口型跟着 Cubism 渲染层一起加。见
+    /// `docs/design/2026-09-28-desktop-pet.md`。
+    #[serde(default)]
+    pub pet: PetConfig,
     /// 这个版本不认识的显示项，原样留着写回。见 [`AppConfig::extra`]。
     #[serde(flatten, skip_serializing_if = "BTreeMap::is_empty")]
     pub extra: BTreeMap<String, serde_json::Value>,
+}
+
+/// 桌面悬浮窗(`gqy-pet` 进程)的用户偏好。
+///
+/// **窗口位置不在这里**:它是运行时状态,写 `state_dir/pet.json`,免得悬浮窗
+/// 退出时把 daemon 期间改过的配置整份覆盖回去。开关也不在这里——`gqy pet`
+/// 是显式启动,窗口关掉进程就退出。
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct PetConfig {
+    /// 人物缩放。窗口那一侧把值夹在 0.5–2.0。
+    #[serde(default = "default_pet_scale")]
+    pub scale: f32,
+    /// 始终置顶。
+    #[serde(default = "default_true")]
+    pub always_on_top: bool,
+}
+
+impl Default for PetConfig {
+    fn default() -> Self {
+        Self {
+            scale: default_pet_scale(),
+            always_on_top: true,
+        }
+    }
+}
+
+fn default_pet_scale() -> f32 {
+    1.0
 }
 
 /// Desktop notifications. Both kinds are suppressed while the REPL window has
@@ -646,6 +679,8 @@ struct RawDisplayConfig {
     theme: Option<String>,
     #[serde(default)]
     mascot: Option<String>,
+    #[serde(default)]
+    pet: Option<PetConfig>,
     #[serde(flatten, default)]
     extra: BTreeMap<String, serde_json::Value>,
 }
@@ -692,6 +727,7 @@ impl<'de> Deserialize<'de> for DisplayConfig {
             banner: raw.banner.unwrap_or(true),
             theme: raw.theme.unwrap_or_else(default_display_theme),
             mascot: raw.mascot.unwrap_or_else(default_display_mascot),
+            pet: raw.pet.unwrap_or_default(),
             extra: raw.extra,
         })
     }
@@ -1080,6 +1116,7 @@ impl Default for DisplayConfig {
             mixed_model_endpoint_display: default_mixed_model_endpoint_display(),
             command_output_lines: default_command_output_lines(),
             repl_replay_turns: default_repl_replay_turns(),
+            pet: PetConfig::default(),
             banner: true,
             theme: default_display_theme(),
             mascot: default_display_mascot(),

@@ -95,6 +95,8 @@ pub enum Command {
     Listen,
     /// 语音会话与播报管理:say / reset / history / status
     Voice(VoiceArgs),
+    /// 桌面悬浮窗:桌面上开一个透明置顶的小窗显示她(需要带 pet 功能构建的 gqy-pet)
+    Pet(PetArgs),
     Init,
     Paths,
     /// 家目录布局:看计划 / --apply 立刻搬 / --rollback 搬回去
@@ -408,6 +410,13 @@ pub struct ConfigArgs {
 pub struct VoiceArgs {
     #[command(subcommand)]
     pub command: VoiceCommand,
+}
+
+#[derive(Debug, Args)]
+pub struct PetArgs {
+    /// 只打印要启动的那个二进制路径,不真的启动(排查用)
+    #[arg(long)]
+    pub dry_run: bool,
 }
 
 #[derive(Debug, Subcommand)]

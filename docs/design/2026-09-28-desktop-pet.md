@@ -178,6 +178,9 @@
 | 4 | 交互与设置：单击反应、双击开 WebUI、右键菜单、`display.pet` + WebUI 设置卡片 | `src/config/`、`web/settings-schema/`、`src/pet/` | 设置页能开关、缩放；关掉后进程退出 |
 | 5 |（可选）包络口型、Linux / Windows 打包、随包发布 | `src/voice/`、IPC 帧、发布链 | 口型跟着音量走；Linux 上能装能跑 |
 
+落地状态（2026-09-28）：**步 1、步 2 已做**，步 4 里「配置 + 右键菜单 + 点击/拖动」也落了；
+**步 3（Cubism 渲染层）与步 5 未做**——等你给的模型接上去（见 §11）。
+
 ## 10. 风险与未核实（施工前先打掉的）
 
 1. **wry 的透明窗 + 置顶 + 点击穿透**在目标 macOS 版本上的真实表现：先写 30 行探针验一遍，
@@ -187,3 +190,64 @@
 4. **daemon 重启时宠物怎么办**：daemon 因 `build_id` 变化重启是常态，宠物应自动重连而不是退出
    （照 REPL 的重连口径）。
 5. **模型资产与人格的关系**：一个模型还是每个账号一套？v1 先全局一套（§5.3）。
+
+## 11. 施工记录（2026-09-28，步 1 部分落地）
+
+> 用户 09-28 拍板：模型由他定，先把**窗口 + IPC + 配置**三块做完。本节记现状与偏差，
+> 未做完的部分留在 §9 的步 2 及以后。
+
+**做完了什么**
+
+| 部分 | 落点 |
+|---|---|
+| `gqy-pet` 独立二进制 + `pet` feature（主 `gqy` 不链接 wry/tao） | `Cargo.toml`、`src/bin/pet.rs`、`src/lib.rs`、`src/pet/` |
+| 透明、无边框、置顶、所有桌面可见、不占 Dock（Accessory）的窗口 | `src/pet/window.rs` |
+| 按住人物原生拖窗（4px 阈值，免得双击被当成两次拖动） | `src/pet/web/index.html` + `window.rs` 的 IPC |
+| 关窗口记住位置，下次开在原地（物理像素，`state/pet.json`） | `src/pet/state.rs`、`window.rs` |
+| 页面与立绘编译进二进制（data URI 内联，不读磁盘、不走网络） | `src/pet/page.rs`、`src/pet/web/index.html` |
+| 配置 `display.pet`（`scale`、`always_on_top`，缩放夹在 0.5–2.0） | `src/config/mod.rs` |
+| 入口 `gqy pet` / `gqy pet --dry-run`（脱离终端启动，日志落 `state/pet.log`） | `src/cli/pet.rs`、`src/cli/args.rs`、`src/cli/mod.rs` |
+| 头一次开窗贴主屏右下角（之后跟着 `state/pet.json` 走） | `src/pet/window.rs` 的 `place_bottom_right` |
+| 右键菜单（页内画）：置顶 ✓ / 大一点 / 小一点 / 打开 WebUI / 关掉；勾选态从配置注入页面 | `src/pet/web/index.html`、`src/pet/page.rs`、`window.rs` |
+| **daemon 侧接上**：`Command::SubscribePet` 长连接，事件折成 `idle / thinking / speaking` 三种状态，**变化才发一帧**；宠物侧断线 3 秒重连、不强拉 daemon | `src/ipc/protocol.rs`（`PetState`）、`src/web/ipc_server.rs`（`stream_pet_events` / `pet_state_of`）、`src/pet/ipc.rs` |
+| 状态表现：状态点（蓝=在想、暖金=在说）+ 立绘光晕（Cubism 接上后换嘴型/表情） | `src/pet/web/index.html`、`window.rs` 的 `evaluate_script` |
+| 层序登记与文档 | `test_scripts/arch_dep_check.py`、`docs/architecture.md`、`docs/wiki/03-使用方式.md` §9、`docs/wiki/05-配置指南.md` |
+
+**实测（本机 macOS，debug 构建，GQY_HOME 沙箱）**
+
+```
+INFO pet: 悬浮窗已就位 x=2876 y=1590 width=512 height=602 scale=1.0   ← 右下角(逻辑 1438×795)
+INFO pet: 已接上 daemon,开始跟她的状态                                  ← SubscribePet 长连接
+INFO pet: 页面已就绪 natural_width=256                                 ← 内联立绘解码成功
+INFO pet: 状态变化 state="thinking"                                    ← 发一轮消息
+INFO pet: 状态变化 state="idle"                                        ← 那一轮结束
+```
+
+- **位置**：按 `EventLoop::primary_monitor()` 算右下角，在建窗时用 `with_position` 一次到位——
+  实测**窗口显示之后再 `set_outer_position` 不生效**（macOS 上读回来还是旧位置），所以那条路废弃了。
+  你这台是 1710×1112 逻辑（「更多空间」缩放），算出 (2876,1590) 物理，正好贴右下角 16px。
+- **状态链路**：起一个沙箱 daemon，`gqy ask` 发一轮（沙箱没有可用模型，所以那轮是失败收尾），
+  宠物侧只收到**两条**状态变化（thinking → idle）——原始 delta 一条都没过来，裁剪生效。
+- **页面**：脚本跑起来了、`window.ipc` 通、内联立绘解码成功（自然宽度 256）——这条自查留在代码里
+  （页面 `load` 后回报，见 `Command::Ready`），将来也是「WebView 是不是白屏了」的抓手
+- `cargo check/build --features pet --bin gqy-pet` 与默认构建（不带 pet）都干净
+- 层序门禁、文件规模、WebUI 依赖、CSS token、model-english 全过
+- `src/pet/tests.rs` 四个用例：页面内联、配置注入、位置往返、坏文件回默认
+
+**偏差与没做的**
+
+- **点击穿透没做**：人物轮廓之外仍占鼠标（窗口 256×301 一块）。方案里说要形状级穿透，
+  实际做要全局取鼠标位置（窗口忽略事件之后自己也收不到 `pointermove`，会死循环），
+  v1 先整窗可点。`display.pet` 里没放 `click_through` 开关，别放空开关。
+- **右键菜单是页内画的**（不是系统原生菜单）：无边框窗里原生菜单还得自己算位置，
+  页内那份 CSS 更好控，代价是它只能摆在这个窗口范围内。
+- **置顶 / 缩放的改动写配置**（读-改-写整份 `config`）：与 daemon 同时改配置存在极小概率的
+  互相覆盖，配置改了随时能再改，先不上锁。
+- **不强拉 daemon**：daemon 没跑时宠物安静等（3 秒一次重连），不替用户把 daemon 拉起来。
+- **模型还没接**：`~/Desktop/11月椿/椿/`（Cubism 3 的 `moc3` + 3 张 4096 贴图 + `idle` 动作 +
+  5 个表情）是下一步的步 3。模型**不入仓库、不随发布包分发**，从磁盘按路径加载。
+- **CI 没加 `--features pet` 的编译检查**：Linux 上编 wry 要 webkit2gtk 系统包，
+  加就要连着改 CI 与 Nix；留给「发布 pet」那一步一起做（§2 第 5 条：发布包先不带）。
+- **Windows / Linux 未验**：只在本机 macOS 上跑过。
+- **截屏验证没成**：终端没有屏幕录制权限（`screencapture` 报 `could not create image from rect`），
+  所以「透明、置顶、无阴影」这三条观感靠用户肉眼在验收里确认。

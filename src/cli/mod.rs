@@ -45,6 +45,7 @@ mod github_cmds;
 mod layout_cmds;
 mod migrate_cmds;
 mod model_cmds;
+mod pet;
 mod pm_cmds;
 mod pop_cmds;
 mod repl;
@@ -61,6 +62,7 @@ use github_cmds::*;
 use layout_cmds::*;
 use migrate_cmds::*;
 use model_cmds::*;
+use pet::*;
 use pm_cmds::*;
 use pop_cmds::*;
 use select::*;
@@ -263,6 +265,7 @@ pub async fn run(cli: Cli, paths: GqyPaths) -> Result<()> {
         }
         Some(Command::Listen) => run_listen(&paths).await,
         Some(Command::Voice(args)) => run_voice_command(&paths, args.command).await,
+        Some(Command::Pet(args)) => run_pet(&paths, args.dry_run),
         Some(Command::Init) => run_init(&paths, InitKind::Explicit),
         Some(Command::Paths) => {
             paths.print();

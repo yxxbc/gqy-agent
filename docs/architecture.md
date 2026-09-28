@@ -71,7 +71,7 @@ IM 平台都在 `src/platforms/` 下：`common/` 是平台中立的回合机器�
 |---|---|
 | 基础 | `i18n` `paths` `shell` `prompts` `logging` `notify` `json_extract` `token_counter` `token_estimate` `memory_types` `platform_types` `slash_commands` |
 | 配置 | `config` `default_models` `models_cache` |
-| 基础设施 | `llm` `state` `embedding` `ipc` `question` `alarm` `skills` `pm` `transfer` `voice` `terminal` `persona_hint` `args` |
+| 基础设施 | `llm` `state` `embedding` `ipc` `question` `alarm` `skills` `pm` `transfer` `voice` `terminal` `persona_hint` `args` `pet` |
 | 能力 | `tools` `memory` `render` `ledger` `clipboard` `host_info` `default_kb` |
 | 回合引擎 | `agent` `runtime` |
 | 场所 | `platforms` |

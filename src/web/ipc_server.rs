@@ -135,6 +135,11 @@ pub(in crate::web) async fn handle_ipc_connection(
         IpcCommand::FollowRun { run_id } => {
             follow_run(&state, &mut stream, run_id).await?;
         }
+        IpcCommand::SubscribePet => {
+            // 先应一声,再当长连接推状态:宠物那边等到 Ack 才算接上。
+            ipc::send(&mut stream, &IpcFrame::Ack).await?;
+            stream_pet_events(&state, &mut stream).await?;
+        }
         IpcCommand::VoiceAttach => {
             voice_bridge::handle_voice_attach(&state, &mut stream).await?;
         }
@@ -822,6 +827,72 @@ pub(in crate::web) async fn switch_session_via_actor_reserved(
 
 /// 等到回合流连接的对端挂断(EOF 或读错误)才返回。回合流上客户端在
 /// StartTurn 之后不再发东西(取消/排队都走新连接),读到的字节只丢弃。
+/// 宠物订阅:只推**状态迁移**,不推原始事件流。
+///
+/// 宠物要的是「她在想 / 她在说话 / 她闲着」,不是每个 token。原始 delta 一路
+/// 推过去会把这条 socket 灌满,宠物那点逻辑也用不上——所以状态在这里就折好,
+/// 变化才发一帧(帧 kind 固定 `pet.state`,data 是 `{"state":"…"}`)。
+async fn stream_pet_events(state: &DaemonState, stream: &mut tokio::net::UnixStream) -> Result<()> {
+    let mut subscription = state.events.subscribe_live();
+    let mut current = ipc::PetState::Idle;
+    loop {
+        let record = tokio::select! {
+            biased;
+            received = subscription.recv() => match received {
+                Ok(record) => record,
+                // 广播通道断了(daemon 正在收摊):退出去,让宠物那边重连。
+                Err(_) => break,
+            },
+            // 宠物窗口关掉时连接断开,这里得跟着退,否则这条任务永远挂着。
+            _ = client_hung_up(stream) => break,
+        };
+        let Some(next) = pet_state_of(&record.kind) else {
+            continue;
+        };
+        if next == current {
+            continue;
+        }
+        current = next;
+        ipc::send(
+            stream,
+            &IpcFrame::Event {
+                id: record.id,
+                kind: "pet.state".to_string(),
+                data: json!({ "state": next }),
+            },
+        )
+        .await?;
+    }
+    Ok(())
+}
+
+/// 事件 kind → 宠物状态;`None` = 这条与宠物无关。
+///
+/// 只认回合级的粗粒度事件:`assistant.delta` 一出现就是「在说话」,思考与工具
+/// 那一路都算「在想」。回合结束的三种收尾一起回 idle——宠物不关心为什么结束。
+fn pet_state_of(kind: &str) -> Option<ipc::PetState> {
+    match kind {
+        "run.started"
+        | "reasoning.start"
+        | "reasoning.reset"
+        | "reasoning.part_start"
+        | "reasoning.part_end"
+        | "reasoning.title"
+        | "reasoning.delta"
+        | "tool.started"
+        | "tool.preparing"
+        | "tool.progress"
+        | "tool.output"
+        | "tool.finished"
+        | "tool.image"
+        | "tool.artifact"
+        | "question.requested" => Some(ipc::PetState::Thinking),
+        "assistant.delta" => Some(ipc::PetState::Speaking),
+        "run.completed" | "run.cancelled" | "run.failed" => Some(ipc::PetState::Idle),
+        _ => None,
+    }
+}
+
 async fn client_hung_up(stream: &tokio::net::UnixStream) {
     let mut scratch = [0u8; 256];
     loop {

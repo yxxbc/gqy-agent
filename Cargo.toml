@@ -23,6 +23,13 @@ name = "gqy-voice"
 path = "src/bin/voice.rs"
 required-features = ["voice"]
 
+# 桌面悬浮窗进程:透明置顶小窗里的她。只有 `--features pet` 才会构建,
+# 主程序 `gqy` 不链接 wry/tao(与 `gqy-voice` 同一套口径)。
+[[bin]]
+name = "gqy-pet"
+path = "src/bin/pet.rs"
+required-features = ["pet"]
+
 [dependencies]
 anyhow = "1.0"
 axum = { version = "0.8", features = ["ws"] }
@@ -92,10 +99,16 @@ sherpa-onnx = { version = "1.13.7", optional = true }
 cpal = { version = "0.15", optional = true }
 pinyin = { version = "0.11", optional = true }
 bzip2 = { version = "0.4", optional = true }
+# 桌面悬浮窗(可选 feature `pet`):wry 起 WebView,tao 起窗口。
+wry = { version = "0.57", optional = true }
+tao = { version = "0.37", optional = true, default-features = false, features = ["rwh_06"] }
 
 [features]
 default = []
 voice = ["dep:sherpa-onnx", "dep:cpal", "dep:pinyin", "dep:bzip2"]
+# 桌面悬浮窗:透明、无边框、置顶的小窗里显示她(`gqy-pet` 进程)。
+# 主程序 `gqy` 不链接 wry/tao——重前端一律走独立二进制(与 voice 同一套口径)。
+pet = ["dep:wry", "dep:tao"]
 
 [build-dependencies]
 base64 = "0.22"

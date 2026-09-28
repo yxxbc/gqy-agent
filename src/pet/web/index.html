@@ -1,0 +1,286 @@
+<!doctype html>
+<!--
+  桌面悬浮窗的页面(src/pet/web/index.html,编译进二进制)。
+
+  这块页面只做三件事:把立绘画出来、给它一点活气(呼吸、淡入)、把鼠标动作
+  翻成指令发回 Rust 侧(window.ipc.postMessage)。立绘由 page.rs 以 data URI
+  内联进来,页面不发任何网络请求、不加载任何外部资源。
+
+  指令(cmd):drag(原生拖窗)、open_webui(双击)、close(✕ / Esc)。
+-->
+<html lang="zh">
+<head>
+  <meta charset="utf-8">
+  <title>顾清影</title>
+  <style>
+    html,
+    body {
+      height: 100%;
+      margin: 0;
+      overflow: hidden;
+      background: transparent;
+      /* 窗口是透明的,任何一层不透明底色都会露成一块方块。 */
+      user-select: none;
+      -webkit-user-select: none;
+    }
+    body {
+      cursor: grab;
+    }
+    body.is-dragging {
+      cursor: grabbing;
+    }
+
+    /* 立绘贴底居中,上方留白给动效(窗口高度里已含 HEADROOM)。 */
+    #stage {
+      position: relative;
+      display: grid;
+      height: 100%;
+      align-items: end;
+      justify-items: center;
+      /* 淡入:窗口先隐藏,WebView 就位后才有内容,露出来时不该是硬切。 */
+      animation: appear 420ms ease-out both;
+    }
+    #pet {
+      display: block;
+      max-width: 100%;
+      max-height: 100%;
+      /* 呼吸:幅度小、周期长,像站着而不是在飘。 */
+      animation: breathe 5.2s ease-in-out infinite;
+      transform-origin: 50% 100%;
+      filter: drop-shadow(0 10px 16px rgb(0 0 0 / 35%));
+      -webkit-user-drag: none;
+    }
+
+    @keyframes appear {
+      from { opacity: 0; transform: translateY(10px); }
+      to { opacity: 1; transform: translateY(0); }
+    }
+    @keyframes breathe {
+      0%, 100% { transform: translateY(0) scale(1); }
+      50% { transform: translateY(-4px) scale(1.012); }
+    }
+    @media (prefers-reduced-motion: reduce) {
+      #stage, #pet { animation: none; }
+    }
+
+    /* 关掉它的小 ✕:常显(半透明),鼠标进来变亮。
+       Accessory 策略下窗口不一定拿得到键盘焦点,Esc 不能当唯一出口。 */
+    #close {
+      position: absolute;
+      top: 8px;
+      right: 8px;
+      width: 20px;
+      height: 20px;
+      border: 0;
+      border-radius: 50%;
+      background: rgb(0 0 0 / 45%);
+      color: #fff;
+      font-size: 12px;
+      line-height: 1;
+      cursor: pointer;
+      opacity: 0.45;
+      transition: opacity 140ms ease;
+    }
+    body:hover #close {
+      opacity: 1;
+    }
+
+    /* 左下角的状态点:闲着是淡白点,在想是蓝色呼吸,在说话是暖金。
+       她的状态由 daemon 经 IPC 推来(见 src/pet/ipc.rs),页面只负责表现。 */
+    #dot {
+      position: absolute;
+      left: 10px;
+      bottom: 8px;
+      width: 6px;
+      height: 6px;
+      border-radius: 50%;
+      background: rgb(255 255 255 / 45%);
+      transition: background-color 260ms ease;
+    }
+    #dot.is-thinking { background: #8ab4ff; animation: pulse 1.4s ease-in-out infinite; }
+    #dot.is-speaking { background: #e0b973; animation: pulse 0.7s ease-in-out infinite; }
+    @keyframes pulse {
+      50% { opacity: 0.35; }
+    }
+    /* 说话时人物外面浮一层暖光:现在只有这张图能表达"她在说",
+       Cubism 接上之后换成嘴型与表情(见设计稿 §6)。 */
+    body[data-state="speaking"] #pet {
+      filter: drop-shadow(0 10px 16px rgb(0 0 0 / 35%)) drop-shadow(0 0 16px rgb(224 185 115 / 40%));
+    }
+    body[data-state="thinking"] #pet {
+      filter: drop-shadow(0 10px 16px rgb(0 0 0 / 35%)) drop-shadow(0 0 14px rgb(138 180 255 / 32%));
+    }
+
+    /* 右键菜单:页内画,不引系统菜单(窗口是无边框的,原生菜单还得自己摆位置)。
+       菜单要有自己的不透明底——它是这个透明窗里唯一该挡住底层东西的地方。 */
+    #menu {
+      position: absolute;
+      z-index: 10;
+      display: grid;
+      min-width: 130px;
+      padding: 4px;
+      border-radius: var(--pet-menu-radius, 8px);
+      background: rgb(30 30 34 / 96%);
+      box-shadow: 0 10px 26px rgb(0 0 0 / 45%);
+      color: #f2f2f5;
+      font-size: 12px;
+      line-height: 1.2;
+    }
+    #menu[hidden] { display: none; }
+    #menu button {
+      display: flex;
+      align-items: center;
+      padding: 6px 8px;
+      border: 0;
+      border-radius: 5px;
+      background: transparent;
+      color: inherit;
+      font: inherit;
+      gap: 6px;
+      text-align: left;
+      cursor: pointer;
+    }
+    #menu button:hover:not(:disabled) { background: rgb(255 255 255 / 12%); }
+    #menu button:disabled { opacity: 0.4; cursor: default; }
+    #menu .check { width: 11px; flex: none; color: #8ab4ff; }
+    #menu hr { margin: 4px 6px; border: 0; border-top: 1px solid rgb(255 255 255 / 14%); }
+  </style>
+</head>
+<body>
+  <div id="stage">
+    <img id="pet" src="__PORTRAIT_DATA_URI__" alt="顾清影" draggable="false">
+    <button id="close" type="button" title="关掉悬浮窗">✕</button>
+    <span id="dot"></span>
+    <div id="menu" role="menu" hidden>
+      <button type="button" role="menuitem" data-act="on_top"><span class="check"></span>置顶</button>
+      <button type="button" role="menuitem" data-act="bigger"><span class="check"></span>大一点</button>
+      <button type="button" role="menuitem" data-act="smaller"><span class="check"></span>小一点</button>
+      <hr>
+      <button type="button" role="menuitem" data-act="webui"><span class="check"></span>打开 WebUI</button>
+      <button type="button" role="menuitem" data-act="close"><span class="check"></span>关掉悬浮窗</button>
+    </div>
+  </div>
+  <script>
+    "use strict";
+
+    /* wry 注入的 IPC 通道;拿不到就说明页面不是被 gqy-pet 打开的(比如直接
+       用浏览器打开了这个文件),那时所有指令都安静地丢掉。 */
+    const send = (message) => {
+      try {
+        window.ipc?.postMessage(JSON.stringify(message));
+      } catch (_) {}
+    };
+
+    const stage = document.getElementById("stage");
+    const pet = document.getElementById("pet");
+
+    /* 配置里带过来的当前状态(置顶、缩放):菜单上的勾按它画,Rust 侧注入。 */
+    const PET_STATE = __PET_STATE__;
+
+    /* 拖动交给系统原生拖动:按住往下走 4px 才算拖,免得双击被当成两次拖动。 */
+    let pressed = false;
+    let dragging = false;
+    let startX = 0;
+    let startY = 0;
+
+    pet.addEventListener("pointerdown", (event) => {
+      if (event.button !== 0) return;
+      pressed = true;
+      dragging = false;
+      startX = event.clientX;
+      startY = event.clientY;
+      pet.setPointerCapture(event.pointerId);
+    });
+
+    pet.addEventListener("pointermove", (event) => {
+      if (!pressed || dragging) return;
+      if (Math.hypot(event.clientX - startX, event.clientY - startY) < 4) return;
+      dragging = true;
+      document.body.classList.add("is-dragging");
+      send({ cmd: "drag" });
+    });
+
+    const release = () => {
+      pressed = false;
+      dragging = false;
+      document.body.classList.remove("is-dragging");
+    };
+    pet.addEventListener("pointerup", release);
+    pet.addEventListener("pointercancel", release);
+    /* 原生拖动一开始,浏览器这边就收不到 pointerup 了:鼠标出窗或失焦也要复位。 */
+    window.addEventListener("blur", release);
+    document.addEventListener("pointerleave", release);
+
+    pet.addEventListener("dblclick", () => send({ cmd: "open_webui" }));
+
+    document.getElementById("close").addEventListener("click", () => send({ cmd: "close" }));
+    document.addEventListener("keydown", (event) => {
+      if (event.key === "Escape") send({ cmd: "close" });
+    });
+
+    /* 右键菜单。位置在鼠标处,但不许跑出窗口——窗口只有立绘那么大,
+       菜单贴着边出去就等于点不到。 */
+    const menu = document.getElementById("menu");
+    const item = (act) => menu.querySelector(`[data-act="${act}"]`);
+
+    const refreshMenu = () => {
+      item("on_top").querySelector(".check").textContent = PET_STATE.on_top ? "✓" : "";
+      item("bigger").disabled = PET_STATE.scale >= 2;
+      item("smaller").disabled = PET_STATE.scale <= 0.5;
+    };
+
+    document.addEventListener("contextmenu", (event) => {
+      event.preventDefault();
+      refreshMenu();
+      menu.hidden = false;
+      const box = menu.getBoundingClientRect();
+      menu.style.left = `${Math.max(4, Math.min(event.clientX, window.innerWidth - box.width - 4))}px`;
+      menu.style.top = `${Math.max(4, Math.min(event.clientY, window.innerHeight - box.height - 4))}px`;
+    });
+
+    menu.addEventListener("click", (event) => {
+      const act = event.target.closest("button")?.dataset.act;
+      if (!act) return;
+      menu.hidden = true;
+      if (act === "on_top") {
+        PET_STATE.on_top = !PET_STATE.on_top;
+        send({ cmd: "set_on_top", on: PET_STATE.on_top });
+      } else if (act === "bigger" || act === "smaller") {
+        const step = act === "bigger" ? 0.1 : -0.1;
+        // 一位小数:反复加减不该攒出 0.7000000000000001
+        PET_STATE.scale = Math.round(Math.min(2, Math.max(0.5, PET_STATE.scale + step)) * 10) / 10;
+        send({ cmd: "set_scale", scale: PET_STATE.scale });
+      } else if (act === "webui") {
+        send({ cmd: "open_webui" });
+      } else if (act === "close") {
+        send({ cmd: "close" });
+      }
+    });
+
+    /* 点别处收菜单。capture 阶段听:菜单里的按钮自己会先把 click 处理掉。 */
+    document.addEventListener(
+      "pointerdown",
+      (event) => {
+        if (!menu.hidden && !menu.contains(event.target)) menu.hidden = true;
+      },
+      true
+    );
+
+    /* 状态由 Rust 侧经 IPC 推来:`idle` / `thinking` / `speaking`。
+       Rust 用 evaluate_script 调这个函数,所以它得挂在 window 上。 */
+    const dot = document.getElementById("dot");
+    window.gqyPet = {
+      setState(name) {
+        document.body.dataset.state = name;
+        dot.className = name === "thinking" ? "is-thinking" : name === "speaking" ? "is-speaking" : "";
+      },
+    };
+
+    /* 加载完报一声:立绘自然宽度 > 0 说明内联的图真的解码出来了,
+       而不是一块空白窗。Rust 侧把它写进日志。 */
+    window.addEventListener("load", () => {
+      send({ cmd: "ready", width: pet.naturalWidth || 0 });
+    });
+  </script>
+</body>
+</html>

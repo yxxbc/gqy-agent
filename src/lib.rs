@@ -30,6 +30,8 @@ mod notify;
 mod oobe;
 mod paths;
 mod persona_hint;
+#[cfg(feature = "pet")]
+pub mod pet;
 mod platform_types;
 mod platforms;
 mod pm;

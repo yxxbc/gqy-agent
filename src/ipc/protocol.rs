@@ -136,6 +136,10 @@ pub enum Command {
     FollowRun {
         run_id: String,
     },
+    /// 桌面悬浮窗的订阅:附着后 daemon 只推**状态迁移**(`pet.state` 帧),
+    /// 不推原始事件流——宠物要的是「她在想 / 她在说话 / 她闲着」。
+    /// 见 `web/ipc_server.rs` 的 `stream_pet_events`。
+    SubscribePet,
     /// Stop all running background commands of a session (REPL exit).
     StopSessionJobs {
         session_id: String,
@@ -409,6 +413,22 @@ pub enum Frame {
         code: Option<ErrorCode>,
         message: String,
     },
+}
+
+/// 桌面悬浮窗能看到的那三种状态。
+///
+/// **两侧共用这一个枚举**(daemon 折状态、宠物读状态),免得各写一份字符串
+/// 对不上。取值走 serde 的 snake_case,帧里就是 `"idle"` / `"thinking"` /
+/// `"speaking"`。
+#[derive(Clone, Copy, Debug, Eq, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum PetState {
+    /// 闲着:没有回合在跑。
+    Idle,
+    /// 在想 / 在调工具:回合跑起来了但还没到说话。
+    Thinking,
+    /// 在说话:正文正在往外流。
+    Speaking,
 }
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq, Serialize, Deserialize)]
