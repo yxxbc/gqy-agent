@@ -148,3 +148,28 @@
 9. 钉住一个浮窗后再选别的词解释:两个浮窗并存;没钉住的点别处就关。
 10. 手机宽度:浮窗是底部面板;真机上选中文字后下方出现工具条。
 11. 旁路档位没配模型时:浮窗里显示「设置 → 模型池 → 旁路请求 → 划词解释 没有可用模型:…」。
+
+## 7. 第二轮用户反馈(2026-09-28)
+
+> 用户原话拆成五条:① 右键之后看不出刚选的是哪几个字 ② 翻译浮窗要一对「切换英文 / 切换中文」的小按钮
+> ③ 模型在思考时浮窗里也要有动画 ④ 浮窗停留就等于钉住了,「钉住」按钮多余 ⑤ 浮窗大小要随回复伸缩,别不够用。
+
+**做了什么**
+
+| 条 | 根因 / 做法 | 动的地方 |
+|---|---|---|
+| ① | 浏览器给原生选区画的底色会随焦点、DOM 重绘、浏览器的不同而消失(用户侧实测丢,本地 Chromium 复现不出来——见下方走查)。改成**自己画**:`Range.getClientRects()` 的矩形贴一层 `.sel-mark`,菜单/浮窗在的一天高亮就在一天;滚轮一动重画一次 `Rect`,DOM 被换掉 Range 失效才撤。另加一条全局 `::selection` 把默认底色染成主题强调色 | `web/selectionmenu.js`、`web/css/44-selection-menu.css`、`web/css/05-base.css` |
+| ② | 原来只有一枚「改译英文 / 改译中文」的切换片。改成标题栏上「中文 / 英文」一对,当前那个亮着(`aria-pressed`),点另一个**原地重来**(不再关掉重开,浮窗不跳位置、不丢拖动后的位置) | `web/selectionmenu.js`、`web/css/44-selection-menu.css` |
+| ③ | 后端原来把 `ChatStreamKind::Reasoning` 整类丢掉,浮窗里只有一个静止转圈。现在把 reasoning 增量也写成 `{"type":"reasoning","text":…}`;前端在第一条增量到达时长出 `.sel-think`——直接复用主对话「正在思考」的 class(`reasoning-block`/`is-live`/`reasoning-icon` 三点弹跳/标题流光,样式在 24-reasoning-media.css),正文一到收尾成「已思考 + 秒数」,思考正文折在签里可点开;`display.reasoning = hidden` 时只留签不留正文 | `src/web/selection_menu.rs`、`web/selectionmenu.js`、`web/app.js` |
+| ④ | 撤掉「钉住」按钮与 `pinned` 状态:浮窗一律不自动关(点别处不关),关它只有 ✕ 和 Esc;拖动不再需要「拖过即钉住」的补丁。多个浮窗可以并存(对比两种译法时用得上)。旧的 NDJSON 事件与旧前端互相兼容(`reasoning` 事件会被旧前端忽略) | `web/selectionmenu.js`、`web/css/44-selection-menu.css` |
+| ⑤ | `fitPopover()`:每次渲染 / 收到增量后按 `head + foot + body.scrollHeight` 量一次内容,上限取选区那一侧剩的空白;这一侧放不下、另一侧宽裕出 80px 以上就换边,让内容往上长(手机底部面板与拖动过的不掺和)。搜索浮窗两栏各自到达时也重量一次 | `web/selectionmenu.js` |
+
+**顺带修掉的**
+
+- 思考签插进来时没重量高度,状态行「正在翻译…」会被挤到折叠线以下(走查里量出来的)。
+
+**黑盒走查(2026-09-28,Playwright + Chromium,桩模型)**
+
+- 实验台(**未入库**,临时放在 `/tmp/selmenu-lab/`):`serve.py` 拼真 `web/css/*.css` + 真 `selectionmenu.js` + 一个桩 NDJSON 流,`drive.py` 走「选中 → 右键 → 翻译 → 切语言 → 关浮窗」全流程,`probe_edges.py` 走手机触摸模拟与搜索浮窗。25 + 8 项断言全绿:高亮矩形与选区误差 0px、菜单开着时选区仍有底色、思考签在直播态、语言按钮成对且可切换、没有钉住按钮、点别处不关、浮窗从 155px 长到 714px(撑满可用空白)、超长内容改为浮窗内滚动、选区在屏幕下部时翻到上方且短回复完整放下、关掉浮窗自绘高亮一起撤。要常驻的话搬进 `testkit/` 即可(现在没搬:用户没要求,先不留新文件)。
+- 仓库门禁:`node --check`、`test_scripts/css_token_check.py`、`test_scripts/web_dep_check.py`(app.js → features/conversation/reasoning.js 的边)、`test_scripts/check-agents-refs.py`。
+- **未做实机验证**:Safari / 移动端真机(移动端工具条那条路只加了「选区高亮」,工具条本身没动);Rust 侧没编译(按仓库约定不跑构建),`selection_assist` 的 reasoning 事件要在下次构建后生效。

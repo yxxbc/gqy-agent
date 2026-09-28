@@ -18,6 +18,7 @@ import { wireMicButton } from "./features/composer/voice.js";
 import { bindConsoleEvents, consoleOpen, parseConsoleHash, parsePlatformView, setConsolePanel, setPlatformView } from "./features/console/panel.js";
 import { start as start_features_console_usage_js } from "./features/console/usage.js";
 import { conversationRunning } from "./features/conversation/chrome.js";
+import { reasoningHidden } from "./features/conversation/reasoning.js";
 import { contentAdded, isAtBottom, isNearBottom, programmaticScrollSmooth, programmaticScrollTimer, scrollToBottom, suspendOutputFollowing, updateJumpButtonOffset } from "./features/conversation/scroll.js";
 import { start as start_features_conversation_subagent_js } from "./features/conversation/subagent.js";
 import { refreshSessionContext } from "./features/goal.js";
@@ -103,6 +104,8 @@ function bindEvents() {
     renderMarkdown,
     getSessionId: () => state.viewSessionId || state.currentSessionId,
     toast: showToast,
+    // 「显示 → 思考」设成 hidden 时,浮窗里的思考签只留动静不留正文。
+    reasoningHidden,
   });
   elements.artifactPreviewButton.addEventListener("click", () => setArtifactMode("preview"));
   elements.artifactSourceButton.addEventListener("click", () => setArtifactMode("source"));

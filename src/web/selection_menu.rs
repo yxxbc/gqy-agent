@@ -35,8 +35,9 @@ pub(in crate::web) struct SelectionSearchQuery {
     q: String,
 }
 
-/// `POST /api/selection/assist` → NDJSON 流:`{"type":"delta","text":…}`…,
-/// 以 `{"type":"done",…}` 或 `{"type":"error","message":…}` 收尾。
+/// `POST /api/selection/assist` → NDJSON 流:`{"type":"reasoning","text":…}`(模型的思考增量,
+/// 浮窗据此亮「正在思考」签)、`{"type":"delta","text":…}`…,以 `{"type":"done",…}` 或
+/// `{"type":"error","message":…}` 收尾(2026-09-28 用户要求:想的那几秒浮窗里要有动静)。
 pub(in crate::web) async fn selection_assist_http(
     State(state): State<DaemonState>,
     headers: HeaderMap,
@@ -183,11 +184,18 @@ fn run_assist(
     };
     let chunks = sender.clone();
     let result = runtime.block_on(client.chat_stream(messages, Vec::new(), move |chunk| {
-        if chunk.kind != crate::llm::ChatStreamKind::Content || chunk.text.is_empty() {
+        // 思考增量也推给浮窗:想得久的时候,浮窗里得有动静(2026-09-28 用户要求)。
+        // 别的 kind(工具调用、中转侧事件)旁路请求用不上,照旧丢掉。
+        let kind = match chunk.kind {
+            crate::llm::ChatStreamKind::Content => "delta",
+            crate::llm::ChatStreamKind::Reasoning => "reasoning",
+            _ => return Ok(()),
+        };
+        if chunk.text.is_empty() {
             return Ok(());
         }
         chunks
-            .send(json!({ "type": "delta", "text": chunk.text }).to_string())
+            .send(json!({ "type": kind, "text": chunk.text }).to_string())
             .map_err(|_| anyhow::anyhow!("selection assist: the popover was closed"))
     }));
     match result {

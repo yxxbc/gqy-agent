@@ -40,6 +40,12 @@ textarea {
   letter-spacing: 0;
 }
 
+/* 选区底色:浏览器默认那层在暗色主题上看不真切(09-28 用户报「不知道自己刚选了什么」),
+   统一成主题的强调色一层淡染;划词菜单另有一条自绘高亮,见 44-selection-menu.css。 */
+::selection {
+  background: color-mix(in srgb, var(--accent) 42%, transparent);
+}
+
 button {
   border: 0;
   appearance: none;

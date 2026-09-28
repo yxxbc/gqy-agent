@@ -1,4 +1,19 @@
 /* ---------- 选中文字右键菜单(web/selectionmenu.js) ---------- */
+
+/* 选区高亮自己画:浏览器的原生高亮会随焦点、重绘、浏览器的不同而消失,而用户正是靠它
+   认「刚选的是哪几个字」。Range 的矩形贴在视口上,层级压在菜单与浮窗之下。 */
+.sel-mark-layer {
+  position: fixed;
+  z-index: var(--z-popover);
+  pointer-events: none;
+  inset: 0;
+}
+.sel-mark {
+  position: absolute;
+  border-radius: var(--radius-sm);
+  background: color-mix(in srgb, var(--accent) 32%, transparent);
+}
+
 .sel-menu {
   position: fixed;
   z-index: var(--z-overlay-top);
@@ -62,9 +77,12 @@
   cursor: pointer;
 }
 .sel-chip { background: var(--surface-2); }
+.sel-chip.is-active { background: color-mix(in srgb, var(--accent) 18%, transparent); color: var(--accent); }
 .sel-icon:hover,
 .sel-chip:hover { background: var(--surface-2); color: var(--text); }
-.sel-icon.is-active { background: color-mix(in srgb, var(--accent) 16%, transparent); color: var(--accent); }
+.sel-chip.is-active:hover { background: color-mix(in srgb, var(--accent) 26%, transparent); }
+/* 翻译的目标语言:两个小按钮并排(selectionmenu.js languageSwitch)。 */
+.sel-switch { display: flex; flex: none; gap: 2px; }
 .sel-pop-body {
   min-height: 0;
   padding: 10px 12px;
@@ -102,6 +120,10 @@
   border-radius: 50%;
   animation: ctx-spin 0.8s linear infinite;
 }
+/* 思考签:外观整套沿用主对话(24-reasoning-media.css 的 .reasoning-block——三点弹跳、
+   标题流光、浅紫底),这里只补它在浮窗里需要的边距与正文上限。 */
+.sel-think { margin-bottom: 8px; }
+.sel-think-text { max-height: 160px; overflow-y: auto; }
 .sel-note { margin-bottom: 8px; padding: 6px 8px; border-radius: var(--radius); background: var(--surface-2); color: var(--text-soft); font-size: var(--fs-micro); line-height: 1.5; }
 .sel-note.is-error { color: var(--danger); }
 .sel-pop-foot { display: flex; justify-content: flex-end; gap: 6px; padding: 8px 10px; border-top: 1px solid var(--line); }

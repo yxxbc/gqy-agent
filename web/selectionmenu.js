@@ -12,6 +12,17 @@
  * - 结果只进浮窗:不进对话、不进记忆、不留历史。关浮窗即中断请求。
  * - 手机:长按菜单拦不住也不该拦,选区停稳 300ms 后在选区下方浮一条工具条(上方是系统菜单)。
  *
+ * 2026-09-28 用户反馈那一轮:
+ * - **选区高亮自己画**(`.sel-mark`):浏览器给原生选区画的底色会随焦点、重绘、浏览器的不同
+ *   而消失,而用户正是靠它认「我刚选的是哪几个字」。浮窗/菜单在的一天,高亮就在一天。
+ * - **思考要有动静**:模型在想的这几秒里浮窗里挂主对话同款的「正在思考」签(三点弹跳 + 标题流光),
+ *   后端把 reasoning 增量也推过来,正文一到就收尾成「已思考」。
+ * - **语言一对按钮**:翻译浮窗里「英文 / 中文」各一个,当前那个亮着,点另一个原地重来。
+ * - **不再自动关,所以「钉住」按钮撤下**(用户 09-28:浮窗停留就是钉住了):点别处不关,
+ *   关浮窗只有 ✕ 和 Esc。
+ * - **尺寸随回复伸缩**:内容多长浮窗多长,这一侧放不下就改用更宽的另一侧,让字往上长,
+ *   而不是把结果切在肚子里。
+ *
  * 菜单与浮窗挂 document.body、fixed 定位:聊天区外层有 overflow 裁剪。
  * 单独成文件:app.js 已经上万行(与 contextpanel.js / todos.js 同构)。
  */
@@ -28,8 +39,9 @@ window.GqySelectionMenu = (() => {
   let ctx = null;
   let menu = null;
   let toolbar = null;
-  let current = null; // { text, turnId, rect }
-  const popovers = []; // { node, head, body, foot, controller, pinned }
+  let marks = null; // { layer, nodes, range } 自己画的选区高亮
+  let current = null; // { text, turnId, rect, range }
+  const popovers = []; // { node, head, body, foot, controller, side, anchor, manual }
   let selectionTimer = 0;
 
   function el(tag, className, text) {
@@ -51,10 +63,13 @@ window.GqySelectionMenu = (() => {
     ctx = options;
     if (!ctx?.root) return;
     ctx.root.addEventListener("contextmenu", onContextMenu);
-    ctx.root.addEventListener("scroll", closeMenu, { passive: true, capture: true });
+    ctx.root.addEventListener("scroll", onRootScroll, { passive: true, capture: true });
     document.addEventListener("pointerdown", onPointerDown, true);
     document.addEventListener("keydown", onKeyDown);
-    window.addEventListener("resize", closeMenu, { passive: true });
+    window.addEventListener("resize", onWindowResize, { passive: true });
+    // 页面整体滚一下(移动端浏览器工具栏收放、外部容器滚动)高亮也要跟着挪:矩形取自 Range,
+    // 重画一次就是新位置。菜单只在聊天区自己滚动时关,所以那条监听单独留着。
+    window.addEventListener("scroll", paintMarks, { passive: true, capture: true });
     if (window.matchMedia("(hover: none), (pointer: coarse)").matches) {
       document.addEventListener("selectionchange", onSelectionChange);
     }
@@ -75,7 +90,72 @@ window.GqySelectionMenu = (() => {
     if (!startBody || !endBody) return null;
     const article = start.closest("article.message");
     if (!article || article !== end.closest("article.message")) return null;
-    return { text, turnId: article.dataset.turnId || "", rect: range.getBoundingClientRect() };
+    return {
+      text,
+      turnId: article.dataset.turnId || "",
+      rect: range.getBoundingClientRect(),
+      range: range.cloneRange(),
+    };
+  }
+
+  // ---------------- 选区高亮 ----------------
+
+  /*
+   * 用 Range 的矩形自己画一条高亮,不看浏览器的脸色。原生高亮只在「文档焦点、DOM 没被重绘、
+   * 浏览器乐意」时才画得出来:点上菜单项、她那边正在流式重画、换一个浏览器,都可能是空白。
+   * 高亮跟着菜单/浮窗活,关了就撤。鼠标滚轮一动 Rect 就过期,重画即可(DOM 被换掉的
+   * 话 Range 会失效,这时只能撤掉——比指着一处错地方强)。
+   */
+
+  function setMarkRange(range) {
+    if (!marks) {
+      marks = { layer: el("div", "sel-mark-layer"), nodes: [], range: null };
+      document.body.appendChild(marks.layer);
+    }
+    marks.range = range ? range.cloneRange() : null;
+    paintMarks();
+  }
+
+  function paintMarks() {
+    if (!marks) return;
+    const range = marks.range;
+    const alive = range?.startContainer?.isConnected && range?.endContainer?.isConnected;
+    const rects = alive && !range.collapsed ? [...range.getClientRects()] : [];
+    marks.layer.replaceChildren();
+    marks.nodes = rects
+      .filter((rect) => rect.width > 0 && rect.height > 0)
+      .map((rect) => {
+        const node = el("div", "sel-mark");
+        node.style.left = `${rect.left}px`;
+        node.style.top = `${rect.top}px`;
+        node.style.width = `${rect.width}px`;
+        node.style.height = `${rect.height}px`;
+        marks.layer.appendChild(node);
+        return node;
+      });
+  }
+
+  function clearMarks() {
+    marks?.layer.remove();
+    marks = null;
+  }
+
+  /// 菜单与浮窗都撤了,高亮才撤:它标的是「你刚才选的是哪几个字」,浮窗还在看就该还在。
+  function syncMarks() {
+    if (!menu && !popovers.length) clearMarks();
+  }
+
+  function onRootScroll() {
+    closeMenu();
+    syncMarks();
+    paintMarks();
+  }
+
+  function onWindowResize() {
+    closeMenu();
+    syncMarks();
+    paintMarks();
+    for (const pop of popovers) fitPopover(pop);
   }
 
   function onContextMenu(event) {
@@ -84,11 +164,13 @@ window.GqySelectionMenu = (() => {
     if (!picked) return;
     event.preventDefault();
     current = picked;
+    setMarkRange(picked.range);
     openMenu(event.clientX, event.clientY);
   }
 
   function openMenu(x, y) {
-    closeMenu();
+    // 直接换掉旧菜单,不走 closeMenu:那条路会顺手撤掉高亮,而高亮正是刚点起来的那条。
+    menu?.remove();
     menu = el("div", "sel-menu");
     menu.setAttribute("role", "menu");
     const tooLong = current.text.length > MAX_CHARS;
@@ -124,13 +206,11 @@ window.GqySelectionMenu = (() => {
     menu = null;
   }
 
+  /// 点别处只关菜单。浮窗不自动关(09-28 用户裁定:浮窗停留就是钉住了),要关只有 ✕ 和 Esc。
   function onPointerDown(event) {
-    const target = event.target;
-    if (menu && !menu.contains(target)) closeMenu();
-    if (toolbar && !toolbar.hidden && toolbar.contains(target)) return;
-    for (const pop of [...popovers]) {
-      if (!pop.pinned && !pop.node.contains(target)) closePopover(pop);
-    }
+    if (!menu || menu.contains(event.target)) return;
+    closeMenu();
+    syncMarks();
   }
 
   function onKeyDown(event) {
@@ -144,13 +224,14 @@ window.GqySelectionMenu = (() => {
       } else if (event.key === "Escape") {
         event.preventDefault();
         closeMenu();
+        syncMarks();
       }
       return;
     }
+    // Esc 关最后一个浮窗:没有「钉住」之后,后开的那个就是眼下在看的那个。
     if (event.key !== "Escape" || !popovers.length) return;
-    const target = [...popovers].reverse().find((pop) => !pop.pinned) || popovers[popovers.length - 1];
     event.preventDefault();
-    closePopover(target);
+    closePopover(popovers[popovers.length - 1]);
   }
 
   function runAction(key) {
@@ -159,6 +240,9 @@ window.GqySelectionMenu = (() => {
     if (key === "quote") quote(current.text);
     else if (key === "search") openSearch(current);
     else openAssist(key, current);
+    // 菜单项一按就关了菜单。动作没开出浮窗(复制 / 引用追问)时,高亮跟着菜单一起撤;
+    // 开出了浮窗的,高亮留到浮窗关掉那一刻(见 closePopover 的 syncMarks)。
+    syncMarks();
   }
 
   // ---------------- 引用追问 / 复制 ----------------
@@ -192,10 +276,7 @@ window.GqySelectionMenu = (() => {
   // ---------------- 浮窗 ----------------
 
   function createPopover(title, picked) {
-    // 同一时间只留一个没钉住的浮窗,再开就替换它;钉住的留着。
-    for (const pop of [...popovers]) {
-      if (!pop.pinned) closePopover(pop);
-    }
+    // 浮窗各自独立:同时开着两个是允许的(对比两种译法、解释配搜索),关哪个由用户点 ✕ 决定。
     const node = el("section", "sel-pop");
     node.setAttribute("role", "dialog");
     node.setAttribute("aria-label", title);
@@ -203,28 +284,20 @@ window.GqySelectionMenu = (() => {
     const excerpt = picked.text.replace(/\s+/g, " ");
     const quoteNode = el("span", "sel-pop-quote", excerpt.length > 60 ? `${excerpt.slice(0, 60)}…` : excerpt);
     quoteNode.title = picked.text;
-    const pop = { node, head, body: null, foot: null, controller: null, pinned: false };
-    const pin = button("sel-icon", "钉住", () => {
-      pop.pinned = !pop.pinned;
-      pin.classList.toggle("is-active", pop.pinned);
-      pin.textContent = pop.pinned ? "已钉住" : "钉住";
-    }, "钉住后点别处不会关,可以再选别的词");
-    head.append(el("strong", null, title), quoteNode, pin, button("sel-icon", "✕", () => closePopover(pop), "关闭"));
+    const pop = { node, head, body: null, foot: null, controller: null, side: "below", anchor: picked.rect, manual: false };
+    head.append(el("strong", null, title), quoteNode, button("sel-icon", "✕", () => closePopover(pop), "关闭"));
     pop.body = el("div", "sel-pop-body");
     pop.foot = el("footer", "sel-pop-foot");
     node.append(head, pop.body, pop.foot);
     document.body.appendChild(node);
     popovers.push(pop);
-    placePopover(node, picked.rect);
-    makeDraggable(pop, head, () => {
-      if (!pop.pinned) pin.click();
-    });
+    placePopover(pop);
+    makeDraggable(pop, head);
     return pop;
   }
 
-  /// 按住标题栏拖动浮窗(标题栏里的按钮照常点)。拖过的浮窗自动钉住:挪到一边就是想留着看,
-  /// 点别处不该把它关掉。手机宽度下浮窗是底部面板,不拖。
-  function makeDraggable(pop, handle, onDragStart) {
+  /// 按住标题栏拖动浮窗(标题栏里的按钮照常点)。手机宽度下浮窗是底部面板,不拖。
+  function makeDraggable(pop, handle) {
     handle.addEventListener("pointerdown", (event) => {
       if (event.button !== 0 || event.target.closest("button")) return;
       if (window.matchMedia("(max-width: 640px)").matches) return;
@@ -234,13 +307,14 @@ window.GqySelectionMenu = (() => {
       const offsetX = event.clientX - rect.left;
       const offsetY = event.clientY - rect.top;
       // 原先可能是贴在选区上方(用 bottom 定位),拖动统一换成 top/left。
-      const startMax = parseFloat(node.style.maxHeight) || rect.height;
+      // 位置是用户亲手摆的,此后不再自动伸缩,只按视口留边收上限。
+      const startMax = window.innerHeight - rect.top - 8;
+      pop.manual = true;
       node.style.bottom = "";
       node.style.top = `${rect.top}px`;
       node.style.left = `${rect.left}px`;
       node.classList.add("is-dragging");
       handle.setPointerCapture(event.pointerId);
-      onDragStart?.();
       const move = (moveEvent) => {
         const left = Math.min(Math.max(8, moveEvent.clientX - offsetX), window.innerWidth - rect.width - 8);
         // 标题栏始终留在视口里,拖到底部时内容区收矮而不是整个跑出屏幕。
@@ -262,27 +336,67 @@ window.GqySelectionMenu = (() => {
   }
 
   /// 贴在选区下方,下方放不下且上方更宽就翻到上方;手机宽度由 CSS 改成底部面板。
-  function placePopover(node, rect) {
+  function placePopover(pop) {
     const gap = 8;
+    const rect = pop.anchor;
+    const node = pop.node;
     const width = Math.min(400, window.innerWidth - 16);
     node.style.width = `${width}px`;
     node.style.left = `${Math.min(Math.max(8, rect.left), window.innerWidth - width - 8)}px`;
     const below = window.innerHeight - rect.bottom - gap;
     const above = rect.top - gap;
-    if (below >= 240 || below >= above) {
-      node.style.top = `${rect.bottom + gap}px`;
-      node.style.maxHeight = `${Math.max(160, below - 8)}px`;
-    } else {
+    pop.side = below >= 240 || below >= above ? "below" : "above";
+    applyPopoverSide(pop);
+    fitPopover(pop);
+  }
+
+  /// 按 pop.side 把浮窗贴在选区的那一侧。
+  function applyPopoverSide(pop) {
+    const gap = 8;
+    const rect = pop.anchor;
+    const node = pop.node;
+    if (pop.side === "above") {
+      node.style.top = "";
       node.style.bottom = `${window.innerHeight - rect.top + gap}px`;
-      node.style.maxHeight = `${Math.max(160, above - 8)}px`;
+    } else {
+      node.style.bottom = "";
+      node.style.top = `${rect.bottom + gap}px`;
     }
   }
+
+  /// 内容多长浮窗多长(09-28 用户要求:大小随回复伸缩)。上限是贴的那一侧还剩多少空白;
+  /// 这一侧放不下、另一侧明显更宽裕时换一边,让字往上长,而不是把结果切在肚子里。
+  /// 拖过的(pop.manual)不自动改位置——那是用户亲手摆的。
+  function fitPopover(pop) {
+    const node = pop.node;
+    if (pop.manual || node.classList.contains("is-dragging")) return;
+    // 手机宽度下 CSS 把它按成底部面板,这里不掺和。
+    if (window.matchMedia("(max-width: 640px)").matches) return;
+    const rect = pop.anchor;
+    if (!rect || !node.isConnected) return;
+    const margin = 8;
+    const gap = 8;
+    const desired = pop.head.offsetHeight + pop.foot.offsetHeight + pop.body.scrollHeight + 2;
+    const space = {
+      below: Math.max(120, window.innerHeight - rect.bottom - gap - margin),
+      above: Math.max(120, rect.top - gap - margin),
+    };
+    // 换边的门槛:另一边要宽裕出 80px 才值当跳一下,否则内容在阈值附近会来回翻。
+    if (desired > space[pop.side] && space[otherSide(pop.side)] > space[pop.side] + 80) {
+      pop.side = otherSide(pop.side);
+      applyPopoverSide(pop);
+    }
+    node.style.maxHeight = `${Math.max(120, Math.min(desired, space[pop.side]))}px`;
+  }
+
+  const otherSide = (side) => (side === "above" ? "below" : "above");
 
   function closePopover(pop) {
     pop.controller?.abort();
     pop.node.remove();
     const index = popovers.indexOf(pop);
     if (index >= 0) popovers.splice(index, 1);
+    syncMarks();
   }
 
   function statusLine(text) {
@@ -300,47 +414,92 @@ window.GqySelectionMenu = (() => {
     return compact && cjk * 2 >= compact.length ? "en" : "zh";
   }
 
+  const LANGUAGES = [
+    { code: "zh", label: "中文" },
+    { code: "en", label: "英文" },
+  ];
+
   function openAssist(kind, picked, targetLang) {
     const title = kind === "explain" ? "解释" : "翻译";
     const pop = createPopover(title, picked);
-    const lang = kind === "translate" ? targetLang || autoTarget(picked.text) : null;
+    pop.assist = { kind, picked, title };
     if (kind === "translate") {
-      const other = lang === "en" ? "zh" : "en";
-      pop.head.insertBefore(
-        button("sel-chip", other === "en" ? "改译英文" : "改译中文", () => {
-          closePopover(pop);
-          openAssist("translate", picked, other);
-        }),
-        pop.head.children[2]
-      );
+      pop.lang = targetLang || autoTarget(picked.text);
+      pop.head.insertBefore(languageSwitch(pop), pop.head.lastElementChild);
     }
     if (!picked.turnId) pop.body.appendChild(el("div", "sel-note", "这条消息还没落库,这次不带对话上下文。"));
-    const status = statusLine(kind === "explain" ? "正在解释…" : "正在翻译…");
-    const output = el("div", "sel-output markdown-body");
-    pop.body.append(status, output);
+    pop.output = el("div", "sel-output markdown-body");
+    pop.body.appendChild(pop.output);
+    startAssist(pop);
+    return pop;
+  }
 
-    let text = "";
-    let frame = 0;
-    const paint = () => {
-      frame = 0;
-      ctx.renderMarkdown(output, text);
-    };
-    const renderFoot = (done) => {
-      pop.foot.replaceChildren();
-      const copy = button("sel-btn", "复制", () => copyText(text));
-      const retry = button("sel-btn", "重试", () => {
-        closePopover(pop);
-        openAssist(kind, picked, lang);
-      });
-      const ask = button("sel-btn", "转成追问", () => {
-        quote(picked.text, `${title}:\n${text}`);
-        closePopover(pop);
-      }, "把选中文字和这段结果一起放进输入框");
-      copy.disabled = !done || !text;
-      ask.disabled = !done || !text;
-      pop.foot.append(copy, retry, ask);
-    };
-    renderFoot(false);
+  /// 翻译的目标语言:两个都摆在标题栏上,当前那个亮着;点另一个原地重来,浮窗不跳位置。
+  function languageSwitch(pop) {
+    const bar = el("div", "sel-switch");
+    for (const { code, label } of LANGUAGES) {
+      const chip = button("sel-chip", label, () => {
+        if (code === pop.lang) return;
+        pop.lang = code;
+        for (const item of bar.children) {
+          const active = item.dataset.lang === code;
+          item.classList.toggle("is-active", active);
+          item.setAttribute("aria-pressed", String(active));
+        }
+        restartAssist(pop);
+      }, `译成${label}`);
+      chip.dataset.lang = code;
+      chip.classList.toggle("is-active", code === pop.lang);
+      chip.setAttribute("aria-pressed", String(code === pop.lang));
+      bar.appendChild(chip);
+    }
+    return bar;
+  }
+
+  /// 思考签:借用主对话「正在思考」那一套(三点弹跳 + 标题流光,样式在
+  /// 24-reasoning-media.css),想完了收尾成「已思考」并挂上秒数。思考正文折叠在签里,
+  /// 「显示 → 思考」设成 hidden 时只留签、不留正文。
+  function thinkBlock() {
+    const node = el("details", "reasoning-block sel-think is-live");
+    const summary = el("summary", null);
+    const icon = el("span", "reasoning-icon");
+    icon.append(el("i"), el("i"), el("i"));
+    const title = el("span", "reasoning-title", "正在思考");
+    const status = el("span", "reasoning-live-status");
+    summary.append(icon, title, status);
+    const text = el("div", "reasoning-text sel-think-text");
+    node.append(summary, text);
+    if (ctx.reasoningHidden?.()) text.remove();
+    return { node, title, status, text, raw: "", startedAt: performance.now(), done: false, frame: 0 };
+  }
+
+  function finalizeThink(pop) {
+    const think = pop.think;
+    if (!think || think.done) return;
+    think.done = true;
+    think.node.classList.remove("is-live");
+    think.title.textContent = "已思考";
+    think.status.textContent = `${((performance.now() - think.startedAt) / 1000).toFixed(1)}s`;
+    if (think.frame) window.cancelAnimationFrame(think.frame);
+    think.frame = 0;
+    think.text.textContent = think.raw;
+  }
+
+  /// 一次旁路请求的全过程。切语言、重试都走 restartAssist:同一个浮窗,原地重来。
+  function startAssist(pop) {
+    const { kind, picked } = pop.assist;
+    pop.controller?.abort();
+    pop.text = "";
+    pop.finished = false;
+    pop.frame = 0;
+    pop.think?.node.remove();
+    if (pop.think?.frame) window.cancelAnimationFrame(pop.think.frame);
+    pop.think = null;
+    pop.status?.remove();
+    pop.status = statusLine(kind === "explain" ? "正在解释…" : "正在翻译…");
+    pop.body.insertBefore(pop.status, pop.output);
+    pop.output.replaceChildren();
+    renderAssistFoot(pop);
 
     pop.controller = new AbortController();
     streamAssist(
@@ -349,30 +508,80 @@ window.GqySelectionMenu = (() => {
         turn_id: picked.turnId || null,
         action: kind,
         text: picked.text,
-        target_lang: lang,
+        target_lang: pop.lang || null,
       },
       pop.controller.signal,
       {
+        reasoning(chunk) {
+          const think = (pop.think ??= thinkBlock());
+          if (!pop.think.node.isConnected) {
+            pop.body.insertBefore(think.node, pop.status);
+            // 签是长出来的,浮窗得跟着长:不然状态行会被挤到折叠线以下看不见。
+            think.node.addEventListener("toggle", () => fitPopover(pop));
+            fitPopover(pop);
+          }
+          think.raw += chunk;
+          if (!think.frame) {
+            think.frame = window.requestAnimationFrame(() => {
+              think.frame = 0;
+              think.text.textContent = think.raw;
+            });
+          }
+        },
         delta(chunk) {
-          text += chunk;
-          status.remove();
-          if (!frame) frame = window.requestAnimationFrame(paint);
+          pop.text += chunk;
+          pop.status?.remove();
+          pop.status = null;
+          finalizeThink(pop);
+          if (!pop.frame) pop.frame = window.requestAnimationFrame(() => paintAssist(pop));
         },
         done(event) {
-          if (!text && event?.text) text = String(event.text);
-          status.remove();
-          if (frame) window.cancelAnimationFrame(frame);
-          paint();
-          if (!text) output.textContent = "模型没有返回内容";
-          renderFoot(true);
+          if (!pop.text && event?.text) pop.text = String(event.text);
+          pop.status?.remove();
+          pop.status = null;
+          finalizeThink(pop);
+          if (pop.frame) window.cancelAnimationFrame(pop.frame);
+          paintAssist(pop);
+          if (!pop.text) pop.output.textContent = "模型没有返回内容";
+          pop.finished = true;
+          renderAssistFoot(pop);
+          fitPopover(pop);
         },
         error(message) {
-          status.remove();
+          pop.status?.remove();
+          pop.status = null;
+          finalizeThink(pop);
           pop.body.appendChild(el("div", "sel-note is-error", message));
-          renderFoot(Boolean(text));
+          pop.finished = Boolean(pop.text);
+          renderAssistFoot(pop);
+          fitPopover(pop);
         },
       }
     );
+  }
+
+  function restartAssist(pop) {
+    startAssist(pop);
+  }
+
+  function paintAssist(pop) {
+    pop.frame = 0;
+    ctx.renderMarkdown(pop.output, pop.text);
+    fitPopover(pop);
+  }
+
+  /// 页脚:复制 / 重试 / 转成追问。复制与追问要有内容才点得动。
+  function renderAssistFoot(pop) {
+    const ready = pop.finished && Boolean(pop.text);
+    const copy = button("sel-btn", "复制", () => copyText(pop.text));
+    const retry = button("sel-btn", "重试", () => restartAssist(pop));
+    const ask = button("sel-btn", "转成追问", () => {
+      quote(pop.assist.picked.text, `${pop.assist.title}:\n${pop.text}`);
+      closePopover(pop);
+    }, "把选中文字和这段结果一起放进输入框");
+    copy.disabled = !ready;
+    ask.disabled = !ready;
+    pop.foot.replaceChildren(copy, retry, ask);
   }
 
   async function streamAssist(payload, signal, handlers) {
@@ -412,6 +621,7 @@ window.GqySelectionMenu = (() => {
             continue;
           }
           if (event.type === "delta") handlers.delta(String(event.text || ""));
+          else if (event.type === "reasoning") handlers.reasoning?.(String(event.text || ""));
           else if (event.type === "done") {
             finished = true;
             handlers.done(event);
@@ -437,17 +647,28 @@ window.GqySelectionMenu = (() => {
     const web = searchSection(pop.body, "网页");
     pop.controller = new AbortController();
     const { signal } = pop.controller;
+    // 两栏是异步到的,谁到谁把浮窗量一次;不到就是它自己的错误提示撑着高度。
     ctx.apiRequest(`/api/dash/kb/search?q=${encodeURIComponent(query)}&limit=5`, { signal })
       .then((response) => response.json())
-      .then((data) => renderKb(kb, data))
+      .then((data) => {
+        renderKb(kb, data);
+        fitPopover(pop);
+      })
       .catch((error) => {
-        if (!signal.aborted) sectionError(kb, error);
+        if (signal.aborted) return;
+        sectionError(kb, error);
+        fitPopover(pop);
       });
     ctx.apiRequest(`/api/selection/web-search?q=${encodeURIComponent(query)}`, { signal })
       .then((response) => response.json())
-      .then((data) => renderWeb(web, data))
+      .then((data) => {
+        renderWeb(web, data);
+        fitPopover(pop);
+      })
       .catch((error) => {
-        if (!signal.aborted) sectionError(web, error);
+        if (signal.aborted) return;
+        sectionError(web, error);
+        fitPopover(pop);
       });
     pop.foot.append(
       button("sel-btn", "复制关键词", () => copyText(query)),
@@ -537,10 +758,13 @@ window.GqySelectionMenu = (() => {
     selectionTimer = window.setTimeout(() => {
       const picked = readSelection();
       if (!picked) {
+        // 手机上高亮也一样自己画:系统长按菜单把原生高亮压暗之后,还得看得见选了什么。
         hideToolbar();
+        clearMarks();
         return;
       }
       current = picked;
+      setMarkRange(picked.range);
       showToolbar(picked.rect);
     }, 300);
   }
