@@ -306,13 +306,15 @@
 .job-chip-wrap {
   width: 100%;
 }
-.job-chip.is-expandable {
+.job-chip.is-expandable,
+.job-chip.is-detail {
   cursor: pointer;
   transition: background var(--motion) ease;
 }
 /* 可点开的任务行悬浮要有「选中」反馈(#5:悬浮没有选中效果)——chip 本身已是
    surface-2,再叠一层正文色兑亮一档,和工具行整行悬浮同一套语言。 */
-.job-chip.is-expandable:hover {
+.job-chip.is-expandable:hover,
+.job-chip.is-detail:hover {
   background: color-mix(in srgb, var(--text) 8%, var(--surface-2));
 }
 .job-chip-label {
@@ -355,6 +357,15 @@
 }
 .job-chip.is-open > .job-chip-marker-slot > .job-chip-chevron {
   transform: rotate(180deg);
+}
+/* 子代理行(详情开关)换成朝左的箭头:打开态常显,意思从「打开详情」变成「回主
+   会话」。它和上面那条旋 180° 是两种语义,所以把旋转按回去。 */
+.job-chip.is-detail.is-open > .job-chip-marker-slot > .job-braille {
+  display: none;
+}
+.job-chip.is-detail.is-open > .job-chip-marker-slot > .job-chip-chevron {
+  display: block;
+  transform: none;
 }
 /* 展开后的子过程流:限高可滚,不许顶满全屏(09-11 用户报)。 */
 /* 后台【子代理】展开面板(不含命令日志面板,它自带一层框、别叠成两层框 #134):
@@ -487,7 +498,9 @@
   min-width: 0;
   justify-content: flex-start;
 }
-.job-chip.is-open > .job-chip-peek {
+/* 内联展开的行收起窥视(下面那张面板已经把过程全摊开了);子代理详情行不适用——
+   抽屉开在一边,横条上那行「它现在在干嘛」仍有意义。 */
+.job-chip.is-expandable.is-open > .job-chip-peek {
   display: none;
 }
 .job-chip > .job-chip-token {

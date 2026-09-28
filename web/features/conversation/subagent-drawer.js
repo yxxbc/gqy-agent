@@ -18,6 +18,22 @@ const POLL_MS = 3000;
 
 let current = null;
 
+// 抽屉开关状态的外播:任务条(jobs.js)据它画那一行的「已打开」态,关掉时重画回
+// 正常样子。用回调注册而不是直接 import——这个模块和 jobs.js 之间有环。
+let stateListener = null;
+
+export function setSubagentDrawerListener(fn) {
+  stateListener = typeof fn === "function" ? fn : null;
+}
+
+function notifyDrawer() {
+  try {
+    stateListener?.(current?.auditId || "");
+  } catch {
+    /* 观察者自己炸了不能带着抽屉一起倒 */
+  }
+}
+
 function closeDrawer() {
   if (!current) return;
   const drawer = current;
@@ -30,6 +46,24 @@ function closeDrawer() {
   window.setTimeout(() => drawer.root.remove(), 400);
   document.body.classList.remove("subagent-drawer-open");
   drawer.returnFocus?.focus?.({ preventScroll: true });
+  notifyDrawer();
+}
+
+/// 当前抽屉在看哪一趟子代理(没开就是空串)。任务条据此画「已打开」态。
+export function openSubagentAuditId() {
+  return current?.auditId || "";
+}
+
+/// 点一下同一条入口:这一趟已经开着就关(再点一次回主会话),否则打开。
+/// 任务条整行和卡片上的「详情」按钮都走它——同一枚开关的两态。
+export function toggleSubagentDrawer(target) {
+  const id = String(target?.auditId || target?.sink?.auditId || "").trim();
+  if (!id) return;
+  if (current?.auditId === id) {
+    closeDrawer();
+    return;
+  }
+  openSubagentDrawer(target);
 }
 
 function el(tag, className, text) {
@@ -323,9 +357,12 @@ export function openSubagentDrawer({ auditId, sink = null, title = "", running =
       }
     });
   }
+  // 开着的时候通知一声:任务条那行要跟着亮「已打开」,再点它才是「回主会话」。
+  notifyDrawer();
 }
 
-/// 卡片 / 任务行上的「详情」按钮。`target()` 在点击时取当下的参数(sink 状态会变)。
+/// 子代理卡片上的「详情」按钮。`target()` 在点击时取当下的参数(sink 状态会变)。
+/// 点第二下是收起(回主会话)——和任务条那一行同一套开关语义。
 export function makeSubagentDetailButton(target, className = "") {
   const button = document.createElement("button");
   button.type = "button";
@@ -336,7 +373,7 @@ export function makeSubagentDetailButton(target, className = "") {
   button.addEventListener("click", (event) => {
     event.preventDefault();
     event.stopPropagation();
-    openSubagentDrawer(target());
+    toggleSubagentDrawer(target());
   });
   return button;
 }

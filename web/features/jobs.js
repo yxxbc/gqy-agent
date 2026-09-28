@@ -7,7 +7,7 @@ import { setReasoningPeek } from "./conversation/reasoning.js";
 import { jobStreamSink } from "./conversation/render.js";
 import { updateJumpButtonOffset } from "./conversation/scroll.js";
 import { renderSubagentProgress, setSubagentAudit, subagentCountsText } from "./conversation/subagent.js";
-import { makeSubagentDetailButton } from "./conversation/subagent-drawer.js";
+import { openSubagentAuditId, setSubagentDrawerListener, toggleSubagentDrawer } from "./conversation/subagent-drawer.js";
 import { connectEventSource } from "./live/sse.js";
 import { loadSessionView } from "./sessions/view.js";
 import { elements } from "../state/elements.js";
@@ -50,16 +50,17 @@ export const JOB_BRAILLE = BRAILLE_FRAMES;
 
 export let jobBrailleFrame = 0;
 
-export function makeJobSpinner() {
-  // 左侧标记槽:默认点阵 spinner,鼠标悬浮时原地换成展开/收起箭头
-  //(09-12 #8b 用户要求,和子代理一样)。展开态箭头旋转 180°。
+export function makeJobSpinner(icon = "chevron-down") {
+  // 左侧标记槽:默认点阵 spinner,鼠标悬浮时原地换成动作图标(09-12 #8b 用户要求)。
+  // 命令行是展开箭头(展开态旋 180°);子代理行是开关详情抽屉的图标,抽屉开着时
+  // 换成朝左的箭头(意思变成「回主会话」,见 renderJobsStrip)。
   const slot = document.createElement("span");
   slot.className = "job-chip-marker-slot";
   const s = document.createElement("span");
   s.className = "job-chip-marker job-braille";
   s.textContent = JOB_BRAILLE[jobBrailleFrame];
   slot.appendChild(s);
-  slot.appendChild(makeIconSlot("chevron-down", "job-chip-chevron"));
+  slot.appendChild(makeIconSlot(icon, "job-chip-chevron"));
   return slot;
 }
 
@@ -180,8 +181,17 @@ export function renderJobsStrip() {
     // 开发模式子代理的 kind 是 "dev"(见 jobs::JobEntry::kind_label):漏了它,开发
     // 子代理会被当成命令,展开只剩日志、没有子过程流。
     const isSubagent = isSubagentJob(job);
+    // 子代理横条整个是详情抽屉的开关(09-28 用户方案):审计会话 id 是那把钥匙,
+    // 开跑时就挂在任务条目上(job.audit_session_id)。万一是审计会话没建起来(极
+    // 罕见),退回老样子——点开内联子过程面板,别让这一行变成死按钮。
+    const auditId = isSubagent
+      ? String(job.audit_session_id || jobStreamSink(jid).auditId || "")
+      : "";
+    const inlinePanel = Boolean(isSubagent) && !auditId;
+    const expandable = !isSubagent || inlinePanel;
+    const detailOpen = Boolean(auditId) && openSubagentAuditId() === auditId;
     const row = document.createElement("div");
-    row.className = "job-chip is-expandable";
+    row.className = expandable ? "job-chip is-expandable" : "job-chip is-detail";
     row.dataset.jobId = jid;
 
     const label = document.createElement("span");
@@ -224,21 +234,9 @@ export function renderJobsStrip() {
     // 布局(09-12 #2):节点 · 标题 · token 秒数 · <淡出过渡> 窥视(撑开右对齐) · ✕。
     // 标题贴左 hug、token/时间紧跟其后,窥视占满余下空间、左侧淡出滚动,不再让标题
     // flex 撑开把窥视顶到最右留下大空档(#12)。展开箭头合进左侧标记槽。
-    let detail = null;
-    if (isSubagent) {
-      // 详情抽屉:审计会话 id 开跑时就挂在任务条目上(audit_session_id)。
-      const auditId = job.audit_session_id || jobStreamSink(jid).auditId;
-      if (auditId) {
-        detail = makeSubagentDetailButton(() => ({
-          auditId,
-          sink: jobStreamSink(jid),
-          title: job.title,
-          running: Boolean(state.backgroundJobs.get(jid)?.running),
-        }), "job-chip-detail");
-      }
-    }
-    row.append(makeJobSpinner(), label, token, time, peekSlot);
-    if (detail) row.appendChild(detail);
+    // 子代理行的动作图标随抽屉状态换:悬停「打开详情」,开着时朝左(回主会话)。
+    const spinnerIcon = detailOpen ? "chevron-left" : auditId ? "panel-right" : "chevron-down";
+    row.append(makeJobSpinner(spinnerIcon), label, token, time, peekSlot);
     row.appendChild(stop);
 
     if (isSubagent) {
@@ -255,11 +253,24 @@ export function renderJobsStrip() {
       if (job.running) trackCommandPeek(jid, peek);
     }
 
-    const expanded = state.expandedJobs.has(jid);
-    row.classList.toggle("is-open", expanded);
-    row.setAttribute("aria-expanded", String(expanded));
+    const expanded = expandable && state.expandedJobs.has(jid);
+    const open = expanded || detailOpen;
+    row.classList.toggle("is-open", open);
+    row.setAttribute("aria-expanded", String(open));
     row.addEventListener("click", (event) => {
-      if (event.target.closest(".job-chip-stop, .job-chip-detail")) return;
+      if (event.target.closest(".job-chip-stop")) return;
+      // 子代理:整行开关详情抽屉。已开着就关(回主会话),否则打开看它的完整过程。
+      if (auditId) {
+        toggleSubagentDrawer({
+          auditId,
+          sink: jobStreamSink(jid),
+          title: job.title,
+          running: Boolean(state.backgroundJobs.get(jid)?.running),
+        });
+        // 行的「已打开」态由抽屉的回播驱动(start() 里那份 setSubagentDrawerListener),
+        // 这里不再自己重画一遍。
+        return;
+      }
       if (state.expandedJobs.has(jid)) {
         state.expandedJobs.delete(jid);
         // 收起状态行时,把里面已展开的思考/工具卡也一并收起(09-12 #5),
@@ -354,6 +365,10 @@ export let lastVisibleResync = 0;
 
 /// 原 app.js 顶层的副作用语句，由入口在启动时按原顺序调用。
 export function start() {
+  // 抽屉从哪个入口开关都一样(任务条整行、卡片「详情」、✕、Esc、手机遮罩):每
+  // 一次都要把任务条重画一遍,那一行的「已打开」态才不会停在旧样子。
+  setSubagentDrawerListener(() => renderJobsStrip());
+
   setInterval(() => {
     if (document.hidden) return;
     const nodes = elements.jobsStrip?.querySelectorAll(".job-braille");

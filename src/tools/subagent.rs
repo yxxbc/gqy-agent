@@ -142,7 +142,7 @@ pub fn register(
                 },
                 "background": {
                     "type": "boolean",
-                    "description": "Run the subagent detached in the background: returns a job_id immediately; check with job(action=status) (its log holds live progress) and you are woken automatically on completion. Use for long research/tasks that should not block the conversation."
+                    "description": "Defaults to true. The subagent runs detached, this call returns a job_id immediately, and its final message wakes you on completion. Set false to block this turn until the subagent returns."
                 },
                 "resume_id": {
                     "type": "string",
@@ -167,13 +167,13 @@ pub fn register(
     // 子代理下一步开始前取走、并入对话——用于运行途中调整任务目标。
     registry.register(ToolSpec::new(
         "send_subagent_message",
-        "Queue a follow-up instruction to a RUNNING background subagent (one you started with task(background=true)). It works like queuing a message to the main agent mid-run: the subagent picks it up before its next step, so you can steer or adjust its goal while it works. Pass the job_id from the background task's result. Only works while that subagent is still running.",
+        "Queue a follow-up instruction to a RUNNING background subagent (one you started with the subagent tool). It works like queuing a message to the main agent mid-run: the subagent picks it up before its next step, so you can steer or adjust its goal while it works. Pass the job_id from that subagent's result. Only works while that subagent is still running.",
         json!({
             "type": "object",
             "properties": {
                 "job_id": {
                     "type": "string",
-                    "description": "The background subagent's job_id, from the task(background=true) result."
+                    "description": "The background subagent's job_id, from the subagent tool result."
                 },
                 "message": {
                     "type": "string",
@@ -201,7 +201,7 @@ fn send_subagent_message(args: Value) -> Result<String> {
         .trim()
         .to_string();
     if job_id.is_empty() {
-        bail!("job_id is required (the background subagent's id from the task result)");
+        bail!("job_id is required (the background subagent's id from the subagent result)");
     }
     if message.is_empty() {
         bail!("message is required");
@@ -293,6 +293,14 @@ fn parse_params(args: &Value) -> Result<SubagentParams> {
     })
 }
 
+/// 子代理默认在后台跑(09-28 用户要求):派活儿不该把主对话锁到它跑完——不写
+/// `background` 就是后台,显式写 `false` 才是「这一轮下一步就要它的结论」。
+fn wants_background(args: &Value) -> bool {
+    args.get("background")
+        .and_then(Value::as_bool)
+        .unwrap_or(true)
+}
+
 async fn run_subagent(
     args: Value,
     context: SubagentContext,
@@ -311,11 +319,7 @@ async fn run_subagent(
             progress.report(audit.session_marker());
         }
     }
-    if args
-        .get("background")
-        .and_then(Value::as_bool)
-        .unwrap_or(false)
-    {
+    if wants_background(&args) {
         return spawn_background(context, params, anchor, audit, progress).await;
     }
     // 前台子代理阻塞在本次调用里,主体无从中途插话,不开收件箱(None)。
@@ -1216,6 +1220,20 @@ fn record_subagent_audit(
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    /// 子代理默认后台。
+    ///
+    /// 「不写 `background`」与「显式 `background=true`」必须同一归宿:前台会把
+    /// 主对话锁到子代理跑完,而派活儿时多半没有非等不可的理由(09-28 用户要求
+    /// 默认后台)。要同轮拿结果得自己写 false——绕回前台的路留着,但不许是默认。
+    #[test]
+    fn subagent_runs_in_the_background_unless_asked_to_wait() {
+        assert!(wants_background(&serde_json::json!({})));
+        assert!(wants_background(&serde_json::json!({ "background": true })));
+        assert!(!wants_background(
+            &serde_json::json!({ "background": false })
+        ));
+    }
 
     /// 中途的量报只刷标题和状态行，**不进流水账**。
     ///
