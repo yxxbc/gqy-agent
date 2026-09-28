@@ -40,16 +40,35 @@
       /* 淡入:窗口先隐藏,WebView 就位后才有内容,露出来时不该是硬切。 */
       animation: appear 420ms ease-out both;
     }
-    #pet {
-      display: block;
-      max-width: 100%;
-      max-height: 100%;
-      /* 呼吸:幅度小、周期长,像站着而不是在飘。 */
+    /* 人物:有模型时是 canvas,没有时是立绘——两者都装在这一层里,呼吸与
+       状态光晕加在层上,免得两处各写一份。 */
+    .pet-visual {
+      display: grid;
+      width: 100%;
+      height: 100%;
+      place-items: end center;
       animation: breathe 5.2s ease-in-out infinite;
       transform-origin: 50% 100%;
       filter: drop-shadow(0 10px 16px rgb(0 0 0 / 35%));
+    }
+    #live2d,
+    #live2d canvas {
+      display: block;
+      width: 100%;
+      height: 100%;
+      /* 透明窗里画布自己不能有底色:pixi 的底由 backgroundAlpha 管,这里再补一道
+         CSS 保险(某些绘制路径上 canvas 会自己填白)。 */
+      background: transparent;
+    }
+    #portrait {
+      display: block;
+      max-width: 100%;
+      max-height: 100%;
       -webkit-user-drag: none;
     }
+    /* 模型自己会呼吸会眨眼:整层的呼吸让位,两套动作叠在一起会像在抖。 */
+    body.has-model .pet-visual { animation: none; }
+    body.has-model #portrait { display: none; }
 
     @keyframes appear {
       from { opacity: 0; transform: translateY(10px); }
@@ -102,12 +121,12 @@
     @keyframes pulse {
       50% { opacity: 0.35; }
     }
-    /* 说话时人物外面浮一层暖光:现在只有这张图能表达"她在说",
-       Cubism 接上之后换成嘴型与表情(见设计稿 §6)。 */
-    body[data-state="speaking"] #pet {
+    /* 说话时人物外面浮一层暖光,在想是冷光。现在只有这张图/这个模型能表达
+       "她在说",Cubism 接上之后嘴型由这里驱动(见 app.js 的 driveMouth)。 */
+    body[data-state="speaking"] .pet-visual {
       filter: drop-shadow(0 10px 16px rgb(0 0 0 / 35%)) drop-shadow(0 0 16px rgb(224 185 115 / 40%));
     }
-    body[data-state="thinking"] #pet {
+    body[data-state="thinking"] .pet-visual {
       filter: drop-shadow(0 10px 16px rgb(0 0 0 / 35%)) drop-shadow(0 0 14px rgb(138 180 255 / 32%));
     }
 
@@ -148,7 +167,10 @@
 </head>
 <body>
   <div id="stage">
-    <img id="pet" src="__PORTRAIT_DATA_URI__" alt="顾清影" draggable="false">
+    <div class="pet-visual">
+      <div id="live2d"></div>
+      <img id="portrait" src="./portrait.png" alt="顾清影" draggable="false">
+    </div>
     <button id="close" type="button" title="关掉悬浮窗">✕</button>
     <span id="dot"></span>
     <div id="menu" role="menu" hidden>
@@ -160,127 +182,6 @@
       <button type="button" role="menuitem" data-act="close"><span class="check"></span>关掉悬浮窗</button>
     </div>
   </div>
-  <script>
-    "use strict";
-
-    /* wry 注入的 IPC 通道;拿不到就说明页面不是被 gqy-pet 打开的(比如直接
-       用浏览器打开了这个文件),那时所有指令都安静地丢掉。 */
-    const send = (message) => {
-      try {
-        window.ipc?.postMessage(JSON.stringify(message));
-      } catch (_) {}
-    };
-
-    const stage = document.getElementById("stage");
-    const pet = document.getElementById("pet");
-
-    /* 配置里带过来的当前状态(置顶、缩放):菜单上的勾按它画,Rust 侧注入。 */
-    const PET_STATE = __PET_STATE__;
-
-    /* 拖动交给系统原生拖动:按住往下走 4px 才算拖,免得双击被当成两次拖动。 */
-    let pressed = false;
-    let dragging = false;
-    let startX = 0;
-    let startY = 0;
-
-    pet.addEventListener("pointerdown", (event) => {
-      if (event.button !== 0) return;
-      pressed = true;
-      dragging = false;
-      startX = event.clientX;
-      startY = event.clientY;
-      pet.setPointerCapture(event.pointerId);
-    });
-
-    pet.addEventListener("pointermove", (event) => {
-      if (!pressed || dragging) return;
-      if (Math.hypot(event.clientX - startX, event.clientY - startY) < 4) return;
-      dragging = true;
-      document.body.classList.add("is-dragging");
-      send({ cmd: "drag" });
-    });
-
-    const release = () => {
-      pressed = false;
-      dragging = false;
-      document.body.classList.remove("is-dragging");
-    };
-    pet.addEventListener("pointerup", release);
-    pet.addEventListener("pointercancel", release);
-    /* 原生拖动一开始,浏览器这边就收不到 pointerup 了:鼠标出窗或失焦也要复位。 */
-    window.addEventListener("blur", release);
-    document.addEventListener("pointerleave", release);
-
-    pet.addEventListener("dblclick", () => send({ cmd: "open_webui" }));
-
-    document.getElementById("close").addEventListener("click", () => send({ cmd: "close" }));
-    document.addEventListener("keydown", (event) => {
-      if (event.key === "Escape") send({ cmd: "close" });
-    });
-
-    /* 右键菜单。位置在鼠标处,但不许跑出窗口——窗口只有立绘那么大,
-       菜单贴着边出去就等于点不到。 */
-    const menu = document.getElementById("menu");
-    const item = (act) => menu.querySelector(`[data-act="${act}"]`);
-
-    const refreshMenu = () => {
-      item("on_top").querySelector(".check").textContent = PET_STATE.on_top ? "✓" : "";
-      item("bigger").disabled = PET_STATE.scale >= 2;
-      item("smaller").disabled = PET_STATE.scale <= 0.5;
-    };
-
-    document.addEventListener("contextmenu", (event) => {
-      event.preventDefault();
-      refreshMenu();
-      menu.hidden = false;
-      const box = menu.getBoundingClientRect();
-      menu.style.left = `${Math.max(4, Math.min(event.clientX, window.innerWidth - box.width - 4))}px`;
-      menu.style.top = `${Math.max(4, Math.min(event.clientY, window.innerHeight - box.height - 4))}px`;
-    });
-
-    menu.addEventListener("click", (event) => {
-      const act = event.target.closest("button")?.dataset.act;
-      if (!act) return;
-      menu.hidden = true;
-      if (act === "on_top") {
-        PET_STATE.on_top = !PET_STATE.on_top;
-        send({ cmd: "set_on_top", on: PET_STATE.on_top });
-      } else if (act === "bigger" || act === "smaller") {
-        const step = act === "bigger" ? 0.1 : -0.1;
-        // 一位小数:反复加减不该攒出 0.7000000000000001
-        PET_STATE.scale = Math.round(Math.min(2, Math.max(0.5, PET_STATE.scale + step)) * 10) / 10;
-        send({ cmd: "set_scale", scale: PET_STATE.scale });
-      } else if (act === "webui") {
-        send({ cmd: "open_webui" });
-      } else if (act === "close") {
-        send({ cmd: "close" });
-      }
-    });
-
-    /* 点别处收菜单。capture 阶段听:菜单里的按钮自己会先把 click 处理掉。 */
-    document.addEventListener(
-      "pointerdown",
-      (event) => {
-        if (!menu.hidden && !menu.contains(event.target)) menu.hidden = true;
-      },
-      true
-    );
-
-    /* 状态由 Rust 侧经 IPC 推来:`idle` / `thinking` / `speaking`。
-       Rust 用 evaluate_script 调这个函数,所以它得挂在 window 上。 */
-    const dot = document.getElementById("dot");
-    window.gqyPet = {
-      setState(name) {
-        document.body.dataset.state = name;
-        dot.className = name === "thinking" ? "is-thinking" : name === "speaking" ? "is-speaking" : "";
-      },
-    };
-
-    /* 加载完报一声:立绘自然宽度 > 0 说明内联的图真的解码出来了,
-       而不是一块空白窗。Rust 侧把它写进日志。 */
-    window.addEventListener("load", () => {
-      send({ cmd: "ready", width: pet.naturalWidth || 0 });
-    });
-  </script>
+  <script defer src="./app.js"></script>
 </body>
 </html>

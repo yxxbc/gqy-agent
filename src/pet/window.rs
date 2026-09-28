@@ -8,7 +8,7 @@
 use crate::config::AppConfig;
 use crate::ipc::PetState;
 use crate::paths::GqyPaths;
-use crate::pet::{ipc, page, state};
+use crate::pet::{assets, ipc, model, state, vendor};
 use anyhow::{Context, Result};
 use tao::dpi::{LogicalSize, PhysicalPosition};
 use tao::event::{Event, WindowEvent};
@@ -20,6 +20,10 @@ use wry::WebViewBuilder;
 
 /// 立绘上方留的余量(逻辑像素):呼吸与浮动动效要有地方挪,不然会被窗口边裁掉。
 const HEADROOM: f64 = 40.0;
+
+/// 有模型时的画布(逻辑像素)。VTS 模型多半是全身或半身,给一块竖长的;实际大小
+/// 由页面按模型尺寸等比缩放铺满(见 app.js 的 fit)。
+const MODEL_CANVAS: (f64, f64) = (360.0, 560.0);
 
 /// 页面发来的指令。
 #[derive(Debug, serde::Deserialize)]
@@ -41,6 +45,26 @@ enum Command {
         #[serde(default)]
         width: u32,
     },
+    /// Live2D 加载完了。动作与表情的条数写进日志——不截屏也能确认清单补全生效。
+    /// 顺带带上画布底与页面底的取值:窗口不透明时,这两个值能直接指出是谁的错。
+    ModelReady {
+        #[serde(default)]
+        motions: usize,
+        #[serde(default)]
+        expressions: usize,
+        #[serde(default)]
+        width: u32,
+        #[serde(default)]
+        height: u32,
+        #[serde(default)]
+        alpha: f32,
+        #[serde(default)]
+        body: String,
+    },
+    /// 模型没加载起来,已经退回静态立绘。
+    ModelFailed { message: String },
+    /// 页面执行中遇到的小问题(模型没绑某参数之类),原样写日志。
+    ModelNote { message: String },
 }
 
 /// 送进事件循环的意图。IPC 回调与事件循环不在同一处,消息走代理回传。
@@ -65,7 +89,51 @@ pub(in crate::pet) fn run(paths: &GqyPaths) -> Result<()> {
     let proxy = event_loop.create_proxy();
 
     let saved = state::load(&paths.state_dir);
-    let size = pet_window_size(scale);
+    // 渲染要用的两样东西:下载来的运行时(三个 JS)与用户的模型目录。缺哪样都
+    // 退回静态立绘——窗口还在,只是不会动,原因写日志。
+    let vendor_dir = match vendor::ensure(&paths.state_dir) {
+        Ok(directory) => Some(directory),
+        Err(error) => {
+            tracing::warn!(%error, "pet: 渲染运行时没准备好,Live2D 用不了");
+            None
+        }
+    };
+    let model = pet
+        .model
+        .as_deref()
+        .map(str::trim)
+        .filter(|path| !path.is_empty())
+        .and_then(|path| match model::load(std::path::Path::new(path)) {
+            Ok(model) => {
+                tracing::info!(
+                    dir = path,
+                    motions = model.motions,
+                    expressions = model.expressions,
+                    "pet: 模型已就绪"
+                );
+                Some(model)
+            }
+            Err(error) => {
+                tracing::warn!(%error, dir = path, "pet: 模型加载不了,改用静态立绘");
+                None
+            }
+        });
+    // 页面只在「运行时齐 + 模型在」时才去加载 Live2D;两样缺一就不给它 URL。
+    let model_url = match (&vendor_dir, &model) {
+        (Some(_), Some(model)) => Some(format!(
+            "gqy-pet://app/model/{}",
+            urlencoding::encode(&model.manifest_name)
+        )),
+        _ => None,
+    };
+    let has_model = model_url.is_some();
+    // 协议 handler 会被跨线程调用(wry 的要求),所以是 Arc 不是 Rc。
+    let assets = std::sync::Arc::new(assets::Assets {
+        model,
+        vendor_dir: vendor_dir.unwrap_or_default(),
+    });
+
+    let size = pet_window_size(scale, has_model);
     // 落点:记过就照记的来;头一次开贴主屏右下角(而不是系统给的正中间——她会挡住
     // 你在看的东西)。位置在**建窗时**就定下来:macOS 上窗口显示之后再挪是不可靠的
     // (实测 set_outer_position 之后读回来还是老的)。
@@ -94,11 +162,19 @@ pub(in crate::pet) fn run(paths: &GqyPaths) -> Result<()> {
         .context("建悬浮窗失败(桌面会话是否可用?)")?;
 
     let ipc_proxy = proxy.clone();
+    let protocol_assets = assets.clone();
+    let bootstrap = pet_bootstrap(model_url.as_deref(), scale, pet.always_on_top);
     let webview = WebViewBuilder::new()
-        .with_html(page::html(&pet))
+        .with_url(assets::PAGE_URL)
         .with_transparent(true)
         .with_background_color((0, 0, 0, 0))
         .with_devtools(cfg!(debug_assertions))
+        // 页面要的每个文件都从这里出:内嵌的页面/脚本/立绘、下载来的运行时、
+        // 磁盘上的模型。页面里因此没有任何磁盘路径。
+        .with_custom_protocol("gqy-pet".to_string(), move |_id, request| {
+            protocol_assets.serve(&request)
+        })
+        .with_initialization_script(bootstrap)
         .with_ipc_handler(move |request: wry::http::Request<String>| {
             match serde_json::from_str::<Command>(request.body()) {
                 Ok(command) => {
@@ -160,11 +236,35 @@ pub(in crate::pet) fn run(paths: &GqyPaths) -> Result<()> {
             }
             Event::UserEvent(UserEvent::Command(Command::SetScale { scale })) => {
                 let scale = f64::from(scale).clamp(0.5, 2.0);
-                window.set_inner_size(pet_window_size(scale));
+                window.set_inner_size(pet_window_size(scale, has_model));
                 save_pet_config(&paths, |pet| pet.scale = scale as f32);
             }
             Event::UserEvent(UserEvent::Command(Command::Ready { width })) => {
                 tracing::info!(natural_width = width, "pet: 页面已就绪");
+            }
+            Event::UserEvent(UserEvent::Command(Command::ModelReady {
+                motions,
+                expressions,
+                width,
+                height,
+                alpha,
+                body,
+            })) => {
+                tracing::info!(
+                    motions,
+                    expressions,
+                    width,
+                    height,
+                    canvas_alpha = alpha,
+                    body_background = %body,
+                    "pet: Live2D 已加载"
+                );
+            }
+            Event::UserEvent(UserEvent::Command(Command::ModelFailed { message })) => {
+                tracing::warn!(message, "pet: Live2D 加载失败,已退回静态立绘");
+            }
+            Event::UserEvent(UserEvent::Command(Command::ModelNote { message })) => {
+                tracing::info!(message, "pet: 页面提示");
             }
             Event::UserEvent(UserEvent::PetState(state)) => {
                 // 表现交给页面(状态点颜色,以后还有表情与口型);这里只转一道。
@@ -191,12 +291,27 @@ fn save_position(state_dir: &std::path::Path, position: &state::PetState) {
     }
 }
 
-/// 窗口逻辑尺寸:立绘 × 缩放,上方留出动效的余量。
-fn pet_window_size(scale: f64) -> LogicalSize<f64> {
-    LogicalSize::new(
-        page::PORTRAIT_WIDTH * scale,
-        page::PORTRAIT_HEIGHT * scale + HEADROOM * scale,
+/// 页面启动时要的那几个值:模型清单的 URL(没有模型就是 `null`)与用户偏好。
+/// 走 initialization script 注入,页面里因此没有模板占位符。
+pub(in crate::pet) fn pet_bootstrap(model_url: Option<&str>, scale: f64, on_top: bool) -> String {
+    format!(
+        "window.__PET__ = {};",
+        serde_json::json!({
+            "model_url": model_url,
+            // 一位小数:免得把 1.399999976158142 这种精度伪影带进页面。
+            "config": { "on_top": on_top, "scale": (scale * 10.0).round() / 10.0 },
+        })
     )
+}
+
+/// 窗口逻辑尺寸:有模型时给一块竖长的画布(模型自己会缩放铺满),没有模型时按立绘。
+fn pet_window_size(scale: f64, has_model: bool) -> LogicalSize<f64> {
+    let (width, height) = if has_model {
+        MODEL_CANVAS
+    } else {
+        (assets::PORTRAIT_WIDTH, assets::PORTRAIT_HEIGHT + HEADROOM)
+    };
+    LogicalSize::new(width * scale, height * scale)
 }
 
 /// 状态名:与 `PetState` 的 serde 口径一致(帧里就是这么写的),页面按它选样式。

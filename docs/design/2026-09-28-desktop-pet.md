@@ -210,32 +210,35 @@
 | 头一次开窗贴主屏右下角（之后跟着 `state/pet.json` 走） | `src/pet/window.rs` 的 `place_bottom_right` |
 | 右键菜单（页内画）：置顶 ✓ / 大一点 / 小一点 / 打开 WebUI / 关掉；勾选态从配置注入页面 | `src/pet/web/index.html`、`src/pet/page.rs`、`window.rs` |
 | **daemon 侧接上**：`Command::SubscribePet` 长连接，事件折成 `idle / thinking / speaking` 三种状态，**变化才发一帧**；宠物侧断线 3 秒重连、不强拉 daemon | `src/ipc/protocol.rs`（`PetState`）、`src/web/ipc_server.rs`（`stream_pet_events` / `pet_state_of`）、`src/pet/ipc.rs` |
-| 状态表现：状态点（蓝=在想、暖金=在说）+ 立绘光晕（Cubism 接上后换嘴型/表情） | `src/pet/web/index.html`、`window.rs` 的 `evaluate_script` |
+| **步 3：Live2D 渲染层**。三个 JS 运行时**运行时下载**到 `state/pet/vendor/`（Cubism Core 是专有运行时，不进仓库）；自定义协议 `gqy-pet://app/…` 供给页面（内嵌页面/脚本/立绘、vendor、模型同 origin，省掉 CORS）；模型清单**在内存里补全**（VTS 导出的 `Motions`/`Expressions` 是空的）；加载失败退回静态立绘 | `src/pet/vendor.rs`、`src/pet/assets.rs`、`src/pet/model.rs`、`src/pet/web/app.js`、`src/pet/window.rs` |
+| 状态表现：状态点（蓝=在想、暖金=在说）+ 人物外的光晕；**说话时驱动嘴型**（只认 Cubism 标准参数名 `ParamMouthOpenY`，模型没绑就不动，猜错参数名比不动难看） | `src/pet/web/app.js`、`src/pet/web/index.html` |
+| 配置加 `display.pet.model`（模型目录，留空 = 静态立绘） | `src/config/mod.rs` |
 | 层序登记与文档 | `test_scripts/arch_dep_check.py`、`docs/architecture.md`、`docs/wiki/03-使用方式.md` §9、`docs/wiki/05-配置指南.md` |
 
 **实测（本机 macOS，debug 构建，GQY_HOME 沙箱）**
 
 ```
-INFO pet: 悬浮窗已就位 x=2876 y=1590 width=512 height=602 scale=1.0   ← 右下角(逻辑 1438×795)
-INFO pet: 已接上 daemon,开始跟她的状态                                  ← SubscribePet 长连接
-INFO pet: 页面已就绪 natural_width=256                                 ← 内联立绘解码成功
-INFO pet: 状态变化 state="thinking"                                    ← 发一轮消息
-INFO pet: 状态变化 state="idle"                                        ← 那一轮结束
+INFO pet: 正在下载渲染运行时(Live2D Cubism Core …) file="live2dcubismcore.min.js"
+INFO pet: 运行时已就位 file="live2dcubismcore.min.js" bytes=207155
+INFO pet: 运行时已就位 file="pixi.min.js" bytes=456133
+INFO pet: 运行时已就位 file="cubism4.min.js" bytes=119922
+INFO pet: 模型已就绪 dir="/Users/mac/Desktop/11月椿/椿" motions=1 expressions=5   ← 清单补全
+INFO pet: 悬浮窗已就位 x=2668 y=1072 width=720 height=1120 scale=1.0            ← 右下角，模型画布
+INFO pet: 页面已就绪 natural_width=256
+INFO pet: Live2D 已加载 motions=1 expressions=5 width=3024 height=6264           ← 模型真被解析
 ```
 
-- **位置**：按 `EventLoop::primary_monitor()` 算右下角，在建窗时用 `with_position` 一次到位——
-  实测**窗口显示之后再 `set_outer_position` 不生效**（macOS 上读回来还是旧位置），所以那条路废弃了。
-  你这台是 1710×1112 逻辑（「更多空间」缩放），算出 (2876,1590) 物理，正好贴右下角 16px。
-- **状态链路**：起一个沙箱 daemon，`gqy ask` 发一轮（沙箱没有可用模型，所以那轮是失败收尾），
-  宠物侧只收到**两条**状态变化（thinking → idle）——原始 delta 一条都没过来，裁剪生效。
-- **页面**：脚本跑起来了、`window.ipc` 通、内联立绘解码成功（自然宽度 256）——这条自查留在代码里
-  （页面 `load` 后回报，见 `Command::Ready`），将来也是「WebView 是不是白屏了」的抓手
-- `cargo check/build --features pet --bin gqy-pet` 与默认构建（不带 pet）都干净
-- 层序门禁、文件规模、WebUI 依赖、CSS token、model-english 全过
-- `src/pet/tests.rs` 四个用例：页面内联、配置注入、位置往返、坏文件回默认
+模型是你给的那份：Cubism 3 的 `椿.moc3`(6.5MB) + 3 张 4096 贴图 + `physics3.json` +
+`idle.motion3.json` 一个待机动作 + 5 个表情（黑脸 / 脸红 / 爱心眼 / 眼高光消失 / 哭，
+即 VTS 的 CTRL 1–5）。它的 `model3.json` 里 `Motions` 与 `Expressions` 都是空的，
+补全后才被加载——这 6 个项目就是补出来的数量对上了。
+
+嘴型参数**在模型里**：`.cdi3.json` 的参数表有标准的 `ParamMouthOpenY`（还有
+`ParamMouthForm`、`JawOpen`），所以说话时驱动嘴不需要猜到自定义名上。
 
 **偏差与没做的**
 
+- **pixi v7 没有 `transparent` 这个选项**（那是 v6 的，传了会被静默忽略），画布底默认不透明黑——透明窗里就是一块黑板（用户 09-28 报「背景不透明」）。改成 `backgroundAlpha: 0`，并让「模型已加载」那条日志同时报画布 alpha 与页面底色，下回一眼能指认是谁的错。
 - **点击穿透没做**：人物轮廓之外仍占鼠标（窗口 256×301 一块）。方案里说要形状级穿透，
   实际做要全局取鼠标位置（窗口忽略事件之后自己也收不到 `pointermove`，会死循环），
   v1 先整窗可点。`display.pet` 里没放 `click_through` 开关，别放空开关。

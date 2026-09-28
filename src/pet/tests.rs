@@ -1,35 +1,77 @@
-//! 悬浮窗里不需要窗口就能验的那部分:页面内联、运行时状态读写。
+//! 悬浮窗里不需要窗口就能验的那部分:内嵌资源、注入脚本、模型清单补全、
+//! 运行时状态读写。
 //!
-//! 窗口本身(透明、置顶、拖动、IPC)要真跑起来看,不进这里——CI 上没有桌面
-//! 会话。
+//! 窗口本身(透明、置顶、拖动、协议、IPC)要真跑起来看,不进这里——CI 上没有
+//! 桌面会话。
 
-use crate::pet::{page, state};
+use crate::pet::{assets, model, state, window};
 
-/// 立绘必须真的内联进页面:漏了占位符就是一块空白窗,而这条只有跑起来才看得见。
+/// 页面、脚本、立绘要真的编译进来:页面没引到脚本、脚本没有 IPC 出口,
+/// 跑起来都是一块空白窗,而这条只有跑起来才看得见。
 #[test]
-fn the_page_carries_the_portrait_inline() {
-    let html = page::html(&crate::config::PetConfig::default());
+fn the_page_script_and_portrait_are_embedded() {
+    assert!(assets::PAGE.contains("./app.js"), "页面没引到脚本");
+    assert!(assets::SCRIPT.contains("window.ipc"), "脚本没有 IPC 出口");
+    assert!(assets::SCRIPT.contains("\"drag\""), "脚本发不出拖动指令");
     assert!(
-        !html.contains("__PORTRAIT_DATA_URI__"),
-        "页面里还留着立绘占位符,内联没发生"
+        assets::SCRIPT.contains("\"open_webui\""),
+        "脚本发不出打开 WebUI 的指令"
     );
-    assert!(html.contains("data:image/png;base64,"), "没有内联的立绘");
-    // 页面是这个进程唯一能渲染的东西,不能漏了窗口指令的出口。
-    assert!(html.contains("window.ipc"), "页面没有 IPC 出口");
-    assert!(html.contains("\"drag\""), "页面发不出拖动指令");
+    assert!(!assets::PORTRAIT.is_empty(), "立绘没内联");
+    assert!(
+        assets::PAGE_URL.starts_with("gqy-pet://"),
+        "页面地址不是我们自己的协议"
+    );
 }
 
-/// 配置状态要真的注进页面:右键菜单上的勾靠它,漏了就是永远不打勾。
+/// 注入脚本要带上模型地址与偏好:漏了页面就不知道去哪拿模型,菜单也永远不打勾。
 #[test]
-fn the_page_gets_the_pet_config_injected() {
-    let pet = crate::config::PetConfig {
-        scale: 1.4,
-        always_on_top: false,
-    };
-    let html = page::html(&pet);
-    assert!(!html.contains("__PET_STATE__"), "状态占位符没被替换");
-    assert!(html.contains("\"scale\":1.4"), "缩放没进页面");
-    assert!(html.contains("\"on_top\":false"), "置顶状态没进页面");
+fn the_bootstrap_script_carries_the_model_url_and_config() {
+    let script = window::pet_bootstrap(Some("gqy-pet://app/model/x.model3.json"), 1.4, false);
+    assert!(script.contains("x.model3.json"), "模型地址没进页面");
+    assert!(script.contains("\"scale\":1.4"), "缩放没进页面");
+    assert!(script.contains("\"on_top\":false"), "置顶状态没进页面");
+
+    let bare = window::pet_bootstrap(None, 1.0, true);
+    assert!(
+        bare.contains("\"model_url\":null"),
+        "没有模型时应当明确是 null"
+    );
+}
+
+/// 清单补全:VTS 导出的模型把动作与表情摊在目录里,而 model3.json 的
+/// Motions / Expressions 是空的——补不上,模型就是个不会动的立绘。
+#[test]
+fn motions_and_expressions_are_registered_from_disk() {
+    let dir = tempfile::tempdir().expect("temp dir");
+    write(
+        dir.path(),
+        "x.model3.json",
+        r#"{"Version":3,"FileReferences":{"Moc":"x.moc3","Textures":["t.png"]}}"#,
+    );
+    write(dir.path(), "x.moc3", "");
+    write(dir.path(), "motions/idle.motion3.json", "{}");
+    write(dir.path(), "EXP3/脸红.exp3.json", "{}");
+
+    let loaded = model::load(dir.path()).expect("load");
+    assert_eq!(loaded.motions, 1, "动作没被注册");
+    assert_eq!(loaded.expressions, 1, "表情没被注册");
+    assert!(loaded.manifest.contains("\"Idle\""), "待机组名应当是 Idle");
+    assert!(loaded.manifest.contains("脸红"), "表情名应当取文件名");
+
+    // 原文件一个字节都不该动。
+    let raw = std::fs::read_to_string(dir.path().join("x.model3.json")).expect("read");
+    assert!(!raw.contains("Motions"), "不该改写用户的 model3.json");
+}
+
+/// 目录里没有 model3.json、或它指向的 moc3 不在,都要明确失败——猜一个加载更糟。
+#[test]
+fn a_directory_without_a_manifest_is_rejected() {
+    let dir = tempfile::tempdir().expect("temp dir");
+    assert!(model::load(dir.path()).is_err(), "空目录应当报错");
+
+    write(dir.path(), "x.model3.json", r#"{"FileReferences":{}}"#);
+    assert!(model::load(dir.path()).is_err(), "没有 Moc 字段应当报错");
 }
 
 /// 位置存了就要读得回来——重启后「还在那儿」全靠这一对函数。
@@ -58,4 +100,12 @@ fn a_broken_state_file_falls_back_to_defaults() {
     };
     state::save(dir.path(), &half).expect("save");
     assert_eq!(state::load(dir.path()).position(), None);
+}
+
+fn write(root: &std::path::Path, relative: &str, contents: &str) {
+    let path = root.join(relative);
+    if let Some(parent) = path.parent() {
+        std::fs::create_dir_all(parent).expect("mkdir");
+    }
+    std::fs::write(path, contents).expect("write");
 }

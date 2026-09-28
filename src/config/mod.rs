@@ -606,6 +606,12 @@ pub struct PetConfig {
     /// 始终置顶。
     #[serde(default = "default_true")]
     pub always_on_top: bool,
+    /// Live2D 模型目录(里面有一份 `*.model3.json`)。留空 = 用内嵌的静态立绘。
+    ///
+    /// 模型是**用户资产**:不入仓库、不随发布包分发,就从这里指的磁盘路径读。
+    /// 清单里没登记的动作与表情会被补进来(见 `src/pet/model.rs`),不动原文件。
+    #[serde(default)]
+    pub model: Option<String>,
 }
 
 impl Default for PetConfig {
@@ -613,6 +619,7 @@ impl Default for PetConfig {
         Self {
             scale: default_pet_scale(),
             always_on_top: true,
+            model: None,
         }
     }
 }
