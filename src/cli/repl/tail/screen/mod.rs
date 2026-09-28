@@ -1165,6 +1165,18 @@ impl super::LiveReplTail {
                             .map(|screen| screen.view_row(row))
                             .and_then(|spans| super::screen::select::url_at(&spans, column))
                         {
+                            // `file://` 指的是本机上的一个路径：点它的人要的是那个路径
+                            // （粘进编辑器、终端、Finder），不是让桌面开一个什么都没有的
+                            // 东西。所以复制 + 提示，不走「交给桌面打开」那条路。
+                            if let Some(path) = super::screen::select::local_path_of(&url) {
+                                if let Some(screen) = &mut self.screen {
+                                    screen.pending_copy = Some(path);
+                                    screen.toast(crate::i18n::text("path copied", "路径已复制"));
+                                }
+                                self.repaint_screen()?;
+                                self.flush_clipboard()?;
+                                return Ok(true);
+                            }
                             let opened = super::screen::select::open_url(&url);
                             if let Some(screen) = &mut self.screen {
                                 screen.toast(if opened {

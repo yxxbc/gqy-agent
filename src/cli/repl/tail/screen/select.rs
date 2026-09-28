@@ -111,11 +111,18 @@ pub(in crate::cli) fn paint_expansion_bg(spans: Vec<AnsiSpan>, width: usize) -> 
     out
 }
 
+/// 这一串是不是能点的目标。
+///
+/// 协议表用渲染端那一份（`render::link::SCHEMES`，里面有 `file://`）：那边认得出
+/// 是链接、这边就得点得动。两处各写一份，迟早会长出「看着像链接、点了没反应」。
+fn is_link_target(text: &str) -> bool {
+    crate::render::scheme_len(text).is_some()
+}
+
 /// 点在哪个链接上。
 ///
 /// 全屏把鼠标捕获走了，终端自己那套"点链接"就失效了——链接看着是链接，点了
-/// 没反应。所以得自己认：按显示宽度走到点击那一列，看它落在哪个 `http(s)://`
-/// 串里。
+/// 没反应。所以得自己认：按显示宽度走到点击那一列，看它落在哪个链接串里。
 ///
 /// 认的是**文本**而不是 OSC 8 的目标：缓冲里一格只存一个字符和样式，没地方
 /// 挂链接；而正文里的裸链接（工具输出、日志）本来就没有 OSC 8，按文本认反而
@@ -129,7 +136,7 @@ pub(in crate::cli) fn url_at(spans: &[AnsiSpan], column: u16) -> Option<String> 
         let span_width: usize = span.text.chars().map(char_columns).sum();
         if target < width + span_width {
             if let Some(link) = &span.link {
-                if link.starts_with("http://") || link.starts_with("https://") {
+                if is_link_target(link) {
                     return Some(link.clone());
                 }
             }
@@ -164,7 +171,36 @@ pub(in crate::cli) fn url_at(spans: &[AnsiSpan], column: u16) -> Option<String> 
         .find(|(_, ch)| boundary(*ch))
         .map_or(text.len(), |(index, _)| hit + index);
     let token = text[start..end].trim_end_matches(['.', ',', '，', '。', ';', '；', ':', '：']);
-    (token.starts_with("http://") || token.starts_with("https://")).then(|| token.to_string())
+    is_link_target(token).then(|| token.to_string())
+}
+
+/// `file://` 协议头。写成常量是因为 `local_path_of` 要先按字节比出它、再按它的
+/// 长度切掉。
+const FILE_SCHEME: &str = "file://";
+
+/// `file://` 链接 → 本地路径。不是 `file://`、或者地址里带着主机
+/// （`file://server/share`，落不到本机）就返回 `None`。
+///
+/// 路径里的空格、中文在地址里是 `%20` / `%E4%B8%AD`，进剪贴板的该是路径本身，
+/// 所以这里解回来；`#L3`、`?q=1` 这类 URL 尾巴不属于路径，一并切掉。
+pub(in crate::cli) fn local_path_of(url: &str) -> Option<String> {
+    // 大小写都收：认不认链接由 `render::link::SCHEMES` 定，那边是不分大小写的。
+    let head = url.as_bytes().get(..FILE_SCHEME.len())?;
+    if !head.eq_ignore_ascii_case(FILE_SCHEME.as_bytes()) {
+        return None;
+    }
+    let rest = &url[FILE_SCHEME.len()..];
+    // `file://localhost/Users/x` 是同一台机器的另一种写法。
+    let rest = rest.strip_prefix("localhost").unwrap_or(rest);
+    if !rest.starts_with('/') {
+        return None;
+    }
+    let rest = rest.split(['#', '?']).next().unwrap_or(rest);
+    Some(
+        urlencoding::decode(rest)
+            .map(|decoded| decoded.into_owned())
+            .unwrap_or_else(|_| rest.to_string()),
+    )
 }
 
 /// 本平台「交给桌面打开」的命令。以前写死 `xdg-open`,macOS 上没有这个
@@ -224,6 +260,48 @@ mod opener_tests {
         };
         assert_eq!(program, expected);
         assert_eq!(args.last().map(String::as_str), Some(url));
+    }
+}
+
+#[cfg(test)]
+mod local_path_tests {
+    use super::local_path_of;
+
+    /// 点 `file://` 链接是为了把**路径**拿进剪贴板，所以进剪贴板的必须是路径本身：
+    /// 百分号编码要解开，URL 的尾巴（行号、查询串）不算路径。
+    #[test]
+    fn file_urls_become_local_paths() {
+        assert_eq!(
+            local_path_of("file:///Users/mac/My%20Notes/%E7%AC%94%E8%AE%B0.md").as_deref(),
+            Some("/Users/mac/My Notes/笔记.md"),
+            "百分号编码没解回路径"
+        );
+        assert_eq!(
+            local_path_of("file:///tmp/x.md#L3").as_deref(),
+            Some("/tmp/x.md"),
+            "行号尾巴留在了路径里"
+        );
+        assert_eq!(
+            local_path_of("file:///tmp/x.md?raw=1").as_deref(),
+            Some("/tmp/x.md"),
+            "查询串留在了路径里"
+        );
+        // `localhost` 和空主机是同一台机器；大小写不敏感（协议表就是不敏感的）。
+        assert_eq!(
+            local_path_of("file://localhost/tmp/x").as_deref(),
+            Some("/tmp/x")
+        );
+        assert_eq!(local_path_of("FILE:///tmp/x").as_deref(), Some("/tmp/x"));
+    }
+
+    /// 落不到本机的、以及根本不是 `file://` 的，都不算本地路径——调用方据此退回
+    /// 「交给桌面打开」那条路。
+    #[test]
+    fn non_local_targets_have_no_path() {
+        assert!(local_path_of("file://server/share/x").is_none());
+        assert!(local_path_of("file://").is_none());
+        assert!(local_path_of("https://example.com/x").is_none());
+        assert!(local_path_of("/tmp/plain").is_none());
     }
 }
 

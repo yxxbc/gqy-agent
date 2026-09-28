@@ -418,6 +418,27 @@ fn clicking_a_link_finds_its_target() {
         "OSC 8 的目标丢了: {:?}",
         spans_text(&row)
     );
+
+    // `file://` 同样是链接：点了是**复制本地路径**，不是开浏览器（转换见
+    // `select::local_path_of`）。认不出来就谈不上点得动。
+    let spans = parse_ansi_line("  路径 file:///Users/mac/notes.md");
+    assert_eq!(
+        url_at(&spans, 8).as_deref(),
+        Some("file:///Users/mac/notes.md"),
+        "正文里的 file:// 没认出来"
+    );
+
+    // markdown 的 file:// 链接在屏幕上只露标题，目标同样藏在 OSC 8 里。
+    let mut screen = Screen::detached(80, 24);
+    screen
+        .feed_for_test(b"\x1b]8;;file:///tmp/notes.md\x07\xe7\xac\x94\xe8\xae\xb0\x1b]8;;\x07\r\n");
+    let row = screen.view_row(0);
+    assert_eq!(
+        url_at(&row, 1).as_deref(),
+        Some("file:///tmp/notes.md"),
+        "OSC 8 里的 file:// 目标丢了: {:?}",
+        spans_text(&row)
+    );
 }
 
 /// 后台面板里的时间线：一次工具调用只占**一步**。
